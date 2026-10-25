@@ -1,0 +1,4 @@
+# Usage: make -f Makefile.macos setup; make -f Makefile.macos all
+include Makefile
+.PHONY: all
+all: test package-macos verify-package

@@ -1,0 +1,1374 @@
+{
+  "source_hashes": {
+    "UI.py": "d69ed30df01ba13dd8a75b59a9724e8ee02fb52bf07861102b816813dd7ff4d6",
+    "rocket.py": "c19c2e4d2d6a7fd28da2592a200d2de70e622756fc5a464a4c23e5570c4aedfe",
+    "pointer.py": "828501a344460e2a8e856167331d3d9d1b95ad71a2d73f2df23d1a8ad6e78ae5"
+  },
+  "commands": [
+    {
+      "command": "advance_state",
+      "value": 1,
+      "hex": "aa000000000000000000000001020003"
+    },
+    {
+      "command": "advance_state",
+      "value": 2,
+      "hex": "aa000000000000000000000002020004"
+    },
+    {
+      "command": "advance_state",
+      "value": 3,
+      "hex": "aa000000000000000000000003020005"
+    },
+    {
+      "command": "advance_state",
+      "value": 4,
+      "hex": "aa000000000000000000000004020006"
+    },
+    {
+      "command": "advance_state",
+      "value": 5,
+      "hex": "aa000000000000000000000005020007"
+    },
+    {
+      "command": "advance_state",
+      "value": 6,
+      "hex": "aa000000000000000000000006020008"
+    },
+    {
+      "command": "set_vtx_power",
+      "value": 0,
+      "hex": "aa000000000000000000000000140014"
+    },
+    {
+      "command": "set_vtx_power",
+      "value": 1,
+      "hex": "aa000000000000000000000001140015"
+    },
+    {
+      "command": "set_vtx_power",
+      "value": 2,
+      "hex": "aa000000000000000000000002140016"
+    },
+    {
+      "command": "set_vtx_power",
+      "value": 3,
+      "hex": "aa000000000000000000000003140017"
+    },
+    {
+      "command": "set_roll_control_servo_angle",
+      "value": -50.5,
+      "hex": "aa000000000000000000004ac2050111"
+    },
+    {
+      "command": "set_roll_control_servo_angle",
+      "value": 0,
+      "hex": "aa000000000000000000000000050005"
+    },
+    {
+      "command": "set_roll_control_servo_angle",
+      "value": 24.25,
+      "hex": "aa00000000000000000000c241050108"
+    },
+    {
+      "command": "set_roll_control_servo_angle",
+      "value": 1.234567,
+      "hex": "aa00000000000000004b069e3f050133"
+    },
+    {
+      "command": "set_airbrakes_angle",
+      "value": -12.5,
+      "hex": "aa0000000000000000000048c103010c"
+    },
+    {
+      "command": "set_airbrakes_angle",
+      "value": 0,
+      "hex": "aa000000000000000000000000030003"
+    },
+    {
+      "command": "set_airbrakes_angle",
+      "value": 60,
+      "hex": "aa0000000000000000000070420300b5"
+    },
+    {
+      "command": "set_airbrakes_angle",
+      "value": 1.234567,
+      "hex": "aa00000000000000004b069e3f030131"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "hex": "aa000000000000000000000000150015"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "hex": "aa000000000000000000000001150016"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        true,
+        false,
+        false,
+        false,
+        false
+      ],
+      "hex": "aa000000000000000000000002150017"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        true,
+        false,
+        false,
+        false,
+        false
+      ],
+      "hex": "aa000000000000000000000003150018"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        false,
+        true,
+        false,
+        false,
+        false
+      ],
+      "hex": "aa000000000000000000000004150019"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        false,
+        true,
+        false,
+        false,
+        false
+      ],
+      "hex": "aa00000000000000000000000515001a"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        true,
+        true,
+        false,
+        false,
+        false
+      ],
+      "hex": "aa00000000000000000000000615001b"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        true,
+        true,
+        false,
+        false,
+        false
+      ],
+      "hex": "aa00000000000000000000000715001c"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        false,
+        false,
+        true,
+        false,
+        false
+      ],
+      "hex": "aa00000000000000000000000815001d"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        false,
+        false,
+        true,
+        false,
+        false
+      ],
+      "hex": "aa00000000000000000000000915001e"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        true,
+        false,
+        true,
+        false,
+        false
+      ],
+      "hex": "aa00000000000000000000000a15001f"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        true,
+        false,
+        true,
+        false,
+        false
+      ],
+      "hex": "aa00000000000000000000000b150020"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        false,
+        true,
+        true,
+        false,
+        false
+      ],
+      "hex": "aa00000000000000000000000c150021"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        false,
+        true,
+        true,
+        false,
+        false
+      ],
+      "hex": "aa00000000000000000000000d150022"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        true,
+        true,
+        true,
+        false,
+        false
+      ],
+      "hex": "aa00000000000000000000000e150023"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        true,
+        true,
+        true,
+        false,
+        false
+      ],
+      "hex": "aa00000000000000000000000f150024"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        false,
+        false,
+        false,
+        true,
+        false
+      ],
+      "hex": "aa000000000000000000000010150025"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        false,
+        false,
+        false,
+        true,
+        false
+      ],
+      "hex": "aa000000000000000000000011150026"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        true,
+        false,
+        false,
+        true,
+        false
+      ],
+      "hex": "aa000000000000000000000012150027"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        true,
+        false,
+        false,
+        true,
+        false
+      ],
+      "hex": "aa000000000000000000000013150028"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        false,
+        true,
+        false,
+        true,
+        false
+      ],
+      "hex": "aa000000000000000000000014150029"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        false,
+        true,
+        false,
+        true,
+        false
+      ],
+      "hex": "aa00000000000000000000001515002a"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        true,
+        true,
+        false,
+        true,
+        false
+      ],
+      "hex": "aa00000000000000000000001615002b"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        true,
+        true,
+        false,
+        true,
+        false
+      ],
+      "hex": "aa00000000000000000000001715002c"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        false,
+        false,
+        true,
+        true,
+        false
+      ],
+      "hex": "aa00000000000000000000001815002d"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        false,
+        false,
+        true,
+        true,
+        false
+      ],
+      "hex": "aa00000000000000000000001915002e"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        true,
+        false,
+        true,
+        true,
+        false
+      ],
+      "hex": "aa00000000000000000000001a15002f"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        true,
+        false,
+        true,
+        true,
+        false
+      ],
+      "hex": "aa00000000000000000000001b150030"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        false,
+        true,
+        true,
+        true,
+        false
+      ],
+      "hex": "aa00000000000000000000001c150031"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        false,
+        true,
+        true,
+        true,
+        false
+      ],
+      "hex": "aa00000000000000000000001d150032"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        true,
+        true,
+        true,
+        true,
+        false
+      ],
+      "hex": "aa00000000000000000000001e150033"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        false
+      ],
+      "hex": "aa00000000000000000000001f150034"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+      ],
+      "hex": "aa000000000000000000000020150035"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        false,
+        false,
+        false,
+        false,
+        true
+      ],
+      "hex": "aa000000000000000000000021150036"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        true,
+        false,
+        false,
+        false,
+        true
+      ],
+      "hex": "aa000000000000000000000022150037"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        true,
+        false,
+        false,
+        false,
+        true
+      ],
+      "hex": "aa000000000000000000000023150038"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        false,
+        true,
+        false,
+        false,
+        true
+      ],
+      "hex": "aa000000000000000000000024150039"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        false,
+        true,
+        false,
+        false,
+        true
+      ],
+      "hex": "aa00000000000000000000002515003a"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        true,
+        true,
+        false,
+        false,
+        true
+      ],
+      "hex": "aa00000000000000000000002615003b"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        true,
+        true,
+        false,
+        false,
+        true
+      ],
+      "hex": "aa00000000000000000000002715003c"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        false,
+        false,
+        true,
+        false,
+        true
+      ],
+      "hex": "aa00000000000000000000002815003d"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        false,
+        false,
+        true,
+        false,
+        true
+      ],
+      "hex": "aa00000000000000000000002915003e"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        true,
+        false,
+        true,
+        false,
+        true
+      ],
+      "hex": "aa00000000000000000000002a15003f"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        true,
+        false,
+        true,
+        false,
+        true
+      ],
+      "hex": "aa00000000000000000000002b150040"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        false,
+        true,
+        true,
+        false,
+        true
+      ],
+      "hex": "aa00000000000000000000002c150041"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        false,
+        true,
+        true,
+        false,
+        true
+      ],
+      "hex": "aa00000000000000000000002d150042"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        true,
+        true,
+        true,
+        false,
+        true
+      ],
+      "hex": "aa00000000000000000000002e150043"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        true,
+        true,
+        true,
+        false,
+        true
+      ],
+      "hex": "aa00000000000000000000002f150044"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        false,
+        false,
+        false,
+        true,
+        true
+      ],
+      "hex": "aa000000000000000000000030150045"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        false,
+        false,
+        false,
+        true,
+        true
+      ],
+      "hex": "aa000000000000000000000031150046"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        true,
+        false,
+        false,
+        true,
+        true
+      ],
+      "hex": "aa000000000000000000000032150047"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        true,
+        false,
+        false,
+        true,
+        true
+      ],
+      "hex": "aa000000000000000000000033150048"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        false,
+        true,
+        false,
+        true,
+        true
+      ],
+      "hex": "aa000000000000000000000034150049"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        false,
+        true,
+        false,
+        true,
+        true
+      ],
+      "hex": "aa00000000000000000000003515004a"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        true,
+        true,
+        false,
+        true,
+        true
+      ],
+      "hex": "aa00000000000000000000003615004b"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        true,
+        true,
+        false,
+        true,
+        true
+      ],
+      "hex": "aa00000000000000000000003715004c"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        false,
+        false,
+        true,
+        true,
+        true
+      ],
+      "hex": "aa00000000000000000000003815004d"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        false,
+        false,
+        true,
+        true,
+        true
+      ],
+      "hex": "aa00000000000000000000003915004e"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        true,
+        false,
+        true,
+        true,
+        true
+      ],
+      "hex": "aa00000000000000000000003a15004f"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        true,
+        false,
+        true,
+        true,
+        true
+      ],
+      "hex": "aa00000000000000000000003b150050"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        false,
+        true,
+        true,
+        true,
+        true
+      ],
+      "hex": "aa00000000000000000000003c150051"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        false,
+        true,
+        true,
+        true,
+        true
+      ],
+      "hex": "aa00000000000000000000003d150052"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        false,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "hex": "aa00000000000000000000003e150053"
+    },
+    {
+      "command": "update_converters",
+      "value": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "hex": "aa00000000000000000000003f150054"
+    },
+    {
+      "command": "bmsprotections",
+      "value": 0,
+      "hex": "aa000000000000000000000000160016"
+    },
+    {
+      "command": "bmsprotections",
+      "value": 1,
+      "hex": "aa000000000000000000000001160017"
+    },
+    {
+      "command": "arm_pyros",
+      "value": [
+        0
+      ],
+      "hex": "aa000000000000000000000001010002"
+    },
+    {
+      "command": "arm_pyros",
+      "value": [
+        1
+      ],
+      "hex": "aa000000000000000000000002010003"
+    },
+    {
+      "command": "arm_pyros",
+      "value": [
+        2
+      ],
+      "hex": "aa000000000000000000000004010005"
+    },
+    {
+      "command": "arm_pyros",
+      "value": [
+        3
+      ],
+      "hex": "aa000000000000000000000008010009"
+    },
+    {
+      "command": "arm_pyros",
+      "value": [
+        4
+      ],
+      "hex": "aa000000000000000000000010010011"
+    },
+    {
+      "command": "arm_pyros",
+      "value": [
+        5
+      ],
+      "hex": "aa000000000000000000000020010021"
+    },
+    {
+      "command": "arm_pyros",
+      "value": [
+        0,
+        2,
+        5
+      ],
+      "hex": "aa000000000000000000000025010026"
+    },
+    {
+      "command": "arm_pyros",
+      "value": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "hex": "aa00000000000000000000003f010040"
+    },
+    {
+      "command": "fire_pyros",
+      "value": [
+        0
+      ],
+      "hex": "aa000000000000000000000001060007"
+    },
+    {
+      "command": "fire_pyros",
+      "value": [
+        1
+      ],
+      "hex": "aa000000000000000000000002060008"
+    },
+    {
+      "command": "fire_pyros",
+      "value": [
+        2
+      ],
+      "hex": "aa00000000000000000000000406000a"
+    },
+    {
+      "command": "fire_pyros",
+      "value": [
+        3
+      ],
+      "hex": "aa00000000000000000000000806000e"
+    },
+    {
+      "command": "fire_pyros",
+      "value": [
+        4
+      ],
+      "hex": "aa000000000000000000000010060016"
+    },
+    {
+      "command": "fire_pyros",
+      "value": [
+        5
+      ],
+      "hex": "aa000000000000000000000020060026"
+    },
+    {
+      "command": "fire_pyros",
+      "value": [
+        0,
+        2,
+        5
+      ],
+      "hex": "aa00000000000000000000002506002b"
+    },
+    {
+      "command": "fire_pyros",
+      "value": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "hex": "aa00000000000000000000003f060045"
+    },
+    {
+      "command": "disarm_pyros",
+      "value": [
+        0
+      ],
+      "hex": "aa000000000000000000000001070008"
+    },
+    {
+      "command": "disarm_pyros",
+      "value": [
+        1
+      ],
+      "hex": "aa000000000000000000000002070009"
+    },
+    {
+      "command": "disarm_pyros",
+      "value": [
+        2
+      ],
+      "hex": "aa00000000000000000000000407000b"
+    },
+    {
+      "command": "disarm_pyros",
+      "value": [
+        3
+      ],
+      "hex": "aa00000000000000000000000807000f"
+    },
+    {
+      "command": "disarm_pyros",
+      "value": [
+        4
+      ],
+      "hex": "aa000000000000000000000010070017"
+    },
+    {
+      "command": "disarm_pyros",
+      "value": [
+        5
+      ],
+      "hex": "aa000000000000000000000020070027"
+    },
+    {
+      "command": "disarm_pyros",
+      "value": [
+        0,
+        2,
+        5
+      ],
+      "hex": "aa00000000000000000000002507002c"
+    },
+    {
+      "command": "disarm_pyros",
+      "value": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "hex": "aa00000000000000000000003f070046"
+    },
+    {
+      "command": "zero_servos",
+      "value": null,
+      "hex": "aa000000000000000000000000080008"
+    },
+    {
+      "command": "zero_pitchYawRoll",
+      "value": null,
+      "hex": "aa000000000000000000000000090009"
+    },
+    {
+      "command": "zero_roll",
+      "value": null,
+      "hex": "aa000000000000000000000000090009"
+    },
+    {
+      "command": "zero_alt",
+      "value": null,
+      "hex": "aa0000000000000000000000000a000a"
+    },
+    {
+      "command": "zero_velo",
+      "value": null,
+      "hex": "aa0000000000000000000000000b000b"
+    },
+    {
+      "command": "pd_activate",
+      "value": null,
+      "hex": "aa000000000000000000000000040004"
+    },
+    {
+      "command": "EMERG_DEPLOY_PISTON",
+      "value": null,
+      "hex": "aa000000000000000000000000100010"
+    },
+    {
+      "command": "EMERG_DEPLOY_BP_WELLS",
+      "value": null,
+      "hex": "aa000000000000000000000000110011"
+    },
+    {
+      "command": "EMERG_DEPLOY_TD",
+      "value": null,
+      "hex": "aa000000000000000000000000120012"
+    },
+    {
+      "command": "EMERG_DEPLOY_ALL",
+      "value": null,
+      "hex": "aa000000000000000000000000130013"
+    }
+  ],
+  "pointer_commands": [
+    {
+      "command": "send_angles",
+      "angles": [
+        90,
+        45
+      ],
+      "hex": "aa000000b442000034426c"
+    },
+    {
+      "command": "send_angles",
+      "angles": [
+        -90.5,
+        91.25
+      ],
+      "hex": "aa000000b5c20080b642ef"
+    },
+    {
+      "command": "send_angles",
+      "angles": [
+        720,
+        -135
+      ],
+      "hex": "aa0000003444000007c342"
+    },
+    {
+      "command": "up",
+      "angles": null,
+      "hex": "aa01000000000000000001"
+    },
+    {
+      "command": "down",
+      "angles": null,
+      "hex": "aa02000000000000000002"
+    },
+    {
+      "command": "left",
+      "angles": null,
+      "hex": "aa03000000000000000003"
+    },
+    {
+      "command": "right",
+      "angles": null,
+      "hex": "aa04000000000000000004"
+    },
+    {
+      "command": "zero",
+      "angles": null,
+      "hex": "aa05000000000000000005"
+    }
+  ],
+  "pointing": [
+    {
+      "origin": [
+        42.36037,
+        -71.09355,
+        52.3
+      ],
+      "target": [
+        42.366,
+        -71.091,
+        803.5
+      ],
+      "angles": [
+        18.5661618135017,
+        50.60730219362794
+      ]
+    },
+    {
+      "origin": [
+        -33.91234,
+        151.23456,
+        -10
+      ],
+      "target": [
+        -33.95,
+        151.2,
+        200
+      ],
+      "angles": [
+        217.40429865470398,
+        2.1540844245806423
+      ]
+    },
+    {
+      "origin": [
+        0.12345,
+        179.99999,
+        10
+      ],
+      "target": [
+        0.124,
+        -179.98,
+        300
+      ],
+      "angles": [
+        88.43605884062931,
+        7.657445156193721
+      ]
+    }
+  ],
+  "csv_fields": [
+    "timestamp",
+    "pyros",
+    "servos",
+    "servos_deg",
+    "accelerometer",
+    "barofilteredalt",
+    "temp",
+    "gyro",
+    "gps_fix",
+    "lat",
+    "lon",
+    "gpsalt",
+    "gps_horiz_prec",
+    "gps_vert_prec",
+    "gps_num_sat",
+    "flight_time",
+    "yaw_gyro_int",
+    "pitch_gyro_int",
+    "roll_gyro_int",
+    "state",
+    "pktnum",
+    "rssi",
+    "armed_pyros",
+    "fired_pyros",
+    "badpackets",
+    "rxrssi",
+    "accel_integrated_velo",
+    "baro_max_alt",
+    "gps_max_alt",
+    "pyro_resistances",
+    "cell_voltages",
+    "total_current",
+    "converter_voltages",
+    "converter_currents",
+    "bms_protections_enabled",
+    "bms_protection_status",
+    "bms_temp",
+    "enabled_status",
+    "angleFromVertical",
+    "gnd_lat",
+    "gnd_lon",
+    "gnd_fix",
+    "gnd_alt"
+  ],
+  "telemetry": [
+    {
+      "hex": "abab4e0e290a010a1964c8ffdd157db3146f40e201337efe003200470116ff96000352a43f198708a0d500a0d743d2040000290900000bb27572d2809200e0d743030000a03f000020c000000242dc05400640e201004101e9cd0eaa0d1b102efb3d45ca53070e08350c111282145c44640038ff2c0190010cfe580200004cc10094ed0393a43f190504a0d5c7cfffff",
+      "rejected": false,
+      "values": {
+        "timestamp": "1789930056.241249",
+        "pyros": "[2, 3, 0, 1, 2, 3]",
+        "servos": "[1501, 2001, 1203, 1777]",
+        "servos_deg": "[np.float64(0.12), np.float64(60.12), np.float64(-29.7), np.float64(27.7)]",
+        "accelerometer": "[94.58513924999998, -75.66826462890624, 9.80665]",
+        "barofilteredalt": "431.75",
+        "temp": "21.379964475631713",
+        "gyro": "[9.97924804524, 7.14111328008, 4.577636718]",
+        "gps_fix": "3",
+        "lat": "42.3601234",
+        "lon": "-71.0932345",
+        "gpsalt": "431.25",
+        "gps_horiz_prec": "1.234",
+        "gps_vert_prec": "2.345",
+        "gps_num_sat": "11",
+        "flight_time": "123456",
+        "yaw_gyro_int": "32.5",
+        "pitch_gyro_int": "-2.5",
+        "roll_gyro_int": "1.25",
+        "state": "state.POST_APOGEE",
+        "pktnum": "321",
+        "rssi": "-118",
+        "armed_pyros": "[1, 0, 0, 1, 0, 1, 0, 0]",
+        "fired_pyros": "[0, 1, 0, 1, 0, 0, 0, 0]",
+        "badpackets": "0",
+        "rxrssi": "-122",
+        "accel_integrated_velo": "-12.75",
+        "baro_max_alt": "1500",
+        "gps_max_alt": "1600",
+        "pyro_resistances": "[0.1, 1.0, 2.5, 10.0, 20.0, 25.5, 0, 0]",
+        "cell_voltages": "[3.789, 3.498, 4.123]",
+        "total_current": "1.234",
+        "converter_voltages": "[3.0, 3.2992000000000004, 5.0, 7.4, 8.4, 28.0]",
+        "converter_currents": "[0.0625, -0.125, 0.1875, 0.25, -0.3125, 0.375]",
+        "bms_protections_enabled": "202",
+        "bms_protection_status": "69",
+        "bms_temp": "30.5",
+        "enabled_status": "[np.True_, np.True_, np.True_, np.True_, np.True_, np.True_]",
+        "angleFromVertical": "32.58549938197662",
+        "gnd_lat": "42.36013",
+        "gnd_lon": "-71.09335",
+        "gnd_fix": "True",
+        "gnd_alt": "-12.34"
+      }
+    },
+    {
+      "hex": "abab4e0e290a010a1964c8ffdd157db3146f40e201337efe003200470116ff96000352a43f198708a0d500a0d743d2040000290900000bb27572d2809200e0d743030000a03f000020c000000242dc05400640e201004101e9cd0eaa0d1b102efb3d45ca53070e08350c111282145c44640038ff2c0190010cfe580200004cc10095ed0393a43f190504a0d5c7cfffff",
+      "rejected": true,
+      "values": {
+        "timestamp": "1789930056.241771",
+        "pyros": "[2, 3, 0, 1, 2, 3]",
+        "servos": "[1501, 2001, 1203, 1777]",
+        "servos_deg": "[0.12, 60.12, -29.7, 27.700000000000003]",
+        "accelerometer": "[94.58513924999998, -75.66826462890624, 9.80665]",
+        "barofilteredalt": "431.75",
+        "temp": "21.379964475631713",
+        "gyro": "[9.97924804524, 7.14111328008, 4.577636718]",
+        "gps_fix": "3",
+        "lat": "42.3601234",
+        "lon": "-71.0932345",
+        "gpsalt": "431.25",
+        "gps_horiz_prec": "1.234",
+        "gps_vert_prec": "2.345",
+        "gps_num_sat": "11",
+        "flight_time": "123456",
+        "yaw_gyro_int": "32.5",
+        "pitch_gyro_int": "-2.5",
+        "roll_gyro_int": "1.25",
+        "state": "state.POST_APOGEE",
+        "pktnum": "321",
+        "rssi": "-118",
+        "armed_pyros": "[1, 0, 0, 1, 0, 1]",
+        "fired_pyros": "[0, 1, 0, 1, 0, 0]",
+        "badpackets": "0",
+        "rxrssi": "-122",
+        "accel_integrated_velo": "-12.75",
+        "baro_max_alt": "1600",
+        "gps_max_alt": "1500",
+        "pyro_resistances": "[0.1, 1.0, 2.5, 10.0, 20.0, 25.5]",
+        "cell_voltages": "[3.789, 3.498, 4.123]",
+        "total_current": "1.234",
+        "converter_voltages": "[3.0, 3.2992000000000004, 5.0, 7.4, 8.4, 28.0]",
+        "converter_currents": "[0.0625, -0.125, 0.1875, 0.25, -0.3125, 0.375]",
+        "bms_protections_enabled": "202",
+        "bms_protection_status": "69",
+        "bms_temp": "30.5",
+        "enabled_status": "[np.True_, np.True_, np.True_, np.True_, np.True_, np.True_]",
+        "angleFromVertical": "32.58549938197662",
+        "gnd_lat": "42.36013",
+        "gnd_lon": "-71.09335",
+        "gnd_fix": "False",
+        "gnd_alt": "-12.34"
+      }
+    }
+  ],
+  "shortcuts": [
+    "Ctrl+R",
+    "Ctrl+Alt+C",
+    "Shift+Ctrl+Alt+C",
+    "Ctrl+Return",
+    "Ctrl+L",
+    "Ctrl+Up",
+    "Ctrl+Down",
+    "Ctrl+Right",
+    "Ctrl+Left",
+    "Ctrl+0"
+  ]
+}

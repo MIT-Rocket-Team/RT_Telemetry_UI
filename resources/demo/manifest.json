@@ -1,0 +1,29 @@
+{
+  "GS1": {
+    "file": "ZEPH_TEST_FLIGHT_GS1.csv.gz",
+    "source_filename": "ZEPH_TEST_FLIGHT_GS1.csv",
+    "sha256": "2417e0b5664a5ed559ba31e4861ec527e7e2fba6ad752c289dcde9b9d02a7512",
+    "rows": 4366,
+    "duration_s": 274.0556070804596,
+    "launch_timestamp": 1775933260.0170963,
+    "flight_zero": 747.766
+  },
+  "GS2": {
+    "file": "ZEPH_TEST_FLIGHT_GS2.csv.gz",
+    "source_filename": "ZEPH_TEST_FLIGHT_GS2.csv",
+    "sha256": "528df6e7bd5235b5198dce8ac4380f04788c257e5d86f25222118e96a76fc398",
+    "rows": 5464,
+    "duration_s": 330.23369812965393,
+    "launch_timestamp": 1775933255.5430558,
+    "flight_zero": 747.766
+  },
+  "GS3": {
+    "file": "ZEPH_TEST_FLIGHT_GS3.csv.gz",
+    "source_filename": "ZEPH_TEST_FLIGHT_GS3.csv",
+    "sha256": "d4765ef36ee810dc2948a8a96fe7bb899a7ebe544bb2a2a23da113edd5987968",
+    "rows": 4939,
+    "duration_s": 332.72527527809143,
+    "launch_timestamp": 1775933258.1304846,
+    "flight_zero": 747.766
+  }
+}

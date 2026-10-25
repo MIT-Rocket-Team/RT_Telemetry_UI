@@ -1,0 +1,4 @@
+# Run with GNU Make on Windows. PowerShell alternatives are documented in docs/BUILD.md.
+include Makefile
+.PHONY: all
+all: test package-windows verify-package

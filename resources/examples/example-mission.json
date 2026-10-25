@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "name": "Example mission \u00b7 configure actual site and mount",
+  "latitude": 0.0,
+  "longitude": 0.0,
+  "altitude": 0.0,
+  "altitude_msl": 0.0,
+  "site_configured": false,
+  "legacy_altitude": "unknown",
+  "canard_count": 4,
+  "pointer_latitude": 0.0,
+  "pointer_longitude": 0.0,
+  "pointer_altitude": 0.0,
+  "pointer_calibrated": false,
+  "pointer_az_offset": 0.0,
+  "pointer_el_offset": 0.0,
+  "pointer_el_min": 0.0,
+  "pointer_el_max": 80.0,
+  "pointer_az_min": 0.0,
+  "pointer_az_max": 359.0,
+  "pointer_full_rotation": false,
+  "freshness": 2.0,
+  "video_offset": 0.0,
+  "wind": [
+    {
+      "height": 0.0,
+      "east": 0.0,
+      "north": 0.0
+    }
+  ],
+  "wind_source": "Manual \u00b7 calm",
+  "weather_raw": {},
+  "model": "",
+  "motor_files": [],
+  "simulation_index": 0,
+  "rail_length": 2.0,
+  "rail_tilt": 0.0,
+  "rail_heading": 0.0,
+  "seed": 42,
+  "low_battery": 9.0
+}
