@@ -321,6 +321,9 @@ def package(target, engine="", release=""):
         [imageio_ffmpeg.get_ffmpeg_exe(), "-version"], capture_output=True, text=True, check=True
     )
     (VENDOR / "ffmpeg-build.txt").write_text(ffinfo.stdout + ffinfo.stderr)
+    # Concurrent native builds must not clear each other's shared PyInstaller cache.
+    packager_environment = dict(os.environ)
+    packager_environment.setdefault("PYINSTALLER_CONFIG_DIR", str(ROOT / "build" / "pyinstaller-cache"))
     run(
         sys.executable,
         "-m",
@@ -328,6 +331,7 @@ def package(target, engine="", release=""):
         "--noconfirm",
         "--clean",
         ROOT / "packaging" / "RocketGNCMonitor.spec",
+        env=packager_environment,
     )
     dist = ROOT / "dist"
     label = process_architecture() if platform.system() == "Windows" else platform.machine()

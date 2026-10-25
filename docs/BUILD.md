@@ -11,6 +11,8 @@ Run commands from the repository root. The application remains `RocketGNCMonitor
 
 PyInstaller builds on the target operating system. Build Apple Silicon and Intel Mac payloads in separate architecture-specific environments; Intel builds can run through Rosetta on Apple Silicon. Windows x64 can build/run through x64 emulation in Windows ARM. Never copy `.venv` or `vendor/java` between operating systems or architectures.
 
+Each checkout keeps its PyInstaller cache under `build/pyinstaller-cache`, so simultaneous native builds in separate working folders cannot erase each other's cached binaries. An explicit `PYINSTALLER_CONFIG_DIR` overrides this default; use a different directory for each concurrent build.
+
 ## Prepare and run
 
 ```sh
