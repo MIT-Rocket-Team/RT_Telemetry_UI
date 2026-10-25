@@ -145,7 +145,7 @@ def test_telemetry_station_board_inventory_and_iris_placeholders(qtbot, tmp_path
         if not switches:
             assert w.iris_links is None
         else:
-            assert w.iris_links.isVisible()
+            assert w.iris_links.isVisible() is (not w.main_base)
             assert set(w.iris_links.selectors) == switches
             assert not any(button.isEnabled() for button in w.iris_links.buttons.values())
             assert all('Placeholder' in label.text() or 'PLACEHOLDER' in label.text()

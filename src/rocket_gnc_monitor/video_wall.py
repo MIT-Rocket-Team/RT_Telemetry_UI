@@ -21,7 +21,8 @@ from .widgets import COLORS
 
 AWAY_STATIONS = ("away1", "away2", "away3", "away4")
 LOCAL_DIGITAL = ("local", "digital")
-STALE_SECONDS = 5.0
+STALE_SECONDS = 2.0
+UNAVAILABLE_SECONDS = 5.0
 
 
 class VideoImage(QWidget):
@@ -31,6 +32,7 @@ class VideoImage(QWidget):
         super().__init__(parent)
         self._pixmap = QPixmap()
         self.placeholder = "Awaiting station link"
+        self.overlay = ""
         self.setMinimumSize(40, 30)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
 
@@ -63,6 +65,12 @@ class VideoImage(QWidget):
         else:
             painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
             painter.drawPixmap(self.frame_rect(), self._pixmap, QRectF(self._pixmap.rect()))
+        if self.overlay and not self._pixmap.isNull():
+            rect = self.rect().adjusted(0, self.height() // 3, 0, -self.height() // 3)
+            painter.fillRect(rect, Qt.GlobalColor.black)
+            painter.setPen(Qt.GlobalColor.white)
+            painter.drawText(rect.adjusted(8, 4, -8, -4),
+                             Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap, self.overlay)
 
     def resizeEvent(self, event):
         self.update()
@@ -139,6 +147,7 @@ class Feed:
     quality: str = ""
     available: bool = False
     reason: str = "Awaiting station link"
+    epoch: str | None = None
 
 
 class VideoWall(QWidget):
@@ -149,6 +158,8 @@ class VideoWall(QWidget):
     matching main channel and never removes the source from the thumbnail grid.
     """
 
+    source_requested = Signal(str, str)
+
     def __init__(self, profile, local_controls=None, parent=None):
         super().__init__(parent)
         if profile.station != "base":
@@ -157,6 +168,7 @@ class VideoWall(QWidget):
         if profile.vehicle not in ("iris", "balius") or tuple(profile.channels) != expected:
             raise ValueError("Unsupported vehicle or video channels")
         self.profile = profile
+        self.external_selection = False
         self.channels = tuple(profile.channels)
         self.channel_labels = dict(profile.channel_labels)
         if any(not isinstance(self.channel_labels.get(channel), str) for channel in self.channels):
@@ -267,7 +279,7 @@ class VideoWall(QWidget):
         self.feeds[LOCAL_DIGITAL] = Feed(reason=str(text) or "Awaiting local USB camera")
         self._refresh_feed(LOCAL_DIGITAL)
 
-    def update_remote_frame(self, station, channel, pixmap, quality="", received=None):
+    def update_remote_frame(self, station, channel, pixmap, quality="", received=None, *, epoch=None):
         key = self._remote_key(station, channel)
         now = time.monotonic()
         stamp = now if received is None else received
@@ -276,7 +288,7 @@ class VideoWall(QWidget):
             raise ValueError("Frame reception time must use the local monotonic clock")
         if not isinstance(quality, str):
             raise ValueError("Link quality must be text")
-        self.feeds[key] = Feed(self._frame(pixmap), float(stamp), quality.strip(), True, "")
+        self.feeds[key] = Feed(self._frame(pixmap), float(stamp), quality.strip(), True, "", epoch)
         self._refresh_feed(key)
 
     def mark_remote_unavailable(self, station, channel, reason="Station link unavailable"):
@@ -288,12 +300,20 @@ class VideoWall(QWidget):
 
     def select_remote(self, station, channel):
         key = self._remote_key(station, channel)
+        if self.external_selection:
+            self.source_requested.emit(station, channel)
+            return
+        self.commit_remote(*key)
+
+    def commit_remote(self, station, channel):
+        key = self._remote_key(station, channel)
         self.selected_sources[channel] = key
         self._refresh_selection(channel)
 
     def select_local_digital(self):
         self.selected_sources["digital"] = LOCAL_DIGITAL
         self._refresh_selection("digital")
+        self.source_requested.emit("local", "digital")
 
     def _status(self, key):
         feed = self.feeds[key]
@@ -304,7 +324,9 @@ class VideoWall(QWidget):
         if key == LOCAL_DIGITAL and not self.local_source_live:
             return self.local_source_label
         age = max(0.0, time.monotonic() - feed.received)
-        if age > STALE_SECONDS:
+        if age >= UNAVAILABLE_SECONDS:
+            state = f"UNAVAILABLE · {age:.1f}s since last frame"
+        elif age >= STALE_SECONDS:
             state = f"STALE · {age:.1f}s since last frame"
         else:
             state = "LIVE" if key != LOCAL_DIGITAL else self.local_source_label + " · LIVE"
@@ -318,6 +340,15 @@ class VideoWall(QWidget):
             tile.image.set_frame(feed.frame)
         tile.status_label.setText(self._status(key))
         tile.status_label.setToolTip(tile.status_label.text())
+        self._overlay(tile, key)
+
+    def _overlay(self, tile, key):
+        feed = self.feeds[key]
+        age = time.monotonic() - feed.received if feed.received is not None else None
+        timed = key != LOCAL_DIGITAL or self.local_source_live
+        tile.image.overlay = self._status(key) if (not feed.available or timed and age is not None and
+                                                   age >= STALE_SECONDS) else ""
+        tile.image.update()
 
     def _refresh_feed(self, key):
         if key in self.thumbnails:
@@ -342,9 +373,11 @@ class VideoWall(QWidget):
         for key, tile in self.thumbnails.items():
             tile.status_label.setText(self._status(key))
             tile.status_label.setToolTip(tile.status_label.text())
+            self._overlay(tile, key)
         for channel, key in self.selected_sources.items():
             self.primary_status[channel].setText(self._status(key))
             self.primary_status[channel].setToolTip(self.primary_status[channel].text())
+            self._overlay(self.primary_tiles[channel], key)
 
     def showEvent(self, event):
         self.refresh_status()

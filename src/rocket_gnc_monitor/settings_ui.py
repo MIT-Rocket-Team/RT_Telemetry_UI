@@ -21,7 +21,8 @@ from .widgets import ComboBox as QComboBox
 
 
 class SettingsDialog(QDialog):
-    def __init__(self, settings, data_dir, apply_settings, parent=None):
+    def __init__(self, settings, data_dir, apply_settings, parent=None, *,
+                 open_network=None, open_station_assignments=None):
         super().__init__(parent)
         self.data_dir = Path(data_dir)
         self.apply_settings = apply_settings
@@ -73,6 +74,19 @@ class SettingsDialog(QDialog):
         self.theme = QComboBox()
         self.theme.addItems(["Dark", "Daylight"])
         form.addRow("Appearance", self.theme)
+        if open_network is not None or open_station_assignments is not None:
+            network = QHBoxLayout()
+            self.network_button = QPushButton("Station network…")
+            self.network_button.setEnabled(open_network is not None)
+            if open_network is not None:
+                self.network_button.clicked.connect(open_network)
+            network.addWidget(self.network_button)
+            self.assignments_button = QPushButton("Station assignments & locations…")
+            self.assignments_button.setEnabled(open_station_assignments is not None)
+            if open_station_assignments is not None:
+                self.assignments_button.clicked.connect(open_station_assignments)
+            network.addWidget(self.assignments_button)
+            form.addRow("Ground-station network", network)
         layout.addLayout(form)
         layout.addStretch()
         self.error = QLabel()

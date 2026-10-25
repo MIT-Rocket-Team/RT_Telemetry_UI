@@ -69,6 +69,12 @@ def test_all_telemetry_workspaces_replace_horizon_with_slider_controlled_rocket(
 def test_reference_events_follow_existing_player_without_becoming_telemetry(pose_window):
     w, c = pose_window, pose_window.controller
     panel = w.attitude
+    if getattr(w, "main_base", False):
+        # Main Base deliberately removed simulation comparison; secondary and
+        # away workspaces retain the existing reference player.
+        assert panel.source.findData("openrocket") == -1
+        assert panel.source.currentData() == "telemetry"
+        return
     c.reference = reference()
     c.latest = TelemetryDecoder().feed(frame())[0]
     c.mode = "REPLAY"

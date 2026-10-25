@@ -587,12 +587,30 @@ class MainWindow(QMainWindow):
     def open_settings(self):
         if self.settings_dialog is None:
             self.settings_dialog = SettingsDialog(
-                self.controller.settings, self.controller.data_dir, self.apply_settings, self
+                self.controller.settings, self.controller.data_dir, self.apply_settings, self,
+                open_network=getattr(self, "open_station_network", None),
+                open_station_assignments=self.open_station_assignments if hasattr(self, "profile") else None,
             )
             self.settings_dialog.finished.connect(self.settings_closed)
         self.settings_dialog.show()
         self.settings_dialog.raise_()
         self.settings_dialog.activateWindow()
+
+    def open_station_assignments(self):
+        if not hasattr(self, "profile"):
+            return
+        bridge = getattr(self, "station_network", None)
+        if bridge is None:
+            from .network_bridge import StationNetworkBridge, network_configuration
+
+            self.station_network = bridge = StationNetworkBridge(
+                self, network_configuration(self.controller.data_dir)
+            )
+            bridge.changed.connect(self.refresh_network_status)
+        from .network_configuration_ui import StationAssignmentsDialog
+
+        dialog = StationAssignmentsDialog(bridge, self)
+        dialog.exec()
 
     def settings_closed(self):
         self.settings_dialog.deleteLater()
@@ -1894,7 +1912,8 @@ class MainWindow(QMainWindow):
                 self.legacy_actions[key].setEnabled(
                     pointer_ready and (not c.pointer_pending or c.virtual_pointer is not None)
                 )
-        self.align_time_button.setEnabled(c.latest is not None and (c.mode == "REPLAY" or live_ready))
+        self.align_time_button.setEnabled(c.remote_display_key is None and c.latest is not None
+                                          and (c.mode == "REPLAY" or live_ready))
         for control in [self.play, self.step_button, self.replay_slider, self.speed]:
             control.setEnabled(c.mode == "REPLAY" and c.reader is not None)
 
@@ -1904,7 +1923,8 @@ class MainWindow(QMainWindow):
             return
         self.last_ui = now
         c = self.controller
-        s = c.latest
+        s = c.display_latest
+        remote = c.remote_display_key is not None
         if hasattr(self, "flight_actions"):
             self.flight_actions["open"].setEnabled(not c.flight_busy and c.recorder is None)
             self.flight_actions["save"].setEnabled(not c.flight_busy)
@@ -1931,7 +1951,7 @@ class MainWindow(QMainWindow):
         values = dict(
             altitude=s.altitude if s else None,
             velocity=s.velocity if s else None,
-            flight=s.t - c.flight_zero if s and c.time_aligned else None,
+            flight=s.t - c.display_flight_zero if s and c.display_time_aligned else None,
             battery=s.battery if s else None,
             rssi=s.rssi if s else None,
             age=age,
@@ -1939,7 +1959,11 @@ class MainWindow(QMainWindow):
         for key, value in values.items():
             self.metrics[key].setText(f"{value:,.1f}" if finite(value) else "—")
         issues = []
-        if c.mode == "REPLAY":
+        if remote:
+            source_name = s.details.get("display_source", "Remote station") if s else "Remote station"
+            issues.append(f"NETWORK · {source_name} · READ ONLY · {s.phase if s else 'awaiting telemetry'}")
+            issues.append("Packet age is a lower bound · clocks unsynchronized")
+        elif c.mode == "REPLAY":
             issues.append("REPLAY · physical pointer disabled")
         else:
             phase = s.phase if s else "awaiting telemetry"
@@ -1952,7 +1976,7 @@ class MainWindow(QMainWindow):
                 issues.append("VIRTUAL POINTER · SIMULATED MOTION")
             if not c.ground_connected:
                 issues.append("GROUND STATION DISCONNECTED")
-        if (c.mode != "LIVE" or c.polling) and (
+        if (remote or c.mode != "LIVE" or c.polling) and (
             age is None
             or (age > c.mission.freshness and c.mode != "REPLAY")
         ):
@@ -1964,13 +1988,11 @@ class MainWindow(QMainWindow):
         if c.ui_drops:
             issues.append(f"DISPLAY BUFFER LOSS: {c.ui_drops}")
         self.banner.setText("  ·  ".join(issues))
-        self.alert_status.setText(
-            "  ·  ".join(
+        alert_text = "  ·  ".join(
                 a["message"] + (" (acknowledged)" if a["acknowledged"] else " (new)")
                 for a in c.alerts.values()
-            )
-            or "No active alerts"
-        )
+            ) or "No active alerts"
+        self.alert_status.setText(("Local board · " if remote else "") + alert_text)
         self.banner.setStyleSheet(
             "color: "
             + (COLORS["red"] if any(not a["acknowledged"] for a in c.alerts.values()) else COLORS["muted"])
@@ -2034,7 +2056,8 @@ class MainWindow(QMainWindow):
             self.refresh_actuators()
             self.rocket_panel.refresh()
             self.details.setPlainText(json.dumps(s.to_dict() if s else {}, indent=2))
-        self.link_stats.setText("  ·  ".join(f"{k.title()}: {v}" for k, v in c.stats.items()))
+        self.link_stats.setText(("Local board · " if remote else "")
+                                + "  ·  ".join(f"{k.title()}: {v}" for k, v in c.stats.items()))
         m = c.mission
         self.mission_summary.setText(
             f"{m.name} · "
@@ -2065,10 +2088,11 @@ class MainWindow(QMainWindow):
 
     def refresh_actuators(self):
         c = self.controller
+        sample = c.display_latest
         channels = {f"Canard {i + 1}": {} for i in range(c.mission.canard_count)}
         channels.update({f"Tab {i + 1}": {} for i in range(4)})
-        if c.latest:
-            channels.update(c.latest.actuators)
+        if sample:
+            channels.update(sample.actuators)
         self.actuators.setRowCount(len(channels))
         for row, (name, values) in enumerate(channels.items()):
             cells = [name] + [
@@ -2088,11 +2112,16 @@ class MainWindow(QMainWindow):
         if not hasattr(self, "trajectory_plot"):
             return
         c = self.controller
+        sample = c.display_latest
+        remote = c.remote_display_key is not None
+        flight_zero = c.display_flight_zero
         key = (
             c.mode,
-            c.latest.sequence if c.latest else None,
-            c.latest.utc if c.latest else None,
-            c.flight_zero,
+            c.remote_display_key,
+            sample.sequence if sample else None,
+            sample.utc if sample else None,
+            sample.details.get("remote_observation_id") if sample else None,
+            flight_zero,
             id(c.reference),
             (id(c.virtual_flight), c.virtual_flight.time) if c.virtual_flight else None,
             self.view.currentIndex(),
@@ -2100,8 +2129,10 @@ class MainWindow(QMainWindow):
         if key == self.last_sample_key and not force:
             return
         self.last_sample_key = key
-        history = list(c.history)[-1200:]
-        times = [s.t - c.flight_zero for s in history]
+        history = list(c.display_history)[-1200:]
+        times = [s.t - flight_zero for s in history]
+        for graph in (self.altitude_plot, self.rate_plot, self.angle_plot):
+            graph.setLabel("bottom", "Source device uptime" if remote else "Flight time", units="s", color=COLORS["muted"])
         self.altitude_curve.setData(times, [s.altitude if finite(s.altitude) else np.nan for s in history])
         for i in range(3):
             self.rate_curves[i].setData(times, [s.rates[i] if s.rates else np.nan for s in history])
@@ -2126,12 +2157,12 @@ class MainWindow(QMainWindow):
         self.trajectory_plot.setLabel(
             "bottom", ["East (m)", "East (m)", "Projected horizontal (m)"][view], color=COLORS["muted"]
         )
-        x, y = project(list(c.track))
+        x, y = project(list(c.display_track))
         self.actual_curve.setData(x, y)
         self.actual_marker.setData(x[-1:] if len(x) else [], y[-1:] if len(y) else [])
-        self.trajectory_legend.setVisible(c.reference is not None)
+        self.trajectory_legend.setVisible(c.reference is not None and not remote)
         self.virtual_mount_marker.setData([], [])
-        if c.reference:
+        if c.reference and not remote:
             reference = c.reference
             x, y = project(reference.points[:, 1:])
             self.reference_curve.setData(x, y)

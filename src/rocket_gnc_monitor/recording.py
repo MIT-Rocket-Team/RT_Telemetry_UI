@@ -23,6 +23,150 @@ RAW_HEADER = struct.Struct("<4sddBI")
 RAW_ROLES = {"telemetry_rx": 1, "pointer_rx": 2, "pointer_tx": 3, "telemetry_tx": 4}
 
 
+class ObservationArchive:
+    """Independent bounded receive log, regardless of UI or peer delivery.
+
+    Runtime owns one archive for its own accepted observations and received
+    remote envelopes. The producer only snapshots and queues JSON; disk I/O and
+    fsync run here. Overflow produces an explicit archive.gap and error status.
+    """
+
+    def __init__(self, parent, metadata=None, *, queue_size=8192,
+                 max_queue_bytes=16 * 1024 * 1024, on_error=None):
+        if queue_size < 1 or max_queue_bytes < 1:
+            raise ValueError("Archive queue limits must be positive")
+        self.path = Path(parent) / (time.strftime("receive_%Y%m%d_%H%M%S_") + uuid.uuid4().hex[:8])
+        self.queue = queue.Queue(maxsize=queue_size)
+        self.max_queue_bytes = max_queue_bytes
+        self.queued_bytes = 0
+        self.lock = threading.Lock()
+        self.error = ""
+        self.dropped = 0
+        self.written = 0
+        self.closed = False
+        self.failed = False
+        self.pending_gap = None
+        self.on_error = on_error
+        self.manifest = {
+            "schema_version": 1,
+            "archive_type": "station-network-receptions",
+            "app_version": __version__,
+            "started_utc": time.time(),
+            "metadata": metadata or {},
+            "complete": False,
+            "dropped": 0,
+            "error": "",
+        }
+        self.thread = threading.Thread(target=self._run, name="observation-archive", daemon=True)
+        self.thread.start()
+
+    def _report(self, message):
+        self.error = message
+        if self.on_error:
+            try:
+                self.on_error(message)
+            except Exception:
+                pass
+
+    def put(self, payload):
+        """Archive an origin observation payload before network publication."""
+        return self.event("telemetry.observation", payload)
+
+    observation = put
+
+    def event(self, kind, payload):
+        """Archive a remote envelope or an explicit discontinuity unchanged."""
+        record = {"kind": kind, "archived_utc": time.time(), "payload": payload}
+        try:
+            line = json.dumps(record, ensure_ascii=True, allow_nan=False, separators=(",", ":")) + "\n"
+        except (TypeError, ValueError, OverflowError) as exc:
+            self._report(f"Receive archive rejected invalid JSON: {exc}")
+            return False
+        size = len(line)  # ensure_ascii makes this also the UTF-8 byte size.
+        error = None
+        with self.lock:
+            if self.closed or self.failed:
+                self.dropped += 1
+                return False
+            try:
+                if self.queued_bytes + size > self.max_queue_bytes:
+                    raise queue.Full
+                self.queue.put_nowait((line, size))
+                self.queued_bytes += size
+                return True
+            except queue.Full:
+                self.dropped += 1
+                observation = payload.get("payload", payload) if isinstance(payload, dict) else {}
+                observation_id = observation.get("observation_id") if isinstance(observation, dict) else None
+                if self.pending_gap is None:
+                    self.pending_gap = {
+                        "reason": "archive_buffer_full",
+                        "lost_records": 0,
+                        "first_observation_id": observation_id,
+                        "last_observation_id": observation_id,
+                    }
+                self.pending_gap["lost_records"] += 1
+                self.pending_gap["last_observation_id"] = observation_id
+                error = f"Receive archive buffer full: {self.dropped} records lost"
+        self._report(error)
+        return False
+
+    def close(self):
+        with self.lock:
+            self.closed = True
+        self.thread.join(timeout=5)
+        if self.thread.is_alive():
+            self._report("Receive archive did not finish; log remains incomplete")
+
+    def _write_gap(self, handle):
+        with self.lock:
+            gap, self.pending_gap = self.pending_gap, None
+        if gap:
+            handle.write(json.dumps({"kind": "archive.gap", "archived_utc": time.time(), "payload": gap}) + "\n")
+
+    def _run(self):
+        try:
+            self.path.mkdir(parents=True)
+            write_json(self.path / "manifest.json", self.manifest)
+            last_flush = time.monotonic()
+            with (self.path / "observations.jsonl").open("w", encoding="utf-8", newline="\n") as handle:
+                while not self.closed or not self.queue.empty():
+                    try:
+                        line, size = self.queue.get(timeout=0.1)
+                    except queue.Empty:
+                        pass
+                    else:
+                        with self.lock:
+                            self.queued_bytes -= size
+                        handle.write(line)
+                        self.written += 1
+                        self.queue.task_done()
+                    if time.monotonic() - last_flush >= 0.25:
+                        self._write_gap(handle)
+                        handle.flush()
+                        os.fsync(handle.fileno())
+                        last_flush = time.monotonic()
+                self._write_gap(handle)
+                handle.flush()
+                os.fsync(handle.fileno())
+        except Exception as exc:
+            self.failed = True
+            self._report(f"Receive archive failed: {exc}")
+        finally:
+            self.manifest.update(
+                complete=self.closed and not bool(self.error),
+                stopped_utc=time.time(),
+                written=self.written,
+                dropped=self.dropped,
+                error=self.error,
+            )
+            try:
+                write_json(self.path / "manifest.json", self.manifest)
+            except Exception as exc:
+                self.failed = True
+                self._report(f"Receive archive manifest failed: {exc}")
+
+
 class SessionRecorder:
     def __init__(self, parent, mission, mode, flight_zero=0.0, time_aligned=True):
         self.path = Path(parent) / (time.strftime("session_%Y%m%d_%H%M%S_") + uuid.uuid4().hex[:6])

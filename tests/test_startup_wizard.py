@@ -140,7 +140,7 @@ def test_accepted_startup_only_saves_choices_when_operator_opts_in(qapp, tmp_pat
         return wizard.DialogCode.Accepted
 
     class Window:
-        def __init__(self, data, *, profile, auto_place):
+        def __init__(self, data, *, profile, auto_place, network_config=None):
             assert load_startup_choices(data) == ((selected, True) if remember else (StationProfile(), False))
             opened.append(profile)
             self.controller = SimpleNamespace(video_streams=dict.fromkeys(profile.local_channels))
@@ -182,7 +182,7 @@ def test_cli_preselects_all_wizard_choices_and_can_open_directly(
         return wizard.DialogCode.Accepted
 
     class Window:
-        def __init__(self, data, *, profile, auto_place):
+        def __init__(self, data, *, profile, auto_place, network_config=None):
             opened.append(profile)
             self.controller = SimpleNamespace(video_streams=dict.fromkeys(profile.local_channels))
 

@@ -3,14 +3,16 @@
 from __future__ import annotations
 import math
 import struct
+import time
 from .domain import Sample, finite
 
 
 class TelemetryDecoder:
     FRAME_SIZE = 144
 
-    def __init__(self, on_rejected=None):
+    def __init__(self, on_rejected=None, on_accepted=None):
         self.on_rejected = on_rejected
+        self.on_accepted = on_accepted
         self.buffer = bytearray()
         self.accepted = self.rejected = self.discarded = self.gaps = 0
         self.last_sequence = None
@@ -18,7 +20,11 @@ class TelemetryDecoder:
         self.wrap_offset = 0
         self.boot = 0
 
-    def feed(self, chunk: bytes):
+    def feed(self, chunk: bytes, *, received=None, utc=None):
+        # Receipt means completion of the host serial read containing the final
+        # frame byte, never the later GUI dequeue or network transmission time.
+        received = time.monotonic() if received is None else received
+        utc = time.time() if utc is None else utc
         self.buffer.extend(chunk)
         output = []
         while len(self.buffer) >= 2:
@@ -40,7 +46,8 @@ class TelemetryDecoder:
                     self.on_rejected(payload, bytes(self.buffer[130:144]), self.rejected)
                 del self.buffer[0]  # Rescan; never discard a potentially overlapping valid sync.
                 continue
-            trailer = bytes(self.buffer[130:144])
+            raw_frame = bytes(self.buffer[:self.FRAME_SIZE])
+            trailer = raw_frame[130:144]
             del self.buffer[:144]
             try:
                 sample = self.decode(payload, trailer)
@@ -48,7 +55,10 @@ class TelemetryDecoder:
                 self.rejected += 1
                 continue
             self.accepted += 1
+            sample.received, sample.utc = received, utc
             sample.details["bad_packets"] = self.rejected
+            if self.on_accepted:
+                self.on_accepted(sample, raw_frame)
             output.append(sample)
         return output
 

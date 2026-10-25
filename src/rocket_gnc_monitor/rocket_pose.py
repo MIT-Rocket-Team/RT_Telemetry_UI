@@ -159,6 +159,8 @@ def _source(mode, sample):
     if source not in {"LIVE", "REPLAY"}:
         source = "UNKNOWN"
     sample_source = getattr(sample, "source", "")
+    if source == "LIVE" and sample_source == "NETWORK":
+        return "NETWORK"
     if source == "LIVE" and isinstance(sample_source, str) and sample_source and sample_source != "LIVE":
         source = "REPLAY"
     return source
@@ -181,7 +183,7 @@ def telemetry_pose(sample, mode="LIVE", fresh=True):
     flight_status = flight_status if isinstance(flight_status, Mapping) else {}
     motor, parachute, ignited = (_flag(flight_status, key) for key in
                                 ("motor_burning", "parachute_deployed", "motor_ignited"))
-    stale = source == "LIVE" and not fresh
+    stale = source in {"LIVE", "NETWORK"} and not fresh
     state = "STALE · last telemetry" if stale else "Telemetry"
     if known:
         attitude = "Orientation quaternion · body-to-ENU · +Z nose"
@@ -192,6 +194,8 @@ def telemetry_pose(sample, mode="LIVE", fresh=True):
     if "orientation" in details and not known:
         attitude += " · Invalid orientation metadata"
     status = f"{source} · {state} · {attitude}"
+    if source == "NETWORK":
+        status = f"NETWORK · {details.get('display_source', 'Remote station')} · READ ONLY · {state} · {attitude}"
     if ignited is True and motor is None:
         status += " · Ignition reported; current burn unknown"
     return RocketPose(

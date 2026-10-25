@@ -11,6 +11,11 @@ Bundled dependency versions/hashes are in `vendor/build-manifest.json`. Python p
 | PyQtGraph | https://github.com/pyqtgraph/pyqtgraph ; MIT |
 | NumPy | https://numpy.org/doc/stable/license.html ; BSD-style and included dependency notices |
 | pyserial | https://github.com/pyserial/pyserial ; BSD |
+| aiohttp and dependencies | https://github.com/aio-libs/aiohttp ; Apache-2.0/MIT and dependency notices collected under `licenses/` |
+| Python zeroconf | https://github.com/python-zeroconf/python-zeroconf ; LGPL-2.1-or-later, runtime license retained |
+| SRT 1.5.4 | https://github.com/Haivision/srt ; MPL-2.0, native source/build scripts and `vendor/network-media/SRT-LICENSE` retained |
+| OpenSSL (Mac SRT dependencies) | https://www.openssl.org/ ; Apache-2.0, `vendor/network-media/OpenSSL-LICENSE.txt` |
+| Microsoft Visual C++ runtime (Windows SRT) | Visual Studio redistributable binaries, Microsoft's runtime redistribution terms |
 | imageio-ffmpeg wrapper | https://github.com/imageio/imageio-ffmpeg ; BSD-2-Clause |
 | FFmpeg binary | https://ffmpeg.org/legal.html ; actual build configuration retained in `vendor/ffmpeg-build.txt` |
 | Eclipse Temurin Java17 | https://adoptium.net/ ; legal notices retained under `vendor/java/legal` |

@@ -69,6 +69,13 @@ def argument_parser():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--data-dir", type=Path)
+    parser.add_argument("--mission-id", help="Shared station-network mission UUID; never inferred from the mission name")
+    parser.add_argument("--network-port", type=int, help="Local HTTP/WebSocket port (default 8766)")
+    parser.add_argument("--network-bind", help="Local network bind address (default 0.0.0.0)")
+    parser.add_argument("--peer", action="append", help="Manual station HTTP endpoint; repeat for multiple peers")
+    parser.add_argument("--no-network", action="store_true", help="Start without the station network service")
+    parser.add_argument("--no-discovery", action="store_true", help="Disable multicast discovery; use manual peers")
+    parser.add_argument("--accept-network-replay", action="store_true", help="Explicitly allow replay sources for network testing")
     parser.add_argument(
         "--station", choices=["launch", "launch-v2", "base", "away", "video"], metavar="{launch,launch-v2,away,video}",
         help="Base station workspace: launch or base uses no tabs; launch-v2 uses tabs; away/video keep their existing roles",
@@ -253,7 +260,17 @@ def main():
     # setup has been accepted (or explicitly bypassed for automation).
     from .station_workspace import StationWindow as MainWindow
 
-    window = MainWindow(data, profile=profile, auto_place=not args.station_smoke)
+    network_config = None
+    if not smoke and not args.no_network:
+        from .network_bridge import network_configuration
+        try:
+            network_config = network_configuration(data, mission_id=args.mission_id,
+                network_port=args.network_port, network_bind_host=args.network_bind,
+                peers=args.peer, network_discovery=False if args.no_discovery else None,
+                accept_replay=args.accept_network_replay)
+        except ValueError as exc:
+            argument_parser().error(str(exc))
+    window = MainWindow(data, profile=profile, auto_place=not args.station_smoke, network_config=network_config)
     if preference_error:
         window.statusBar().showMessage(preference_error, 12000)
     profile_fields = dict(

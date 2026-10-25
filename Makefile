@@ -13,7 +13,7 @@ VEHICLE ?=
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup run away video test lint runtime bridge package package-macos package-macos-universal package-windows smoke verify-package clean
+.PHONY: help setup run away video test lint runtime bridge network-media package package-macos package-macos-universal package-windows smoke verify-package clean
 
 help:
 	@$(PYTHON) scripts/build.py help
@@ -34,6 +34,8 @@ runtime:
 	$(VENV_PY) scripts/build.py runtime
 bridge:
 	$(VENV_PY) scripts/build.py bridge $(ENGINE_OPTIONS)
+network-media:
+	$(VENV_PY) scripts/prepare_network_media.py $(if $(SRT_LIBRARY),--srt-library "$(SRT_LIBRARY)")
 package:
 	$(VENV_PY) scripts/build.py package $(ENGINE_OPTIONS)
 package-macos:

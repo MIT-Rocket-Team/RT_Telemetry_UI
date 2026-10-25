@@ -4,6 +4,7 @@ from __future__ import annotations
 import queue
 import threading
 import time
+import uuid
 import serial
 from serial.tools import list_ports
 from .protocol import TelemetryDecoder
@@ -29,15 +30,18 @@ def ports():
 
 
 class SerialWorker:
-    def __init__(self, role, device, generation, emit, raw, baud=115200):
+    def __init__(self, role, device, generation, emit, raw, baud=115200, on_observation=None):
         if role not in {"telemetry", "uplink", "pointer"}:
             raise ValueError("Unknown serial role")
         self.role, self.device, self.generation = role, device, generation
         self.emit, self.raw, self.baud = emit, raw, baud
+        self.on_observation = on_observation
+        self.connection_id = None
+        self.observation_counter = 0
         self.stop_event = threading.Event()
         self.poll_event = threading.Event()
         self.commands = queue.Queue(maxsize=1 if role == "pointer" else 64)
-        self.decoder = TelemetryDecoder() if role == "telemetry" else None
+        self.decoder = TelemetryDecoder(on_accepted=self._accepted) if role == "telemetry" else None
         self.connection = None
         self.thread = threading.Thread(target=self.run, name=f"{role}-serial", daemon=True)
         self.thread.start()
@@ -78,6 +82,23 @@ class SerialWorker:
     def message(self, kind, data):
         self.emit(self.generation, self.role, kind, data)
 
+    def _accepted(self, sample, raw_frame):
+        self.observation_counter += 1
+        if self.on_observation is not None:
+            context = {
+                "connection_id": self.connection_id,
+                "observation_counter": self.observation_counter,
+                "decoder_gaps": self.decoder.gaps,
+                "rejected_packets": self.decoder.rejected,
+            }
+            try:
+                # The sink must enqueue bounded work; it runs before the GUI
+                # queue so rendering delays cannot erase reception records.
+                self.on_observation(sample, raw_frame, context)
+            except Exception as exc:
+                # A monitoring/archive problem must not kill the serial link.
+                self.message("observation_error", str(exc))
+
     def run(self):
         try:
             self.connection = serial.Serial(
@@ -88,6 +109,7 @@ class SerialWorker:
             )
             self.connection.port = self.device
             self.connection.open()
+            self.connection_id = str(uuid.uuid4())
             self.message("connected", self.device)
             while not self.stop_event.is_set():
                 if self.role == "telemetry" and not self.poll_event.is_set() and self.commands.empty():
@@ -114,11 +136,12 @@ class SerialWorker:
                 if self.role == "telemetry" and not self.poll_event.is_set():
                     continue
                 chunk = self.connection.read(min(max(self.connection.in_waiting, 1), 4096))
+                received, utc = time.monotonic(), time.time()
                 if chunk and (self.role != "telemetry" or self.poll_event.is_set()):
                     if self.role != "uplink":
                         self.raw(self.role + "_rx", chunk)
                     if self.role == "telemetry":
-                        for sample in self.decoder.feed(chunk):
+                        for sample in self.decoder.feed(chunk, received=received, utc=utc):
                             self.message("sample", sample)
                         self.message(
                             "stats",

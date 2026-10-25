@@ -41,6 +41,7 @@ class StationConnectionTile(QWidget):
         super().__init__(parent)
         self.title = title
         self.reading = None
+        self.role_status = ""
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
 
     def set_reading(self, reading):
@@ -81,7 +82,11 @@ class StationConnectionTile(QWidget):
         p.drawText(QRectF(49, 8, self.width() - 58, 20),
                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, self.state_label())
 
-        top, bottom = 41, max(43, self.height() - 62)
+        if self.role_status:
+            font(8)
+            p.setPen(QColor(COLORS["muted"]))
+            p.drawText(QRectF(7, 26, self.width() - 14, 14), Qt.AlignmentFlag.AlignCenter, self.role_status)
+        top, bottom = 44, max(46, self.height() - 62)
         chart_height = bottom - top
         p.setPen(QPen(QColor(COLORS["line"]), .6))
         for fraction in (0, .5, 1):

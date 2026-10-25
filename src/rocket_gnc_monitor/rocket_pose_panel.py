@@ -88,8 +88,10 @@ class RocketPosePanel(QWidget):
                 )
                 self.timeline.setText(f"{frame.time:.2f} s · {playback_state}")
         else:
-            pose = telemetry_pose(c.latest, mode=c.mode,
-                                  fresh=c.mode != "LIVE" or c.rocket_link_state()[0] == "RECEIVING")
+            pose = telemetry_pose(
+                getattr(c, "display_latest", c.latest), mode=c.mode,
+                fresh=getattr(c, "display_fresh", c.mode != "LIVE" or c.rocket_link_state()[0] == "RECEIVING"),
+            )
         self.view.set_pose(pose)
 
     def showEvent(self, event):

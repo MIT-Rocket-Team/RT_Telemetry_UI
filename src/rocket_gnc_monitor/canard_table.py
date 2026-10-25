@@ -92,7 +92,7 @@ class CanardTable(QWidget):
         channels += tuple(f"Tab{i + 1}" for i in range(4))
         if channels != self.channels:
             self._set_channels(channels)
-        sample = self.controller.latest
+        sample = getattr(self.controller, "display_latest", self.controller.latest)
         feedback = sample.actuators if sample is not None else {}
         blocked = self.controller.command_block_reason
         reason = f"{blocked}. {COMMAND_UNAVAILABLE}" if blocked else COMMAND_UNAVAILABLE

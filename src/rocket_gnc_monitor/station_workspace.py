@@ -93,7 +93,7 @@ class StationDisplay(QMainWindow):
 
 
 class StationWindow(InstrumentWindow):
-    def __init__(self, data_dir, station=None, auto_place=True, profile=None):
+    def __init__(self, data_dir, station=None, auto_place=True, profile=None, network_config=None):
         self.workspace_ready = False
         self.closing = False
         self.auto_place = auto_place
@@ -125,6 +125,7 @@ class StationWindow(InstrumentWindow):
         self.launch_links = None
         self.launch_uplink = None
         self.wifi_panel = None
+        self.station_network = None
         super().__init__(data_dir, video_channels=self.profile.local_channels,
                          video_labels={key: self.profile.channel_labels[key] for key in self.profile.local_channels},
                          board_layout=("launch" if self.launch_station
@@ -156,6 +157,29 @@ class StationWindow(InstrumentWindow):
         self.refresh()
         QApplication.instance().screenAdded.connect(self.screens_changed)
         QApplication.instance().screenRemoved.connect(self.screens_changed)
+        if network_config is not None:
+            from .network_bridge import StationNetworkBridge
+            self.station_network = StationNetworkBridge(self, network_config)
+            self.station_network.changed.connect(self.refresh_network_status)
+        self.refresh_network_status()
+
+    def open_station_network(self):
+        if self.station_network is None:
+            from .network_bridge import StationNetworkBridge, network_configuration
+            self.station_network = StationNetworkBridge(self, network_configuration(self.controller.data_dir))
+            self.station_network.changed.connect(self.refresh_network_status)
+        from .network_ui import StationNetworkDialog
+        dialog = StationNetworkDialog(self.station_network, self)
+        dialog.exec()
+
+    def refresh_network_status(self):
+        if not self.station_network:
+            self.workspace_network.setText("Network…")
+            return
+        runtime = self.station_network.runtime
+        count = sum(p["state"] == "ONLINE" and not p.get("conflict") for p in self.station_network.peers)
+        self.workspace_network.setText(f"Network · {count}" if runtime.mission_id else "Join network…")
+        self.workspace_network.setToolTip(self.station_network.summary())
 
     def card(self, key, title):
         panel = QFrame()
@@ -213,6 +237,8 @@ class StationWindow(InstrumentWindow):
             heading.addWidget(widget)
             widget.show()
         self.workspace_settings = button("Settings…", self.open_settings)
+        self.workspace_network = button("Network…", self.open_station_network)
+        heading.addWidget(self.workspace_network)
         heading.addWidget(self.workspace_settings)
         outer.addLayout(heading)
         if self.launch_station:
@@ -351,6 +377,7 @@ class StationWindow(InstrumentWindow):
                 if key != "log":
                     action.setVisible(False)
         view_menu.addAction("Arrange station displays", self.arrange_displays)
+        view_menu.addAction("Station network…", self.open_station_network)
         if self.main_base:
             self.configure_main_base_actions()
         if not self.profile_locked:
@@ -392,6 +419,8 @@ class StationWindow(InstrumentWindow):
         self.usb_strip.layout().addStretch(1)
         controls.addWidget(self.usb_strip)
         heading.addLayout(controls, 1)
+        heading.addWidget(self.workspace_network)
+        self.workspace_network.show()
         heading.addWidget(self.workspace_settings)
         self.workspace_settings.show()
         heading.addWidget(self.rocket_state_badge)
@@ -1081,8 +1110,8 @@ class StationWindow(InstrumentWindow):
         c = self.controller
         channels = {f"Canard {i + 1}": {} for i in range(c.mission.canard_count)}
         channels.update({f"Tab {i + 1}": {} for i in range(4)})
-        if c.latest:
-            channels.update(c.latest.actuators)
+        if c.display_latest:
+            channels.update(c.display_latest.actuators)
         self.actuators.setColumnCount(len(channels))
         self.actuators.setRowCount(4)
         self.actuators.setHorizontalHeaderLabels(list(channels))
@@ -1210,8 +1239,8 @@ class StationWindow(InstrumentWindow):
         from .balius_states import balius_state_name
 
         self.rocket_state_badge.update_state(
-            c.latest, mode=c.mode, fresh=c.mode != "LIVE" or c.rocket_link_state()[0] == "RECEIVING",
-            state_name=balius_state_name(c.latest) if self.main_base and c.vehicle == "balius" else None,
+            c.display_latest, mode=c.mode, fresh=c.display_fresh,
+            state_name=balius_state_name(c.display_latest) if self.main_base and c.vehicle == "balius" else None,
         )
         if self.main_base:
             self.record_button.hide()
@@ -1219,7 +1248,8 @@ class StationWindow(InstrumentWindow):
             self.mission_label.hide()
             self.configure_main_base_actions()
             self.canard_panel.refresh()
-            self.away_connections.refresh()
+            if self.station_network is None:
+                self.away_connections.refresh()
         self.update_local_video_context()
         if self.profile_locked and self.profile.role == "video":
             for key, action in self.legacy_actions.items():
@@ -1264,6 +1294,9 @@ class StationWindow(InstrumentWindow):
                 self.health.setText(self.health.text() + "   /   IRIS BOARD TARGET · UNKNOWN")
             if c.mode == "LIVE":
                 self.banner.setText(self.banner.text() + " · UPLINK SWITCH PROTOCOL PENDING")
+        if self.station_network:
+            self.health.setText(self.health.text().replace("AWAY TRANSPORT PENDING", self.station_network.summary())
+                                .replace("four links · transport pending", self.station_network.summary()))
         self.secondary_health.setText(c.mode + " · " + self.connection_tiles["rocket"].text())
         self.secondary_banner.setText(self.banner.text())
         self.network_panel.refresh()
@@ -1328,7 +1361,7 @@ class StationWindow(InstrumentWindow):
             table.setRowCount(len(names))
             for r, name in enumerate(names):
                 set_cell(table, r, 0, name)
-                if not c.latest:
+                if not c.display_latest:
                     set_cell(table, r, 1, "—")
                 table.setRowHeight(r, 19)
             table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
@@ -1380,6 +1413,8 @@ class StationWindow(InstrumentWindow):
             event.accept()
             return
         self.closing = True
+        if self.station_network is not None:
+            self.station_network.close()
         if self.wifi_panel is not None:
             self.wifi_panel.cleanup()
         if self.away_flight_dialog is not None:

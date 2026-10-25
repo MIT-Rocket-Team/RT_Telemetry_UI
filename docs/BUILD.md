@@ -53,6 +53,22 @@ Choose either `OPENROCKET_JAR` or `OPENROCKET_DOWNLOAD`. The downloader queries 
 
 ## Native packaging
 
+The station network requires a staged native SRT library. It is embedded in the app; end users do not install SRT, FFmpeg, Python or Bonjour separately. Python `zeroconf` provides discovery without Apple's Windows Bonjour service.
+
+```sh
+# macOS, after installing/building libsrt for this Python architecture:
+make network-media SRT_LIBRARY=/opt/homebrew/lib/libsrt.dylib
+```
+
+```powershell
+# Windows x64, with Visual Studio 2022 C++ build tools installed:
+powershell -ExecutionPolicy Bypass -File scripts\build_srt_windows.ps1
+```
+
+The Windows script builds pinned SRT 1.5.4 from checksum-verified source and stages its required redistributables. To use an existing native build instead, run `.venv\Scripts\python.exe scripts\prepare_network_media.py --srt-library C:\path\to\native-dll-directory`. Mac staging copies libraries, rewrites dependencies to bundle-relative paths and ad-hoc signs them. Packaging verifies SRT loading and includes only native libraries for the target platform. Re-run staging when changing architecture. Native files and manifests remain ignored under `vendor/network-media`.
+
+Network access uses TCP 8766, UDP 5353 multicast discovery and UDP 55000–55031 media listeners by default. Allow the app on the intended private LAN in the OS firewall and accept macOS Local Network permission. Manual HTTP peer addresses remain available when multicast is blocked.
+
 ```sh
 # macOS
 make -f Makefile.macos all OPENROCKET_DOWNLOAD=v6.2

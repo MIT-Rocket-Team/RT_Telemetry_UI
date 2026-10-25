@@ -98,6 +98,12 @@ class Controller(QObject):
         self.latest = None
         self.history = deque(maxlen=6000)
         self.track = deque(maxlen=6000)
+        # Remote observations are a read-only display source. They never enter
+        # accept(), local radio liveness, command targets, alerts or tracking.
+        self.network_observation_sink = None
+        self.remote_display_key = None
+        self.remote_display_sample = None
+        self.remote_display_history = deque(maxlen=6000)
         self.reference = None
         self.workers = dict.fromkeys(self.serial_labels)
         self.states = dict.fromkeys(self.serial_labels, "Disconnected")
@@ -175,6 +181,8 @@ class Controller(QObject):
 
     @property
     def command_block_reason(self):
+        if self.remote_display_key is not None:
+            return "Remote station telemetry is read-only; select the local board to command"
         if self.board_layout == "away":
             return "Away stations cannot transmit rocket commands"
         if self.mode == "REPLAY":
@@ -190,6 +198,48 @@ class Controller(QObject):
     @property
     def can_command(self):
         return not self.command_block_reason
+
+    @property
+    def display_latest(self):
+        return self.remote_display_sample if self.remote_display_key is not None else self.latest
+
+    @property
+    def display_history(self):
+        return self.remote_display_history if self.remote_display_key is not None else self.history
+
+    @property
+    def display_track(self):
+        if self.remote_display_key is None:
+            return self.track
+        if not self.mission.site_configured:
+            return ()
+        points = []
+        for sample in self.remote_display_history:
+            try:
+                points.append(to_enu(
+                    *target_position(sample, self.mission),
+                    (self.mission.latitude, self.mission.longitude, self.mission.altitude),
+                ))
+            except (ValueError, TypeError):
+                continue
+        return points
+
+    @property
+    def display_fresh(self):
+        if self.remote_display_key is None:
+            return self.mode != "LIVE" or self.rocket_link_state()[0] == "RECEIVING"
+        sample = self.remote_display_sample
+        return bool(sample is not None and finite(sample.received)
+                    and 0 <= time.monotonic() - sample.received <= self.mission.freshness)
+
+    @property
+    def display_flight_zero(self):
+        # A local alignment does not establish remote device clock alignment.
+        return 0 if self.remote_display_key is not None else self.flight_zero
+
+    @property
+    def display_time_aligned(self):
+        return self.remote_display_key is None and self.time_aligned
 
     @property
     def remote_pointer_status(self):
@@ -380,6 +430,9 @@ class Controller(QObject):
             self.disconnect(role)
         self.generation += 1
         self.mode = mode
+        self.remote_display_key = None
+        self.remote_display_sample = None
+        self.remote_display_history.clear()
         self.latest = None
         self.history.clear()
         self.track.clear()
@@ -457,10 +510,22 @@ class Controller(QObject):
             if worker and worker.generation == token and self.recorder:
                 self.recorder.raw(source, data)
 
+        def observation(sample, packet, context):
+            worker = self.workers.get(role)
+            sink = self.network_observation_sink
+            if (sink is not None and worker is not None and worker.generation == token
+                    and self.mode == "LIVE" and self.polling and role == "telemetry"):
+                sink(sample, packet, context)
+
+        observation_options = (
+            {"on_observation": observation}
+            if role == "telemetry" and self.network_observation_sink is not None else {}
+        )
+
         self.workers[role] = (
             VirtualPointer(token, self.enqueue, raw)
             if device == VIRTUAL_POINTER_DEVICE
-            else SerialWorker(role, device, token, self.enqueue, raw)
+            else SerialWorker(role, device, token, self.enqueue, raw, **observation_options)
         )
         self.log(f"Connecting {role}: {device}")
 
@@ -1033,6 +1098,8 @@ class Controller(QObject):
                 self.accept(data)
             elif role == "telemetry" and kind == "stats":
                 self.stats = data
+            elif kind == "observation_error":
+                self.log("Telemetry observation could not be archived or published", {"error": data})
             elif kind == "connected":
                 self.states[role] = "Connected"
                 if role == "pointer":

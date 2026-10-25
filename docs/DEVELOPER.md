@@ -15,6 +15,11 @@ The repository root is the application root. There are no imports from the forme
 | USB video/FFmpeg and Launch video wall | `media.py`, `video_wall.py` |
 | Mission coordinates and presets | `location.py`, `location_ui.py`, `site_presets.py` |
 | Settings and per-user persistence | `settings.py`, `settings_ui.py` |
+| Station HTTP/WebSocket/discovery and event journal | `network/runtime.py`, `network/protocol.py`, `network/journal.py` |
+| Immutable observations and accepted-frame capture | `network/observation.py`, `devices.py`, `recording.py` |
+| SRT leases, H.264 renditions and video receivers | `network/media.py`, `network/media_srt.py`, `network/media_receiver.py` |
+| Qt network integration, peer/settings dialogs | `network_bridge.py`, `network_ui.py`, `network_configuration_ui.py` |
+| Durable remote station/location configuration | `network/configuration.py` |
 | Reference simulation and wind | `trajectory.py`, plus `simulation_bridge/src/RocketBridge.java` |
 | Antenna mesh, rendering and virtual movement | `mount_geometry.py`, `widgets.py`, `scene_mesh.py`, `virtual_pointer.py` |
 | Rocket geometry, source model and rendering | `rocket_geometry.py`, `rocket_pose.py`, `rocket_pose_view.py`, `rocket_pose_panel.py` |

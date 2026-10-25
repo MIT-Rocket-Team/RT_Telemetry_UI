@@ -377,7 +377,7 @@ class RocketPanel(QWidget):
 
     def refresh(self):
         self.set_controls_enabled()
-        s = self.c.latest
+        s = getattr(self.c, "display_latest", self.c.latest)
         if s is None:
             # Never retain another source's values when switching modes.
             for widget in [self.telemetry, self.gps, self.servos, self.cells, self.protections]:
@@ -389,7 +389,12 @@ class RocketPanel(QWidget):
                 for col in (2, 3, 4):
                     set_cell(self.pyros, row, col, "—")
             return
-        v = legacy_values(s, self.c.stats["rejected"])
+        rejected = s.details.get("bad_packets", 0) if s.source == "NETWORK" else self.c.stats["rejected"]
+        v = legacy_values(s, rejected)
+        if s.source == "NETWORK":
+            for native, rendered in (("armed_bits", "armed_pyros"), ("fired_bits", "fired_pyros")):
+                if native not in s.details:
+                    v[rendered] = [None] * 6
         if self.base_controls and self.c.vehicle == "balius":
             v["state"] = balius_state_name(s)
         self.fill(
@@ -461,7 +466,8 @@ class RocketPanel(QWidget):
             if not any(requested)
             else Qt.CheckState.PartiallyChecked
         )
-        set_cell(self.power, 0, 2, text(all(v["enabled_status"])))
+        all_enabled = None if any(value is None for value in v["enabled_status"]) else all(v["enabled_status"])
+        set_cell(self.power, 0, 2, text(all_enabled))
         set_cell(self.power, 0, 4, text(v["total_current"]))
         set_cell(self.power, 7, 3, text(v["bms_temp"]))
         for row, field in enumerate(["bms_protections_enabled", "bms_protection_status"]):
@@ -475,5 +481,5 @@ class RocketPanel(QWidget):
             label = ["FAIL", "UNCONNECTED", "CONNECTED", "FIRED"][status] if status in (0, 1, 2, 3) else "—"
             color = COLORS[["red", "muted", "accent", "gold"][status]] if status in (0, 1, 2, 3) else None
             set_cell(self.pyros, row, 2, label, color)
-            set_cell(self.pyros, row, 3, f"A:{v['armed_pyros'][row]} F:{v['fired_pyros'][row]}")
+            set_cell(self.pyros, row, 3, f"A:{text(v['armed_pyros'][row])} F:{text(v['fired_pyros'][row])}")
             set_cell(self.pyros, row, 4, text(v["pyro_resistances"][row]))

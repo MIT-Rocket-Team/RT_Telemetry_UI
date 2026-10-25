@@ -243,6 +243,15 @@ def bridge(engine="", release=""):
 def package(target, engine="", release=""):
     if target and target != platform.system():
         raise SystemExit(f"Build {target} on a native {target} machine; PyInstaller is not a cross-compiler.")
+    # ctypes-loaded SRT is a required part of the standalone video package.
+    # Verify it before packaging so a developer's system library cannot mask a
+    # missing runtime in the delivered app.
+    sys.path.insert(0, str(ROOT / "src"))
+    from rocket_gnc_monitor.network.media_srt import library, runtime_directory
+    try:
+        library()
+    except OSError as exc:
+        raise SystemExit(f"Network video runtime missing: {exc}. Run make network-media SRT_LIBRARY=/path/to/native/library first.") from exc
     if engine or release:
         bridge(engine, release)
         runtime()
@@ -286,6 +295,8 @@ def package(target, engine="", release=""):
         "pyinstaller",
         "mgrs",
         "openlocationcode",
+        "aiohttp", "aiohappyeyeballs", "aiosignal", "attrs", "frozenlist",
+        "idna", "ifaddr", "multidict", "propcache", "yarl", "zeroconf",
     ):
         dist = importlib.metadata.distribution(name)
         for file in dist.files or []:
@@ -315,6 +326,9 @@ def package(target, engine="", release=""):
         "engine": json.loads((VENDOR / "engine.json").read_text()),
         "runtime": json.loads((VENDOR / "java-runtime.json").read_text()),
         "ffmpeg_sha256": sha(imageio_ffmpeg.get_ffmpeg_exe()),
+        "station_network_protocol": "1.0",
+        "network_media_native": {path.name: sha(path) for path in runtime_directory().iterdir()
+            if path.is_file() and path.suffix == (".dll" if platform.system() == "Windows" else ".dylib")},
     }
     write(VENDOR / "build-manifest.json", metadata)
     ffinfo = subprocess.run(

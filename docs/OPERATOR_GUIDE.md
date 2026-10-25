@@ -1,6 +1,40 @@
 # Operator guide
 
-The startup wizard selects Launch or Away 1–4, Telemetry or Video, Balius or Iris, and launch site. Launch Telemetry opens Flight and Systems windows; Away Telemetry is a reduced single-window layout. Video has its own workspace. Remembering setup is optional and off by default. See [station modes](V0A_STATION_MODES.md) for role-specific placement, receiver routing, URRG presets, Iris-only APRS and the read-only LAN link.
+The startup wizard selects Base or Away 1–4, Telemetry or Video, Balius or Iris, and launch site. Main Base Telemetry shows its instruments in one window without tabs; the optional secondary `launch-v2` layout retains tabs. Away Telemetry is a reduced single-window layout. Video has its own workspace. Remembering setup is optional and off by default. See [station modes](V0A_STATION_MODES.md) for receiver routing, URRG presets and Iris-only APRS.
+
+## Test two station computers
+
+1. Put both computers on the same station LAN. Start one as **Base Station / Telemetry** and the other as **Away Station 1 / Telemetry**, selecting the same vehicle.
+2. Open **Network…** at Base. Choose **New mission**, then **Apply network configuration**. Copy its mission UUID.
+3. At Away, open **Network…**, paste that UUID and apply. Alternatively select the discovered Base row and use **Join selected station's mission**. Mission names and Wi-Fi names do not join missions. A UUID is intentionally not restored on the next launch.
+4. Discovery should show both applications online. If multicast is blocked, enter the other computer's displayed HTTP address under **Manual peer addresses** on **both** computers and apply. Use the actual LAN address, not `127.0.0.1`. Allow the application through the private-network firewall and macOS Local Network permission prompt.
+5. At Away, connect the telemetry board and start polling. At Base, the GS1 tile shows network round-trip time and remote sample age. Select **GS1 · network · READ ONLY** as the telemetry display source to populate the plots, rocket state and instrument tables. Switch back to **Local telemetry board** for local commands. Remote samples never enable local hardware commands or pointer tracking.
+6. For video testing, start the applications in their **Video** roles, join the same mission, and select USB cameras at Away. Base receives thumbnails automatically. Double-click a thumbnail to request main quality for its matching channel; the previous large view remains until the replacement decodes. Base's local digital camera remains independently selectable.
+
+The same two computers can test telemetry and video sequentially. Running two roles on one computer requires separate `--data-dir` folders and `--network-port` values; each process owns a separate installation identity and must use distinct USB devices.
+
+Command-line example for a shared mission (replace the sample UUID and LAN addresses):
+
+```sh
+RocketGNCMonitor-v0a --site base --role telemetry --vehicle balius --skip-setup \
+  --mission-id 33333333-3333-4333-8333-333333333333 --peer http://192.168.1.12:8766
+RocketGNCMonitor-v0a --site away1 --role telemetry --vehicle balius --skip-setup \
+  --mission-id 33333333-3333-4333-8333-333333333333 --peer http://192.168.1.11:8766
+```
+
+On Mac the executable is inside `RocketGNCMonitor-v0a.app/Contents/MacOS/`; on Windows use `RocketGNCMonitor-v0a.exe`. `--no-discovery` uses manual peers only; `--no-network` starts without the service. Network discovery does not open serial ports or cameras.
+
+## Assign devices and send station locations
+
+Open **Settings → Station assignments & locations…** at Base. Each discovered computer is identified by its persistent node UUID, address and role. Select the exact computer, assign GS1–GS4, and enter latitude/longitude, MGRS or a Plus Code plus WGS84 ellipsoid altitude. Send the update and check the applied acknowledgement. Configure the telemetry and video computers for a station separately; they are separate devices even when their GS number matches.
+
+Both devices must already share a mission, and the Away device must have discovered or manually connected to the Base application. A station-number change restarts the remote station view and disconnects its local devices; reconnect those inputs afterward. A location-only update pauses pointer tracking and updates the station's mission coordinates. Review the position before resuming tracking. The assignment is recorded against the device UUID; it never merges conflicting publishers silently. Saved station locations are restored only when explicitly joining their matching mission and GS identity.
+
+## Reading network health
+
+The two GS bars remain distinct: the LTU-XR path bar uses measured **application round-trip time**, not radio RSSI or a direct LTU management reading. Rocket age is a lower bound derived from source-local timing plus elapsed receive time; the computers' monotonic clocks are never subtracted. GS titles use green below 250 ms, orange below 1 s, red at 1 s or older/no sample, and gray when the station link is absent. Separate T/V labels show telemetry/video application status: stale after 3 s and offline after 10 s. The network dialog exposes mission mismatches, duplicate identities, rejected peers and archive errors.
+
+Accepted observations are archived independently of the UI under the application data directory's `network-observations/`. Exact local wire bytes and complete remote events are retained with their source identity. This does not estimate a fused trajectory or average duplicate packets. Physical USB/radio commands remain local; network command forwarding is not enabled.
 
 Lucida Grande Regular/Bold is included in the application package and loaded privately on every platform. No font installation is needed.
 

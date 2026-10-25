@@ -110,11 +110,15 @@ def test_remote_staleness_and_disconnection_never_label_retained_frames_live(qtb
     wall.update_remote_frame("away1", "analog", frame("green"), quality="-70 dBm", received=99.0)
     key = wall.primary_views["analog"].pixmap().cacheKey()
     assert "LIVE" in wall.primary_status["analog"].text()
-    clock[0] = 105.0
+    clock[0] = 101.5
     wall.refresh_status()
     for label in (wall.primary_status["analog"], wall.thumbnails[("away1", "analog")].status_label):
         assert "STALE" in label.text() and "LIVE" not in label.text()
         assert "-70 dBm" in label.text()
+    clock[0] = 105.0
+    wall.refresh_status()
+    assert "UNAVAILABLE" in wall.primary_status["analog"].text()
+    assert "UNAVAILABLE" in wall.primary_tiles["analog"].image.overlay
     assert wall.primary_views["analog"].pixmap().cacheKey() == key
     wall.mark_remote_unavailable("away1", "analog", "Station disconnected")
     assert "Station disconnected" in wall.primary_status["analog"].text()
@@ -193,7 +197,7 @@ def test_local_source_context_distinguishes_live_camera_file_and_paused_replay(q
     assert "LIVE" in wall.primary_status["digital"].text()
     clock[0] += 6
     wall.refresh_status()
-    assert "STALE" in wall.primary_status["digital"].text()
+    assert "UNAVAILABLE" in wall.primary_status["digital"].text()
     assert "LIVE" not in wall.primary_status["digital"].text()
     wall.select_remote("away2", "digital")
     wall.set_local_source("Replay · paused", live=False)
