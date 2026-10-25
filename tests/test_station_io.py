@@ -39,7 +39,7 @@ def message(name="base"):
         "version": 1,
         "name": name,
         "mode": "LIVE",
-        "mission": "Zephyrus",
+        "mission": "Test flight",
         "utc": time.time(),
         "sample_age_s": 0.5,
         "telemetry": {
@@ -234,7 +234,7 @@ def test_panel_preferences_offline_and_controller_isolation(qtbot, tmp_path):
     from rocket_gnc_monitor.domain import Sample
     from rocket_gnc_monitor.station_panel import StationNetworkPanel
 
-    controller = Controller(tmp_path)
+    controller = Controller(tmp_path, vehicle="iris")
     controller.timer.stop()
     controller.latest = Sample(12.5, 10, "legacy", altitude=250, latitude=42.5, longitude=-76.5)
     panel = StationNetworkPanel(controller)
@@ -267,3 +267,102 @@ def test_panel_preferences_offline_and_controller_isolation(qtbot, tmp_path):
         controller.shutdown()
     assert not panel.timer.isActive()
     assert not any(t.name in {"StationLink", "APRSReceiver"} and t.is_alive() for t in threading.enumerate())
+
+
+@pytest.mark.parametrize("vehicle", ["balius", "iris"])
+def test_panel_aprs_availability_follows_vehicle_with_saved_preferences(qtbot, tmp_path, monkeypatch, vehicle):
+    from rocket_gnc_monitor.controller import Controller
+    from rocket_gnc_monitor.station_panel import StationNetworkPanel
+
+    (tmp_path / "station_network.json").write_text(json.dumps({
+        "aprs_host": "192.168.2.10", "aprs_port": 8002, "aprs_callsign": "N0CALL-7",
+    }))
+    controller = Controller(tmp_path, vehicle=vehicle)
+    controller.timer.stop()
+    panel = StationNetworkPanel(controller)
+    qtbot.addWidget(panel)
+    panel.show()
+    starts = []
+    monkeypatch.setattr(panel.aprs, "start", lambda *args: starts.append(args))
+    try:
+        available = vehicle == "iris"
+        assert panel.aprs_section.isVisible() is available
+        assert panel.aprs_button.isEnabled() is available
+        assert not panel.aprs.active
+        assert panel.listen_button.isVisible() and panel.listen_button.isEnabled()
+        assert panel.connect_button.isVisible() and panel.connect_button.isEnabled()
+        assert panel.aprs_host.text() == "192.168.2.10"
+        panel.toggle_aprs()
+        assert starts == ([("192.168.2.10", 8002, "N0CALL-7")] if available else [])
+        if not available:
+            assert panel.aprs_status.text() == ""
+            assert "Dire Wolf" not in panel.topology.toolTip()
+    finally:
+        panel.shutdown()
+        controller.shutdown()
+
+
+@pytest.mark.parametrize("vehicle", ["balius", "iris"])
+def test_controller_snapshot_only_advertises_aprs_for_iris(qtbot, tmp_path, vehicle):
+    from rocket_gnc_monitor.controller import Controller
+
+    controller = Controller(tmp_path, vehicle=vehicle)
+    controller.timer.stop()
+    fix = parse_aprs_position(frame())
+    try:
+        payload = controller_snapshot(controller, "station", fix)
+        if vehicle == "iris":
+            assert payload["aprs"]["callsign"] == "N0CALL-7"
+            assert payload["aprs"]["latitude"] == fix.latitude
+        else:
+            assert payload["aprs"] is None
+    finally:
+        controller.shutdown()
+
+
+def test_switch_to_balius_disconnects_aprs_and_withdraws_fix_from_live_lan(qtbot, tmp_path):
+    from rocket_gnc_monitor.controller import Controller
+    from rocket_gnc_monitor.station_panel import StationNetworkPanel
+
+    controller = Controller(tmp_path, vehicle="iris")
+    controller.timer.stop()
+    panel = StationNetworkPanel(controller)
+    panel.timer.stop()
+    qtbot.addWidget(panel)
+    panel.show()
+    remote = StationLink()
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(1)
+        listener.settimeout(3)
+        panel.aprs_port.setValue(listener.getsockname()[1])
+        try:
+            panel.toggle_aprs()
+            with listener.accept()[0] as source:
+                source.sendall(kiss(frame()))
+                wait_for(lambda: panel.aprs.snapshot()["latest"] is not None)
+                panel.lan.listen("127.0.0.1", 0)
+                wait_for(lambda: panel.lan.snapshot()["port"] is not None)
+                panel._last_publish = 0
+                panel.refresh()
+                remote.connect("127.0.0.1", panel.lan.snapshot()["port"])
+                wait_for(lambda: remote.snapshot()["remote"] is not None)
+                assert remote.snapshot()["remote"]["aprs"]["callsign"] == "N0CALL-7"
+
+                controller.vehicle = "balius"
+                panel.refresh()
+                assert not panel.aprs.active
+                assert not panel.aprs_section.isVisible()
+                assert panel.aprs_status.text() == ""
+                assert panel.lan.active
+                wait_for(lambda: remote.snapshot()["remote"]["aprs"] is None)
+
+                controller.vehicle = "iris"
+                panel.refresh()
+                assert panel.aprs_section.isVisible()
+                assert not panel.aprs.active  # Changing vehicle never reconnects a receiver.
+                assert remote.snapshot()["remote"]["aprs"] is None
+        finally:
+            remote.stop()
+            panel.shutdown()
+            controller.shutdown()

@@ -1,4 +1,4 @@
-"""Legacy Zephyrus uplinks and CSV fields, preserved from the team's rocket.py."""
+"""Legacy telemetry uplinks and CSV fields, preserved from the team's rocket.py."""
 
 from __future__ import annotations
 import math
@@ -9,7 +9,6 @@ from .domain import finite
 COMMANDS = {
     "arm_pyros": 0x01,
     "advance_state": 0x02,
-    "set_airbrakes_angle": 0x03,
     "pd_activate": 0x04,
     "set_roll_control_servo_angle": 0x05,
     "fire_pyros": 0x06,
@@ -35,7 +34,7 @@ def rocket_packet(command, value=None):
         raise ValueError("Unknown rocket command")
     data = bytearray(16)
     data[0], data[13] = 0xAA, COMMANDS[command]
-    if command in {"set_airbrakes_angle", "set_roll_control_servo_angle"}:
+    if command == "set_roll_control_servo_angle":
         if not finite(value):
             raise ValueError("Angle must be a finite number")
         struct.pack_into("<f", data, 9, value)

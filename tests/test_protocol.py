@@ -1,6 +1,6 @@
 import struct
 import pytest
-from rocket_gnc_monitor.protocol import ZephyrusDecoder, pointer_packet, validate_route
+from rocket_gnc_monitor.protocol import TelemetryDecoder, pointer_packet, validate_route
 from rocket_gnc_monitor.domain import Mission
 
 
@@ -20,7 +20,7 @@ def frame(sequence=1, tick=1000, latitude=42.0, altitude=123.25):
 
 
 def test_stream_splits_noise_corruption_and_recovery():
-    decoder = ZephyrusDecoder()
+    decoder = TelemetryDecoder()
     corrupted = bytearray(frame(2))
     corrupted[12] ^= 1
     stream = b"garbage\xab" + frame() + corrupted + frame(3, 2000)
@@ -41,12 +41,12 @@ def test_sync_inside_valid_payload_not_a_frame_boundary():
     data = bytearray(frame())
     data[18:20] = b"\xab\xab"
     data[129] = sum(data[2:129]) % 256
-    decoder = ZephyrusDecoder()
+    decoder = TelemetryDecoder()
     assert len(decoder.feed(data + frame(2))) == 2
 
 
 def test_rollover_then_reboot_starts_new_time_epoch():
-    decoder = ZephyrusDecoder()
+    decoder = TelemetryDecoder()
     values = decoder.feed(frame(65535, 2**32 - 1) + frame(0, 25) + frame(1, 10))
     assert values[1].t > values[0].t
     assert values[2].t == 0.010
@@ -55,7 +55,7 @@ def test_rollover_then_reboot_starts_new_time_epoch():
 
 
 def test_invalid_coordinates_and_nan_do_not_look_valid():
-    value = ZephyrusDecoder().feed(frame(latitude=100, altitude=float("nan")))[0]
+    value = TelemetryDecoder().feed(frame(latitude=100, altitude=float("nan")))[0]
     assert value.gps_fix == 0 and value.latitude is None
     assert value.altitude is None
 

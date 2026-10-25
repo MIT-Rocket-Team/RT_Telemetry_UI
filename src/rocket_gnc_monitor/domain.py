@@ -1,4 +1,4 @@
-"""Qt-independent contracts, coordinate transformations and deterministic demo data."""
+"""Qt-independent contracts, coordinate transformations."""
 
 from __future__ import annotations
 
@@ -263,44 +263,3 @@ def validate_wind(layers):
         if math.hypot(layer["east"], layer["north"]) > 150:
             raise ValueError("Wind exceeds 150 m/s")
         last = layer["height"]
-
-
-def demo_sample(t, sequence, canards=4):
-    # Repeatable fictional flight; no physics-validity claim.
-    t = min(max(t, 0), 140)
-    height = max(0, 1500 * math.sin(math.pi * t / 140))
-    velocity = 1500 * math.pi / 140 * math.cos(math.pi * t / 140) if 0 < t < 140 else 0
-    east, north = t * 3.8, t * 1.7
-    angles = [18 * math.sin(t * 0.24), 4 * math.sin(t * 0.11), 2 * math.cos(t * 0.16)]
-    actuators = {
-        f"Canard {i + 1}": {
-            "demand": 6 * math.sin(t * 1.1 + i),
-            "measured": 5.8 * math.sin(t * 1.1 + i - 0.06),
-        }
-        for i in range(canards)
-    }
-    actuators.update(
-        {
-            f"Tab {i + 1}": {
-                "demand": 4 * math.sin(t * 0.7 + i),
-                "measured": 3.9 * math.sin(t * 0.7 + i - 0.05),
-            }
-            for i in range(4)
-        }
-    )
-    return Sample(
-        t=t,
-        sequence=sequence,
-        source="DEMO",
-        altitude=height,
-        velocity=velocity,
-        attitude=angles,
-        rates=[4.32 * math.cos(t * 0.24), 0.44 * math.cos(t * 0.11), -0.32 * math.sin(t * 0.16)],
-        acceleration=[0, 0, 9.8 + 3 * math.sin(t)],
-        enu=[east, north, height],
-        battery=12.4 - t * 0.007,
-        rssi=-64 - 7 * math.sin(t / 20),
-        phase="Ascent" if t < 70 else "Descent" if t < 140 else "Landed",
-        actuators=actuators,
-        details={"attitude_kind": "Synthetic Euler angles", "schema_version": 1},
-    )

@@ -1,6 +1,6 @@
 # Operator guide
 
-The startup wizard selects Launch or Away 1–4, Telemetry or Video, Balius or Iris, and launch site. Launch Telemetry opens Flight and Systems windows; Away Telemetry is a reduced single-window layout. Video has its own workspace. Remembering setup is optional and off by default. See [station modes](V0A_STATION_MODES.md) for role-specific placement, receiver routing, URRG presets, APRS and the read-only LAN link.
+The startup wizard selects Launch or Away 1–4, Telemetry or Video, Balius or Iris, and launch site. Launch Telemetry opens Flight and Systems windows; Away Telemetry is a reduced single-window layout. Video has its own workspace. Remembering setup is optional and off by default. See [station modes](V0A_STATION_MODES.md) for role-specific placement, receiver routing, URRG presets, Iris-only APRS and the read-only LAN link.
 
 Lucida Grande Regular/Bold is included in the application package and loaded privately on every platform. No font installation is needed.
 
@@ -8,7 +8,7 @@ Lucida Grande Regular/Bold is included in the application package and loaded pri
 
 A normal session opens LIVE with no automatic serial connection or camera capture. Link indicators separate computer-to-telemetry-board USB from rocket-to-ground radio reception; Away additionally shows its local pointer USB connection. Ground board connected means its serial port opened. Rocket telemetry live means a checksum-valid LIVE packet arrived within the mission's freshness limit; no valid packet yet shows Waiting, and expired reception shows Lost / stale. The protocol has no separate radio handshake. Reconnecting the ground board requires a new packet before the radio can be shown live.
 
-Connect each board independently at 115200 baud. Connecting the ground board opens its port; click **Start Polling** to receive telemetry. **Stop Polling** pauses reception while leaving the serial port open. **Start Logging** creates a session immediately when eligible telemetry or video is available. At Away stations, manual pointer controls require the pointer board independently. Launch alone has uplink authority on its one telemetry board, but LIVE rocket commands remain locked while the software-enable protocol is undefined. In DEMO, turn on the labelled simulated uplink switch to exercise those controls. The control panel distinguishes connected/polling stopped, waiting, live reception, and stale reception.
+Connect each board independently at 115200 baud. Connecting the ground board opens its port; click **Start Polling** to receive telemetry. **Stop Polling** pauses reception while leaving the serial port open. **Start Logging** creates a session immediately when eligible telemetry or video is available. At Away stations, manual pointer controls require the pointer board independently. Launch alone has uplink authority on its one telemetry board, but LIVE rocket commands remain locked while the software-enable protocol is undefined. The control panel distinguishes connected/polling stopped, waiting, live reception, and stale reception.
 
 ## Away virtual antenna pointer and trajectory rehearsal
 
@@ -32,7 +32,7 @@ Open **View → 3D flight…**, or **3D…** beside the Flight overview trajecto
 - Play/pause, rewind, change speed, scrub the timeline, or jump to ignition, burnout, apogee, deployment and touchdown events. Playback uses elapsed time, independent of repaint frequency.
 - **Follow monitor time** displays the virtual-pointer rehearsal time, or the aligned telemetry flight time. This shows the simulation at that time; it does not actuate the pointer. Turn it off for independent inspection.
 - Gold is the reference, teal is the actual track when the mission and reference origins match, and purple is the configured antenna. Camera movement and independent playback send no hardware commands.
-- Re-run OpenRocket for older references that lack quaternion/event columns. Old four-column references remain usable, with a path-aligned illustrative rocket and an explicit unavailable-attitude/events label. Motor ignition or recovery is never inferred from height or descending motion. The supplied Zephyrus test model has no recovery event in its nominal output; the bundled small example does.
+- Re-run OpenRocket for older references that lack quaternion/event columns. Old four-column references remain usable, with a path-aligned illustrative rocket and an explicit unavailable-attitude/events label. Motor ignition or recovery is never inferred from height or descending motion. The test-launch fixture model has no recovery event in its nominal output; the bundled small example does.
 - The rocket and canopy are schematic, not a CAD model or a deployment-dynamics prediction. Engine attitude held after tumble/recovery and insufficient angular sampling are labeled explicitly. Flight files retain the added motion/event data.
 
 ## Global settings
@@ -62,21 +62,15 @@ The original shortcuts are retained wherever their station/role permits the acti
 
 The Serial controls menu shows the shortcuts and current toggle state. Each action follows its board's connection state.
 
+On macOS, **⌘W** closes the active window or dialog and **⌘Q** quits the application. Closing the primary Flight window ends the session and closes its owned windows. Closing the Systems window leaves Flight running; **View → Arrange station displays** brings Systems back.
+
 ## Rocket controls
 
-The Launch **Systems** window shows the complete legacy telemetry/GPS/servo/cell tables, state and zero commands, roll and airbrake angles, PD Activate, VTX 1/3/5/8 W, power rail requests and readbacks, BMS status, six pyro channels, and emergency recovery commands. The 3.3 V request stays on, matching the previous UI; Total is an aggregate indicator. State advance, pyro ARM/FIRE, and emergency recovery retain their confirmation dialogs. Pyro actions require selecting channels 0–5. Radio freshness is displayed independently from the ground serial connection.
+The Launch **Systems** window shows the complete legacy telemetry/GPS/servo/cell tables, state and zero commands, roll servo angle, PD Activate, VTX 1/3/5/8 W, power rail requests and readbacks, BMS status, six pyro channels, and emergency recovery commands. The 3.3 V request stays on, matching the previous UI; Total is an aggregate indicator. State advance, pyro ARM/FIRE, and emergency recovery retain their confirmation dialogs. Pyro actions require selecting channels 0–5. Radio freshness is displayed independently from the ground serial connection.
 
-## Rehearse
+## Recorded-file replay
 
-Choose **DEMO** explicitly (or run `make demo`) to play the actual Zephyrus test launch. **GS2** is the default receiver log; select **GS1** or **GS3** in the playback strip. The logs remain independent, preserving each receiver's timing, gaps, packet numbers, UTC timestamps and measurements. All three are bundled for offline use. No serial transport opens in DEMO and all operator commands are simulated.
-
-Playback begins **five seconds before the first recorded FLIGHT state**. Use Pause/Play, the timeline, 0.25×–4× speed, **Launch −5s**, or **Full start** to review the complete recording. Seeking reconstructs the recorded history up to that point. Playback stops at the final received sample; these recordings end during MAIN descent and do not contain touchdown. Starting again returns to the launch cue. Stop logging before changing recordings or seeking; pause and speed changes are allowed during logging. Returning to LIVE clears demo data and retains the configured mission and previous reference.
-
-The track uses recorded GPS horizontal offsets from the launch transition and the reported barometric altitude. This local display frame is not a surveyed altitude datum or simulated prediction. Samples without a 3D fix, or more than 20 km from launch, are omitted from the track and identified in the banner; their original values remain in telemetry and Diagnostics. GS1/GS3 contain corrupt GPS readings. GS3 has no valid receiver GPS, so automatic pointer tracking is unavailable for that log. GS1/GS2 can rehearse pointing using recorded receiver coordinates and the original barometric-height calculation.
-
-Four recorded legacy servo drives appear; new canard/tab feedback remains unavailable. Zero-valued battery readings, state anomalies, and other original data are retained. Local video panels show explicitly labelled **TEST PATTERN** feeds; no launch video was supplied. The available panels follow the selected station/vehicle receiver assignment. Demo session recordings retain source filename/hash, original UTC and row text, all 43 legacy fields, and simulated-command events. Raw radio bytes/checksums are unavailable for these decoded CSVs.
-
-View → Daylight theme changes contrast. Choose plan, side or projected perspective for the track. Imported simulation references show a dashed trace and same-time marker. The compact rocket pane retains raw gyro-integral readouts but does not treat them as attitude: it shows **ORIENTATION UNAVAILABLE** until a validated orientation is supplied. Motor/parachute telemetry status also remains unknown. Select **OpenRocket reference** explicitly to view simulated orientation/events; its upright azimuth slider changes only the camera. Dataset provenance and quality notes: [DEMO_DATA.md](DEMO_DATA.md).
+Open a saved flight or session to inspect telemetry and any recorded video in **REPLAY**. Physical transports are disconnected and replay cannot send commands. Play, pause, seek and speed controls are described under [Sessions](#sessions). For simulation playback without hardware, use the OpenRocket reference and virtual-pointer workflow above.
 
 ## Configure and connect
 
@@ -110,7 +104,7 @@ With both boards connected and polling, use **Send to AntPtr** to freeze the gro
 
 Set the site and a timezone-bearing weather time, e.g. `2026-09-18T16:00:00Z`. Retrieve weather or enter/import a manual profile, then Apply wind after table edits. Heights are metres above launch, directions meteorological **from** true north, speed m/s. Internally wind uses east/north vectors. Retrieved geopotential heights are converted to geometric MSL height then height above launch. The nearest available hour within one hour is used; outside layer coverage the nearest endpoint wind is held. Review coverage. Raw requests/responses are retained with missions/sessions for offline reuse. [Open-Meteo](https://open-meteo.com/en/docs) weather data is attributed under CC BY 4.0.
 
-Select a `.ork` with a saved simulation/motor configuration; index 0 means the first saved simulation. The Zephyrus test-launch motor **MITRT N8406** is bundled and loaded automatically, so `zephy_testlaunch.ork` works without selecting an extra motor file. Other custom `.eng`/`.rse` curves can be added with **Select custom motor files…**; a missing curve is reported by name before simulation. All motor inputs are copied into the job folder and hashed. Run nominal simulation; Cancel terminates its process without stopping telemetry.
+Select a `.ork` with a saved simulation/motor configuration; index 0 means the first saved simulation. The test-launch motor **MITRT N8406** is bundled and loaded automatically, so `test_launch.ork` works without selecting an extra motor file. Other custom `.eng`/`.rse` curves can be added with **Select custom motor files…**; a missing curve is reported by name before simulation. All motor inputs are copied into the job folder and hashed. Run nominal simulation; Cancel terminates its process without stopping telemetry.
 
 The bridge uses the saved motor/flight configuration, specified rail/site/wind, ISA atmosphere, zero turbulence standard deviation, fixed seed and first output branch. Saved simulation extensions and the fork's global inertia override are disabled. Inspect `trajectory.json` warnings/branch count and `worker.log` in the job folder. Controlled canard/tab dynamics remain unqualified.
 
@@ -125,7 +119,6 @@ A flight file contains mission settings (including launch-site choice, wind and 
 - During logging: **Save flight** snapshots committed telemetry while logging continues. Video includes only finalized segments; the segment currently recording is omitted. **Stop Logging and save again** to include the final segment and telemetry. Active snapshots remain labeled as snapshots, with dropped-record/error information retained.
 - After stopping logging: Save includes the last session in the current source mode and waits for its video to finish closing.
 - In REPLAY: Save includes the opened session and current playback position.
-- In DEMO without a recorded session: Save includes the entire selected GS1/GS2/GS3 dataset and the displayed playback position. It does not create fictional launch video or raw radio bytes.
 - In LIVE without a recording: Save includes only the displayed telemetry buffer (up to 6,000 samples), explicitly labeled as such. Use **Start Logging** for a complete capture.
 - Before telemetry arrives: Save creates a planning flight containing mission/model/reference only.
 
@@ -139,4 +132,4 @@ Open the folder in Sessions. Play/pause, seek, 0.1-second step and 0.25×–4× 
 
 Video uses host timing, not exposure timestamps. A positive mission video offset delays video; a negative offset advances it. Paused seek decodes one frame for each recorded stream. Each active channel retains separate segment directories and replay timing; all recorded channels are included in saved flight files. Older single-video recordings open in Digital. A panel's Stop also pauses that replay feed until the next seek or playback restart. Reconnect creates a new segment directory for that stream. A crash may lose the active video segment and uncommitted telemetry while finalized data remain recoverable.
 
-Import Zephyrus CSV converts the audited legacy monitor layout into a replay session, retaining the original file, extra columns and quality limitations. Other CSV layouts are rejected; raw packet checksums are unavailable for CSV imports. Serial reconnect is manual. New vehicle actuator feedback requires a new verified wire contract.
+Import telemetry CSV converts the audited legacy monitor layout into a replay session, retaining the original file, extra columns and quality limitations. Other CSV layouts are rejected; raw packet checksums are unavailable for CSV imports. Serial reconnect is manual. New vehicle actuator feedback requires a new verified wire contract.

@@ -76,6 +76,8 @@ def camera_devices():
 
 class VideoWorker:
     def __init__(self, kind, source="", record_dir=None, seek=0.0, speed=1.0, single_frame=False):
+        if kind not in {"camera", "file"}:
+            raise ValueError("Unsupported video input")
         self.kind, self.source = kind, source
         self.record_dir = Path(record_dir) if record_dir else None
         self.seek = seek
@@ -93,10 +95,7 @@ class VideoWorker:
 
     def arguments(self):
         args = [ffmpeg(), "-hide_banner", "-loglevel", "warning", "-y"]
-        if self.kind == "demo":
-            pattern = {"analog": "smptebars", "analog2": "testsrc"}.get(self.source, "testsrc2")
-            args += ["-re", "-f", "lavfi", "-i", f"{pattern}=size=960x540:rate=30"]
-        elif self.kind == "camera":
+        if self.kind == "camera":
             if platform.system() == "Darwin":
                 args += ["-f", "avfoundation", "-framerate", "30", "-i", f"{self.source}:none"]
             elif platform.system() == "Windows":

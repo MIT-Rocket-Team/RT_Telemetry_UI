@@ -56,12 +56,14 @@ def test_wind_direction_from_and_layer_validation():
 
 
 def test_reference_import_roundtrip_and_no_extrapolation(tmp_path):
-    ref = Trajectory.demo()
+    ref = Trajectory([[0, 0, 0, 0], [10, 5, 10, 100]],
+                     dict(schema_version=1, frame="ENU", units="m,s", synthetic=True,
+                          altitude_datum="launch_relative", origin=None))
     path = tmp_path / "reference.csv"
     ref.save(path)
     loaded = Trajectory.load(path)
     np.testing.assert_allclose(loaded.points, ref.points)
     assert loaded.at(-1) is None and loaded.at(141) is None
-    assert loaded.at(70)[2] == pytest.approx(1500)
+    assert loaded.at(5)[2] == pytest.approx(50)
     with pytest.raises(ValueError):
         Trajectory([[0, 0, 0, 0], [0, 1, 1, 1]], ref.manifest)

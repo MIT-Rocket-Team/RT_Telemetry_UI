@@ -13,13 +13,12 @@ from types import MappingProxyType
 import uuid
 from PySide6.QtCore import QObject, QTimer, Signal
 from .domain import Mission, pointing, target_position, to_enu, finite
-from .demo import DemoFlight
 from .devices import SerialWorker, serial_device_key
 from .protocol import pointer_packet
 from .recording import SessionReader, SessionRecorder
 from .trajectory import Trajectory, SimulationJob
 from .media import DEFAULT_VIDEO_CHANNELS, VIDEO_STREAMS, VideoWorker
-from .zephyrus import rocket_packet, legacy_values
+from .rocket_protocol import rocket_packet, legacy_values
 from .settings import AppSettings
 from .virtual_pointer import VirtualPointer, VirtualFlight, VIRTUAL_POINTER_DEVICE
 
@@ -66,7 +65,6 @@ class Controller(QObject):
             serial_labels = {"telemetry": "Telemetry board"}
         self._serial_labels = MappingProxyType(serial_labels)
         self._selected_away_station = None
-        self._simulated_uplink_enabled = False
         channels = tuple(DEFAULT_VIDEO_CHANNELS if video_channels is None else video_channels)
         if not channels or any(channel not in VIDEO_STREAMS for channel in channels):
             raise ValueError("Video channels must be selected from digital, analog and analog2")
@@ -138,14 +136,6 @@ class Controller(QObject):
         self.last_virtual_command = 0.0
         self.tracking = False
         self.last_tracking = 0
-        self.demo_time = 0
-        self.demo = None
-        self.demo_station = "GS2"
-        self.demo_index = 0
-        self.demo_replayed_rows = 0
-        self.demo_playing = False
-        self.demo_speed = 1.0
-        self._reference_before_demo = None
         self.replay_time = 0
         self.replay_playing = False
         self.replay_speed = 1.0
@@ -191,8 +181,6 @@ class Controller(QObject):
             return "Replay is read-only"
         if self.mode == "LIVE" and self.board_layout == "launch":
             return "Launch uplink switch protocol not defined"
-        if self.mode == "DEMO" and self.board_layout == "launch" and not self.simulated_uplink_enabled:
-            return "Simulated launch uplink is OFF"
         if self.mode == "LIVE" and self.vehicle == "iris":
             return "Iris live command target protocol pending; commands are disabled"
         if self.mode == "LIVE" and not self.command_connected:
@@ -202,25 +190,6 @@ class Controller(QObject):
     @property
     def can_command(self):
         return not self.command_block_reason
-
-    @property
-    def simulated_uplink_enabled(self):
-        """DEMO-only intent; this never reports the physical board switch state."""
-        return self._simulated_uplink_enabled
-
-    def set_simulated_uplink(self, enabled):
-        """Exercise the launch uplink enable switch without transmitting bytes."""
-        if self.board_layout != "launch":
-            raise ValueError("The simulated uplink switch belongs to the launch station")
-        if self.mode != "DEMO":
-            raise ValueError("The launch uplink switch can only be simulated in DEMO mode")
-        if type(enabled) is not bool:
-            raise ValueError("Simulated uplink enable must be a boolean")
-        if enabled == self._simulated_uplink_enabled:
-            return
-        self._simulated_uplink_enabled = enabled
-        self.log("Launch uplink switch simulated", {"enabled": enabled, "source": "DEMO", "placeholder": True})
-        self.changed.emit()
 
     @property
     def remote_pointer_status(self):
@@ -396,17 +365,10 @@ class Controller(QObject):
         return ("RECEIVING" if age <= self.mission.freshness else "STALE"), age
 
     def switch_mode(self, mode, force=False):
-        if mode not in {"LIVE", "DEMO", "REPLAY"}:
+        if mode not in {"LIVE", "REPLAY"}:
             raise ValueError("Unknown source mode")
         if mode == self.mode and not force:
             return
-        # Verify resources before altering the current source or closing a recording.
-        demo = DemoFlight(self.demo_station) if mode == "DEMO" else None
-        if self.mode == "DEMO":
-            self.reference = self._reference_before_demo
-        if mode == "DEMO":
-            self._reference_before_demo = self.reference
-            self.reference = None
         self.stop_recording()
         if self.reader:
             self.reader.close()
@@ -418,7 +380,6 @@ class Controller(QObject):
             self.disconnect(role)
         self.generation += 1
         self.mode = mode
-        self._simulated_uplink_enabled = False
         self.latest = None
         self.history.clear()
         self.track.clear()
@@ -429,93 +390,21 @@ class Controller(QObject):
         self.alerts.clear()
         self.alert_since.clear()
         self.mission.pointer_calibrated = False
-        self.states = {r: "Simulated" if mode == "DEMO" else "Disconnected" for r in self.workers}
-        self.pointer_status = "Demo" if mode == "DEMO" else "Disconnected"
+        self.states = {r: "Disconnected" for r in self.workers}
+        self.pointer_status = "Disconnected"
         if mode == "LIVE" and self.board_layout == "launch":
             self.pointer_status = self.remote_pointer_status
         self.replay_playing = False
         self.flight_zero = 0
         self.time_aligned = mode != "LIVE"
-        self.demo = demo
-        self.demo_playing = False
         self.stats = dict(accepted=0, rejected=0, discarded=0, gaps=0)
-        if mode != "DEMO" and self.reference and self.reference.manifest.get("synthetic"):
+        if self.reference and self.reference.manifest.get("synthetic"):
             self.reference = None
         self.stop_video()
         for stream in self.video_channels:
             self.video_reset.emit(stream)
-        if mode == "DEMO":
-            self.seek_demo(self.demo.cue)
-            self.demo_playing = True
-            for stream in self.video_channels:
-                self.start_video("demo", stream, stream=stream)
         self.log(f"Source changed to {mode}; physical pointer transport closed")
         self.changed.emit()
-
-    def select_demo(self, station):
-        if self.mode != "DEMO" or station == self.demo_station:
-            return
-        if self.recorder:
-            raise ValueError("Stop logging before changing demo recordings")
-        demo = DemoFlight(station)
-        self.demo, self.demo_station = demo, station
-        self.last_session_path = None
-        self.seek_demo(demo.cue)
-        self.demo_playing = True
-        self.log(f"Zephyrus test flight · {station} selected")
-
-    def seek_demo(self, elapsed):
-        if self.mode != "DEMO" or self.demo is None:
-            return
-        if self.recorder:
-            raise ValueError("Stop logging before seeking the demo")
-        self.demo_time = max(0.0, min(float(elapsed), self.demo.duration))
-        self.demo_index = self.demo.index_at(self.demo_time) + 1
-        self.history.clear()
-        self.track.clear()
-        self.latest = None
-        self.tracking = False
-        self.pointer_sent = self.pointer_requested = None
-        self.pointer_status = "Demo · simulated pointer"
-        self.flight_zero, self.time_aligned = self.demo.flight_zero, True
-        now = time.monotonic()
-        for index in range(max(0, self.demo_index - self.history.maxlen), self.demo_index):
-            sample = self.demo.sample(index, received=now - (self.demo_time - self.demo.times[index]))
-            self.accept(sample)
-        self.demo_replayed_rows = 0
-        self.last_tick = time.monotonic()
-        # History decoding is not elapsed flight time. Anchor the restored samples
-        # to seek completion so slow machines preserve the recorded packet ages.
-        seek_duration = self.last_tick - now
-        for sample in self.history:
-            sample.received += seek_duration
-        self.changed.emit()
-
-    def play_demo(self, playing=None):
-        if self.mode != "DEMO":
-            return
-        target = not self.demo_playing if playing is None else playing
-        if target and self.demo_time >= self.demo.duration:
-            self.seek_demo(self.demo.cue)
-        self.demo_playing = bool(target)
-        self.last_tick = time.monotonic()
-        if not self.demo_playing:
-            self.hold("Demo paused")
-        self.log("Demo playing" if self.demo_playing else "Demo paused")
-        self.changed.emit()
-
-    def advance_demo(self, seconds, now):
-        if not self.demo_playing or self.demo is None:
-            return
-        self.demo_time = min(self.demo.duration, self.demo_time + seconds * self.demo_speed)
-        while self.demo_index < len(self.demo.rows) and self.demo.times[self.demo_index] <= self.demo_time:
-            self.accept(self.demo.sample(self.demo_index, received=now), record=True)
-            self.demo_index += 1
-            self.demo_replayed_rows += 1
-        if self.demo_time >= self.demo.duration:
-            self.demo_playing = False
-            self.hold("Recording ended")
-            self.log("Zephyrus recording ended; final received sample retained")
 
     def disconnect(self, role):
         if role not in self.serial_labels:
@@ -588,7 +477,7 @@ class Controller(QObject):
     def accept(self, sample, record=False):
         if self.ground_connected and self.polling and sample.source == "LIVE":
             self.last_live_received = sample.received
-        if sample.enu is None and self.mission.site_configured and not sample.details.get("demo_station"):
+        if sample.enu is None and self.mission.site_configured and not sample.details.get("position_warning"):
             try:
                 sample.enu = to_enu(
                     *target_position(sample, self.mission),
@@ -633,12 +522,6 @@ class Controller(QObject):
             raise ValueError("Replay cannot transmit pointer commands")
         if self.mode == "LIVE" and self.board_layout == "launch":
             raise ValueError("Remote antenna-pointer transport not configured")
-        if self.mode == "DEMO":
-            self.pointer_sent = angles
-            self.pointer_last_command = command
-            self.pointer_status = "Sent " + command
-            self.log("Pointer command sent", {"angles": angles, "command": command, "source": "DEMO"})
-            return
         if not self.pointer_connected:
             raise ValueError("Antenna pointer is disconnected")
         if self.pointer_pending:
@@ -665,9 +548,6 @@ class Controller(QObject):
         if command == "advance_state":
             value = (self.latest.details.get("state_code", 0) if self.latest else 0) + 1
         packet = rocket_packet(command, value)
-        if self.mode == "DEMO":
-            self.log("Rocket command simulated", {"command": command, "value": value})
-            return
         command_id = uuid.uuid4().hex
         self.workers[self.command_role].send(packet, command_id)
         self.rocket_commands[command_id] = {"command": command, "value": value}
@@ -764,25 +644,11 @@ class Controller(QObject):
                 raise ValueError("Start polling first")
             self.tracking_target()
         self.tracking = True
-        self.log("Tracking started" if self.mode == "LIVE" else "Demo tracking started")
+        self.log("Tracking started")
 
     def tracking_target(self):
         if not self.latest or time.monotonic() - self.latest.received > self.mission.freshness:
             raise ValueError("Rocket position is stale")
-        if self.mode == "DEMO":
-            if not self.demo_playing:
-                raise ValueError("Demo playback is paused")
-            values = legacy_values(self.latest)
-            if (
-                not self.latest.enu
-                or not values["gnd_fix"]
-                or not all(finite(values[key]) for key in ("gnd_lat", "gnd_lon"))
-            ):
-                raise ValueError("Recording has no usable rocket / ground-station GPS")
-            return pointing(
-                (self.latest.latitude, self.latest.longitude, self.latest.altitude),
-                (values["gnd_lat"], values["gnd_lon"], 0.0),
-            )
         if self.latest.source != "LIVE":
             raise ValueError("Tracking needs a live source")
         if self.frozen_ground is None:
@@ -807,13 +673,6 @@ class Controller(QObject):
         self.recorder = SessionRecorder(parent, self.mission, self.mode, self.flight_zero, self.time_aligned)
         self.last_session_path = self.recorder.path
         self.recording_close_future = None
-        if self.mode == "DEMO":
-            self.recorder.manifest.update(
-                demo_recording=dict(station=self.demo.station, **self.demo.metadata),
-                demo_start_offset=self.demo_time,
-                raw_packets_available=False,
-                demo_video="Synthetic test pattern; no launch video supplied",
-            )
         if self.reference:
             self.reference.save(self.recorder.path / "reference.csv")
         self.log("Recording started", {"mode": self.mode})
@@ -858,19 +717,16 @@ class Controller(QObject):
             else self.last_session_path
         )
         active = self.recorder is not None
-        demo = self.demo if self.mode == "DEMO" and session is None else None
-        samples = copy.deepcopy(list(self.history)) if session is None and demo is None else []
+        samples = copy.deepcopy(list(self.history)) if session is None else []
         elapsed = [max(0, s.received - samples[0].received) for s in samples]
         position = (
-            self.replay_time if self.reader else self.demo_time if demo else elapsed[-1] if elapsed else 0
+            self.replay_time if self.reader else elapsed[-1] if elapsed else 0
         )
         scope = (
             "Recording snapshot"
             if active
             else "Recorded session"
             if session
-            else f"Complete Zephyrus {demo.station} dataset"
-            if demo
             else "Displayed telemetry buffer only (up to 6,000 samples)"
             if samples
             else "Mission and simulation"
@@ -895,7 +751,6 @@ class Controller(QObject):
                 time_aligned=aligned,
                 position=position,
                 scope=scope,
-                demo=demo,
                 pending_close=pending,
             ),
         )
@@ -1079,6 +934,8 @@ class Controller(QObject):
                 self.video_reset.emit(channel)
 
     def start_video(self, kind, source="", seek=0, *, stream="digital"):
+        if kind not in {"camera", "file"}:
+            raise ValueError("Unsupported video input")
         if stream is None:
             raise ValueError("Choose an active video channel")
         self._selected_video_channels(stream)
@@ -1229,9 +1086,7 @@ class Controller(QObject):
                 self.hold("Queued command expired")
             elif kind == "rx":
                 self.log(f"{role.title()} RX: " + data[:140])
-        if self.mode == "DEMO":
-            self.advance_demo(dt, now)
-        elif self.mode == "REPLAY" and self.reader and self.replay_playing:
+        if self.mode == "REPLAY" and self.reader and self.replay_playing:
             begin = self.replay_time
             self.replay_time = min(self.reader.duration, begin + dt * self.replay_speed)
             for _, event in self.reader.events(self.replay_time, begin):

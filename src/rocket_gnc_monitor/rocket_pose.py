@@ -1,6 +1,6 @@
 """Read-only rocket attitude and effect states for an illustrative 3D instrument.
 
-The mesh has a right-handed body frame with +Z toward the nose. Legacy Zephyrus
+The mesh has a right-handed body frame with +Z toward the nose. Legacy telemetry
 ``sample.attitude`` values are independent body-rate integrals in degrees, not
 Euler angles. Preserve them as readouts, but never use them to rotate the mesh.
 An adapter may provide ``sample.details['orientation']`` with ``frame`` equal
@@ -13,7 +13,7 @@ These display rotations must never be used for estimation or antenna commands.
 An adapter may supply ``sample.details['flight_status']`` with exact Python bool
 values ``motor_ignited`` (ignition occurred), ``motor_burning`` (burning now) and
 ``parachute_deployed`` (deployment confirmed). Missing/malformed fields are
-unknown. This is an internal adapter contract, not a Zephyrus wire definition.
+unknown. This is an internal adapter contract, not a telemetry wire definition.
 Ignition history does not establish whether a motor is still burning. Rocket
 phase, pyro firing bits and continuity are never treated as event confirmation.
 
@@ -156,11 +156,11 @@ def _orientation_rotation(value):
 
 def _source(mode, sample):
     source = mode.upper() if isinstance(mode, str) else "UNKNOWN"
-    if source not in {"LIVE", "DEMO", "REPLAY"}:
+    if source not in {"LIVE", "REPLAY"}:
         source = "UNKNOWN"
     sample_source = getattr(sample, "source", "")
-    if source == "LIVE" and isinstance(sample_source, str) and sample_source in {"DEMO", "REPLAY", "LEGACY_CSV"}:
-        source = "REPLAY" if sample_source == "LEGACY_CSV" else sample_source
+    if source == "LIVE" and isinstance(sample_source, str) and sample_source and sample_source != "LIVE":
+        source = "REPLAY"
     return source
 
 

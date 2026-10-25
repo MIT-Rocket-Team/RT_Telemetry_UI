@@ -75,7 +75,7 @@ class EmbeddedFlightView(Flight3DDialog):
 
 
 class StationDisplay(QMainWindow):
-    """A companion display shares ownership and cannot silently lose its panels."""
+    """A closable companion display sharing the primary window's controller."""
 
     def __init__(self, owner):
         super().__init__(owner, Qt.WindowType.Window)
@@ -87,15 +87,7 @@ class StationDisplay(QMainWindow):
         self.setMinimumSize(1280, 800)
 
     def closeEvent(self, event):
-        if self.owner.closing or self.owner.station_mode != "base":
-            event.accept()
-        else:
-            event.ignore()
-            self.statusBar().showMessage(
-                "Launch telemetry uses both displays. Relaunch and choose Away telemetry or Video for one window."
-                if self.owner.profile_locked else
-                "Launch station uses both displays. Choose Away station or Video station for one window.", 8000
-            )
+        event.accept()
 
 
 class StationWindow(InstrumentWindow):
@@ -144,6 +136,8 @@ class StationWindow(InstrumentWindow):
         for action in (*self.legacy_actions.values(), *self.flight_actions.values()):
             self.companion.addAction(action)
         self.companion.addAction(self.settings_action)
+        self.companion.addAction(self.close_window_action)
+        self.companion.addAction(self.quit_action)
         self.workspace_ready = True
         self.set_daylight(self.controller.settings.daylight, persist=False)
         self.refresh_actuators()
@@ -239,7 +233,6 @@ class StationWindow(InstrumentWindow):
 
             self.iris_links = IrisLinkPanel(self.controller, station=self.profile.station)
             outer.addWidget(self.iris_links)
-        self.attach(outer, self.demo_bar)
         self.health = QLabel()
         self.health.setObjectName("eyebrow")
         outer.addWidget(self.health)
@@ -406,7 +399,7 @@ class StationWindow(InstrumentWindow):
             self.attach(self.card(key, title), graph, 1)
         layout = self.card("actuators", "GNC / canards, tabs & legacy channels")
         self.attach(layout, self.actuators, 1)
-        note = label("Zephyrus: four drive values; new actuator feedback unavailable.", "muted")
+        note = label("Four recorded drive values; new actuator feedback unavailable.", "muted")
         note.setWordWrap(True)
         layout.addWidget(note)
         self.actuator_note = note
@@ -503,7 +496,7 @@ class StationWindow(InstrumentWindow):
             ("bms", "BMS / enabled & triggered protections", rp.protections),
         ):
             self.attach(self.card(key, title), widget, 1)
-        layout = self.card("commands", "ROCKET COMMANDS / Zephyrus")
+        layout = self.card("commands", "ROCKET COMMANDS")
         grid = QGridLayout()
         grid.setSpacing(4)
         for i, command in enumerate(
@@ -513,7 +506,6 @@ class StationWindow(InstrumentWindow):
         layout.addLayout(grid)
         for title, name in (
             ("Roll °", "set_roll_control_servo_angle"),
-            ("Airbrakes °", "set_airbrakes_angle"),
         ):
             layout.addLayout(row(label(title), rp.servo_inputs[name], rp.buttons[name]))
         layout.addLayout(row(label("VTX"), *rp.vtx_buttons))
@@ -627,7 +619,8 @@ class StationWindow(InstrumentWindow):
             self.network_panel.station_name.setText(
                 f"{self.profile.station_label} · {self.profile.role.title()}"
             )
-        self.attach(self.card("network", "APRS / manual status link"), self.network_panel, 1)
+        network_title = "APRS / manual status link" if self.controller.vehicle == "iris" else "Manual status link"
+        self.attach(self.card("network", network_title), self.network_panel, 1)
 
     def place(self, grid, key, r, c, rs=1, cs=1):
         widget = self.cards[key]
@@ -708,8 +701,8 @@ class StationWindow(InstrumentWindow):
             for args in (
                 ("antenna", 0, 0, 2, 1),
                 ("pointing", 2, 0, 2, 1),
-                ("attitude", 0, 1, 3, 1),
-                ("altitude", 3, 1, 1, 1),
+                ("attitude", 0, 1, 2, 1),
+                ("altitude", 2, 1, 2, 1),
                 ("telemetry", 0, 2, 2, 1),
                 ("gps", 2, 2, 2, 1),
             ):
@@ -826,6 +819,7 @@ class StationWindow(InstrumentWindow):
         for window, screen in windows:
             rect = screen.availableGeometry()
             window.setGeometry(rect.adjusted(4, 4, -4, -4))
+            window.show()
         if second is primary and self.station_mode == "base":
             self.companion.move(primary.availableGeometry().topLeft() + QPoint(28, 28))
             self.statusBar().showMessage(
@@ -890,9 +884,6 @@ class StationWindow(InstrumentWindow):
         if c.mode == "REPLAY":
             label = "Replay · paused" if state.replay_paused or not c.replay_playing else "Replay · playing"
             self.video_wall.set_local_source(f"Replay · unavailable: {error}" if error else label)
-        elif c.mode == "DEMO":
-            label = "Demo · test pattern" if state.config else "Demo · stopped"
-            self.video_wall.set_local_source(f"Demo · unavailable: {error}" if error else label)
         elif error:
             self.video_wall.set_local_source(f"Local video · unavailable: {error}")
         elif not state.config:
@@ -936,10 +927,9 @@ class StationWindow(InstrumentWindow):
             for key, action in self.legacy_actions.items():
                 if key != "log":
                     action.setEnabled(False)
-        self.usb_strip.setVisible(not video and (self.launch_station or c.mode != "DEMO"))
+        self.usb_strip.setVisible(not video)
         if self.launch_uplink is not None:
             self.launch_uplink.refresh()
-        self.demo_bar.setVisible(not video and c.mode == "DEMO")
         self.video_replay_bar.setVisible(video and c.mode == "REPLAY")
         if video:
             self.record_button.setText("Stop recording" if c.recorder else "Start recording")
@@ -1070,6 +1060,9 @@ class StationWindow(InstrumentWindow):
             self.companion.setStyleSheet(style)
 
     def closeEvent(self, event):
+        if self.closing:
+            event.accept()
+            return
         self.closing = True
         if self.wifi_panel is not None:
             self.wifi_panel.cleanup()

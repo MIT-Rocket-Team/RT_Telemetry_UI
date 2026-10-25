@@ -201,7 +201,6 @@ def save_flight(
     time_aligned=False,
     position=0,
     scope="Mission and simulation",
-    demo=None,
     pending_close=None,
 ):
     """Create an atomic ZIP64 archive. Arguments are detached from mutable UI state."""
@@ -237,21 +236,6 @@ def save_flight(
         session_path = payload / "session"
         if session is not None:
             snapshot_session(session, session_path, active)
-        elif demo is not None:
-            samples_session(
-                session_path,
-                mission,
-                (demo.sample(i) for i in range(len(demo.rows))),
-                demo.times,
-                "DEMO",
-                demo.flight_zero,
-                True,
-                dict(
-                    demo_recording=dict(station=demo.station, **demo.metadata),
-                    demo_video="No launch video supplied",
-                    export_scope=scope,
-                ),
-            )
         elif samples:
             samples_session(
                 session_path,

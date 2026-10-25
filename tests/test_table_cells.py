@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QCheckBox, QTableWidget
 
-from rocket_gnc_monitor.protocol import ZephyrusDecoder
+from rocket_gnc_monitor.protocol import TelemetryDecoder
 from rocket_gnc_monitor.station_workspace import StationWindow
 from rocket_gnc_monitor.table_cells import clear_cells, set_cell
 from test_protocol import frame
@@ -39,7 +39,7 @@ def test_station_refresh_retains_all_readout_items_and_updates_values(qtbot, tmp
         window.refresh()
 
     try:
-        refresh(ZephyrusDecoder().feed(frame())[0])
+        refresh(TelemetryDecoder().feed(frame())[0])
         panel = window.rocket_panel
         tables = [panel.telemetry, panel.gps, panel.servos, panel.cells,
                   panel.power, panel.protections, panel.pyros, window.actuators]
@@ -48,7 +48,7 @@ def test_station_refresh_retains_all_readout_items_and_updates_values(qtbot, tmp
                  if table.item(r, c) is not None]
         rail_controls = list(panel.rail_requests)
         for index in range(20):
-            refresh(ZephyrusDecoder().feed(frame(index + 2, altitude=250.5 + index))[0])
+            refresh(TelemetryDecoder().feed(frame(index + 2, altitude=250.5 + index))[0])
             assert all(table.item(r, c) is item for table, r, c, item in items)
         assert panel.telemetry.item(3, 1).text() == "269.500"
         assert panel.cells.item(0, 1).foreground().style() != Qt.BrushStyle.NoBrush

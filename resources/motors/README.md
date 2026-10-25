@@ -4,7 +4,7 @@
 `/Users/mdn/Developer/ActiveControl_MIT_RktTeam/sim/old/dat/ork/TestLaunch_v14.eng`.
 
 Its OpenRocket motor digest is `057a820844b93fe3307401623a92d4c6`, an exact match
-to the motor reference in the user's `benchmarking/ork/zephy_testlaunch.ork`.
+to the motor reference in the user's test-launch model under `benchmarking/ork/`.
 The `.ork` stores the motor's identity, not its thrust-curve samples. Loading
 the model without this custom curve previously produced a zero-length flight.
 

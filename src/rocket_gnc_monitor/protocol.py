@@ -1,4 +1,4 @@
-"""The observed Zephyrus ground station and antenna pointer wire formats."""
+"""The observed rocket ground station and antenna pointer wire formats."""
 
 from __future__ import annotations
 import math
@@ -6,7 +6,7 @@ import struct
 from .domain import Sample, finite
 
 
-class ZephyrusDecoder:
+class TelemetryDecoder:
     FRAME_SIZE = 144
 
     def __init__(self, on_rejected=None):

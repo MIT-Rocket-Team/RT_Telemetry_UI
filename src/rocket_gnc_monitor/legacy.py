@@ -34,7 +34,7 @@ def import_legacy(path, parent, mission):
             }
             if not required.issubset(rows.fieldnames or []):
                 raise ValueError(
-                    "Not the documented Zephyrus CSV layout; missing "
+                    "Not the documented telemetry CSV layout; missing "
                     + ", ".join(sorted(required - set(rows.fieldnames or [])))
                 )
             recorder = SessionRecorder(parent, mission, "LEGACY_CSV", time_aligned=False)

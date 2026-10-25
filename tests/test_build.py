@@ -186,7 +186,7 @@ def station_report(verifier, station, profile=None):
         serial_roles=serial_roles,
         visible_serial_roles=serial_roles if station != "video" else [],
         iris_link_boards=iris_boards,
-        iris_simulated_targets=dict.fromkeys(iris_boards),
+        iris_hardware_targets=dict.fromkeys(iris_boards),
         iris_switch_buttons_enabled=dict.fromkeys(iris_boards, False),
     )
     if base_video:
@@ -210,7 +210,7 @@ def test_package_station_verification_rejects_missing_windows_and_open_hardware(
         ("window_count", 0),
         ("hardware_open", True),
         ("shared_controller", False),
-        ("source_mode", "DEMO"),
+        ("source_mode", "REPLAY"),
         ("shortcuts_shared", False),
         ("visible_cards", []),
         ("visible_cards", [*report["visible_cards"], "unexpected-panel"]),
@@ -242,7 +242,7 @@ def test_package_iris_telemetry_requires_station_specific_boards_and_inactive_pl
         ("serial_roles", ["telemetry", "pointer"] if site == "base" else ["telemetry", "uplink", "pointer"]),
         ("visible_serial_roles", ["telemetry", "pointer"] if site == "base" else ["telemetry", "uplink", "pointer"]),
         ("iris_link_boards", ["downlink"] if site == "base" else ["downlink", "uplink"]),
-        ("iris_simulated_targets", dict.fromkeys(boards, "sustainer")),
+        ("iris_hardware_targets", dict.fromkeys(boards, "sustainer")),
         ("iris_switch_buttons_enabled", dict.fromkeys(boards, True)),
     ):
         with pytest.raises(SystemExit, match="station workspace failed"):
@@ -287,22 +287,22 @@ def test_package_iris_away4_requires_booster_analog_camera_controls(verifier):
 
 
 @pytest.mark.parametrize("station,analog", [("away2", "analog"), ("away4", "analog2")])
-def test_package_iris_demo_rejects_a_missing_failed_or_wrong_analog_receiver(verifier, station, analog):
+def test_package_iris_replay_rejects_a_missing_failed_or_wrong_analog_receiver(verifier, station, analog):
     profile = dict(station=station, role="video", vehicle="iris")
     report = dict(
         profile=profile, local_video_channels=["digital", analog],
-        mode="DEMO", station_mode="video", hardware_open=False, demo_progress_samples=30,
+        mode="REPLAY", station_mode="video", hardware_open=False, replay_samples=30, replay_playing=True,
         video_streams={channel: dict(frames=60, error="") for channel in ("digital", analog)},
     )
-    verifier.validate_video_demo(report, profile)
+    verifier.validate_video_replay(report, profile)
     for streams in (
         {key: value for key, value in report["video_streams"].items() if key != analog},
         dict(report["video_streams"], **{analog: dict(frames=0, error="")}),
         dict(report["video_streams"], **{analog: dict(frames=60, error="Decoder failed")}),
         {"digital": dict(frames=60, error=""), "analog2" if analog == "analog" else "analog": dict(frames=60, error="")},
     ):
-        with pytest.raises(SystemExit, match="demo channels failed"):
-            verifier.validate_video_demo(dict(report, video_streams=streams), profile)
+        with pytest.raises(SystemExit, match="replay channels failed"):
+            verifier.validate_video_replay(dict(report, video_streams=streams), profile)
 
 
 def test_package_setup_requires_all_pages_and_no_controller(verifier):

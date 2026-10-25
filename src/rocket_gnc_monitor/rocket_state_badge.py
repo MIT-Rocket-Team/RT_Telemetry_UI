@@ -6,7 +6,7 @@ import re
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QSizePolicy, QVBoxLayout, QWidget
 
-from .zephyrus import PHASE_ENUM
+from .rocket_protocol import PHASE_ENUM
 
 
 STATE_COLORS = {
@@ -101,11 +101,11 @@ class RocketStateBadge(QWidget):
             )
         self.state_label.setText(self.state_name)
         source = mode.upper() if isinstance(mode, str) else "UNKNOWN SOURCE"
-        if source not in {"LIVE", "DEMO", "REPLAY"}:
+        if source not in {"LIVE", "REPLAY"}:
             source = "UNKNOWN SOURCE"
         recorded_source = getattr(sample, "source", "")
-        if source == "LIVE" and isinstance(recorded_source, str) and recorded_source in {"DEMO", "REPLAY", "LEGACY_CSV"}:
-            source = "REPLAY" if recorded_source == "LEGACY_CSV" else recorded_source
+        if source == "LIVE" and isinstance(recorded_source, str) and recorded_source and recorded_source != "LIVE":
+            source = "REPLAY"
         status = ("No telemetry received" if sample is None else
                   "Telemetry" if fresh else "STALE · last telemetry")
         self.status_label.setText(f"{source} · {status}")

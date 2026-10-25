@@ -2,7 +2,7 @@
   "schema_version": 1,
   "frame": "ENU",
   "units": "m,s",
-  "name": "Illustrative demo trajectory",
+  "name": "Illustrative reference trajectory",
   "synthetic": true,
   "altitude_datum": "launch_relative",
   "origin": null

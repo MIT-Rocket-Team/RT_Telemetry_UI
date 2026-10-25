@@ -536,6 +536,8 @@ class StationLink(_SocketWorker):
 
 def controller_snapshot(controller, name, aprs: APRSPosition | None = None):
     """Copy only local display values on the Qt thread; never include commands."""
+    if controller.vehicle != "iris":
+        aprs = None
     sample = controller.latest
     fields = (
         "t",

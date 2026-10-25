@@ -76,26 +76,6 @@
       "hex": "aa00000000000000004b069e3f050133"
     },
     {
-      "command": "set_airbrakes_angle",
-      "value": -12.5,
-      "hex": "aa0000000000000000000048c103010c"
-    },
-    {
-      "command": "set_airbrakes_angle",
-      "value": 0,
-      "hex": "aa000000000000000000000000030003"
-    },
-    {
-      "command": "set_airbrakes_angle",
-      "value": 60,
-      "hex": "aa0000000000000000000070420300b5"
-    },
-    {
-      "command": "set_airbrakes_angle",
-      "value": 1.234567,
-      "hex": "aa00000000000000004b069e3f030131"
-    },
-    {
       "command": "update_converters",
       "value": [
         false,

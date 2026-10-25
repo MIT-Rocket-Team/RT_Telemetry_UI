@@ -1,4 +1,4 @@
-"""Compact board-layout companion: local APRS and explicitly connected LAN peer.
+"""Compact board-layout companion: Iris APRS and explicitly connected LAN peer.
 
 Instantiate ``StationNetworkPanel(controller)``; call ``refresh()`` when desired
 and ``shutdown()`` before controller teardown. A 500 ms timer also updates it.
@@ -57,6 +57,7 @@ class StationNetworkPanel(QWidget):
         self.remote_snapshot = None
         self._closed = False
         self._last_publish = 0
+        self._aprs_available = None
         prefs = self._load_preferences()
         outer = QVBoxLayout(self)
         outer.setContentsMargins(10, 8, 10, 8)
@@ -65,6 +66,11 @@ class StationNetworkPanel(QWidget):
         heading.setObjectName("section")
         outer.addWidget(heading)
 
+        self.aprs_section = QWidget()
+        self.aprs_section.setToolTip("Iris APRS uses Dire Wolf as an external audio modem.")
+        aprs_layout = QVBoxLayout(self.aprs_section)
+        aprs_layout.setContentsMargins(0, 0, 0, 0)
+        aprs_layout.setSpacing(4)
         row = QHBoxLayout()
         row.setSpacing(4)
         row.addWidget(_label("APRS"))
@@ -83,10 +89,11 @@ class StationNetworkPanel(QWidget):
         self.aprs_button.clicked.connect(self.toggle_aprs)
         for widget in (self.aprs_host, self.aprs_port, self.aprs_callsign, self.aprs_button):
             row.addWidget(widget)
-        outer.addLayout(row)
+        aprs_layout.addLayout(row)
         self.aprs_status = _label()
         self.aprs_status.setMinimumHeight(30)
-        outer.addWidget(self.aprs_status)
+        aprs_layout.addWidget(self.aprs_status)
+        outer.addWidget(self.aprs_section)
 
         row = QHBoxLayout()
         row.setSpacing(4)
@@ -127,7 +134,7 @@ class StationNetworkPanel(QWidget):
         )
         self.topology.setToolTip(
             "The physical USB camera previews and serial controls remain independent. "
-            "Dire Wolf is an external audio modem. LAN sharing carries status and telemetry only; "
+            "LAN sharing carries status and telemetry only; "
             "it does not carry video, audio calls or commands. No LTU or VRX control protocol was supplied."
         )
         outer.addWidget(self.topology)
@@ -194,6 +201,9 @@ class StationNetworkPanel(QWidget):
         self.refresh()
 
     def toggle_aprs(self):
+        if not self.aprs_available:
+            self.refresh()
+            return
         if self.aprs.active:
             self.aprs.stop()
             self.refresh()
@@ -214,16 +224,31 @@ class StationNetworkPanel(QWidget):
         self.lan.stop()
         self.refresh()
 
+    @property
+    def aprs_available(self):
+        return self.c.vehicle == "iris"
+
     def refresh(self):
         if self._closed:
             return
+        available = self.aprs_available
+        if available != self._aprs_available:
+            self.aprs_section.setVisible(available)
+            self.aprs_section.setEnabled(available)
+            self._aprs_available = available
+            # Replace a previous Iris fix immediately when changing vehicle.
+            self._last_publish = 0
+        if not available and self.aprs.active:
+            self.aprs.stop()
         aprs = self.aprs.snapshot()
-        fix = aprs["latest"]
-        aprs_connected = aprs["state"] == "Connected"
+        fix = aprs["latest"] if available else None
+        aprs_connected = available and aprs["state"] == "Connected"
         self.aprs_button.setText("Disconnect" if self.aprs.active else "Connect")
         for field in (self.aprs_host, self.aprs_port, self.aprs_callsign):
             field.setEnabled(not self.aprs.active)
-        if fix:
+        if not available:
+            self.aprs_status.clear()
+        elif fix:
             age = max(0, time.monotonic() - fix.received)
             altitude = f" · {fix.altitude_m:.0f} m" if fix.altitude_m is not None else ""
             prefix = "APRS" if aprs_connected else "LAST APRS · disconnected"

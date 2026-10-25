@@ -174,13 +174,13 @@ def test_iris_rejects_receivers_not_present_at_the_selected_away_station(qtbot, 
     assert "disconnected" in wall.primary_status["analog2"].text()
 
 
-def test_local_source_context_distinguishes_live_camera_demo_and_paused_replay(qtbot, monkeypatch):
+def test_local_source_context_distinguishes_live_camera_file_and_paused_replay(qtbot, monkeypatch):
     clock = [100.0]
     monkeypatch.setattr("rocket_gnc_monitor.video_wall.time", SimpleNamespace(monotonic=lambda: clock[0]))
     wall = make_wall(qtbot)
     wall.set_local_frame(frame("blue"))
     assert "LIVE" not in wall.primary_status["digital"].text()
-    for label in ("Demo · test pattern", "Local file", "Replay · paused"):
+    for label in ("Local file", "Replay · paused"):
         wall.set_local_source(label, live=False)
         clock[0] += 10
         wall.refresh_status()

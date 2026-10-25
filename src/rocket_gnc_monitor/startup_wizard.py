@@ -141,7 +141,7 @@ class StartupWizard(QWizard):
                      "\nOne display · Wi-Fi, downlink board and antenna control.")
             if profile.station == "base":
                 text += "\nOne telemetry board: downlink reception and polling."
-                text += "\nUplink enable: firmware pending; DEMO simulation only."
+                text += "\nUplink enable: unavailable until the firmware protocol is defined."
                 text += "\nChoose an away antenna pointer; remote control pending."
             targets = ", ".join(target.title() for target in profile.telemetry_targets)
             text += f"\nTelemetry assignment: {targets}."

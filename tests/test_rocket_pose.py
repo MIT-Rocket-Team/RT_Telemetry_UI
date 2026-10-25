@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from rocket_gnc_monitor.demo import DemoFlight
+from recorded_flight import RecordedFlight
 from rocket_gnc_monitor.domain import Sample
 from rocket_gnc_monitor.flight_scene import FlightFrame, FlightScene, quaternion_matrix
 from rocket_gnc_monitor.rocket_pose import RocketPose, rotation_from_rpy, simulation_pose, telemetry_pose
@@ -48,18 +48,18 @@ def test_reported_angles_are_not_normalized_or_replaced_by_simulation():
 
 @pytest.mark.parametrize("station", ["GS1", "GS2", "GS3"])
 @pytest.mark.parametrize("seconds_after_launch", [2, 10])
-def test_real_zephyrus_climb_data_does_not_make_false_sideways_rocket(station, seconds_after_launch):
-    demo = DemoFlight(station)
-    stamp = demo.flight_zero + seconds_after_launch
-    index = min(range(len(demo.rows)), key=lambda i: abs(float(demo.rows[i]["flight_time"]) / 1000 - stamp))
-    value = demo.sample(index)
-    raw = tuple(float(demo.rows[index][key]) for key in ("roll_gyro_int", "pitch_gyro_int", "yaw_gyro_int"))
-    assert value.phase == "Flight" and value.altitude > demo.sample(demo.launch_index).altitude + 500
+def test_real_recorded_climb_data_does_not_make_false_sideways_rocket(station, seconds_after_launch):
+    recording = RecordedFlight(station)
+    stamp = recording.flight_zero + seconds_after_launch
+    index = min(range(len(recording.rows)), key=lambda i: abs(float(recording.rows[i]["flight_time"]) / 1000 - stamp))
+    value = recording.sample(index)
+    raw = tuple(float(recording.rows[index][key]) for key in ("roll_gyro_int", "pitch_gyro_int", "yaw_gyro_int"))
+    assert value.phase == "Flight" and value.altitude > recording.sample(recording.launch_index).altitude + 500
     assert any(abs(angle) > 90 for angle in raw)
-    pose = telemetry_pose(value, "DEMO")
+    pose = telemetry_pose(value, "REPLAY")
     assert tuple(value.attitude) == raw == pose.angles
     assert pose.angle_kind == "gyro_integrals" and not pose.attitude_known
-    assert pose.source == "DEMO" and "gyro integrals are not attitude" in pose.status
+    assert pose.source == "REPLAY" and "gyro integrals are not attitude" in pose.status
     np.testing.assert_array_equal(pose.rotation, np.eye(3))
 
 
@@ -205,9 +205,8 @@ def test_historical_ignition_does_not_mean_continuous_flame():
 
 @pytest.mark.parametrize("mode,sample_source,source,stale", [
     ("LIVE", "LIVE", "LIVE", True),
-    ("DEMO", "LIVE", "DEMO", False),
     ("REPLAY", "LIVE", "REPLAY", False),
-    ("LIVE", "DEMO", "DEMO", False),
+    ("LIVE", "ARCHIVED", "REPLAY", False),
     ("LIVE", "LEGACY_CSV", "REPLAY", False),
 ])
 def test_stale_source_provenance_is_explicit_and_pose_remains_last_known(mode, sample_source, source, stale):

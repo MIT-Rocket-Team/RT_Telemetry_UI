@@ -13,10 +13,10 @@ from PySide6.QtGui import QKeySequence
 from PySide6.QtTest import QSignalSpy, QTest
 from PySide6.QtWidgets import QMessageBox
 from rocket_gnc_monitor.domain import Mission, pointing
-from rocket_gnc_monitor.protocol import ZephyrusDecoder, pointer_packet
+from rocket_gnc_monitor.protocol import TelemetryDecoder, pointer_packet
 from rocket_gnc_monitor.recording import SessionRecorder, SessionReader
 from rocket_gnc_monitor.ui import MainWindow
-from rocket_gnc_monitor.zephyrus import COMMANDS, CSV_FIELDS, legacy_values, rocket_packet
+from rocket_gnc_monitor.rocket_protocol import COMMANDS, CSV_FIELDS, legacy_values, rocket_packet
 
 REFERENCE = json.loads((Path(__file__).parent / "fixtures/legacy_reference.json").read_text())
 
@@ -48,7 +48,7 @@ def test_all_pointer_commands_and_geometry_match_original():
 def test_every_good_csv_field_matches_original():
     assert CSV_FIELDS == REFERENCE["csv_fields"]
     row = REFERENCE["telemetry"][0]
-    sample = ZephyrusDecoder().feed(bytes.fromhex(row["hex"]))[0]
+    sample = TelemetryDecoder().feed(bytes.fromhex(row["hex"]))[0]
     actual = legacy_values(sample)
     for key, expected in row["values"].items():
         if key == "timestamp":
@@ -65,7 +65,7 @@ def test_logging_retains_good_bad_csv_and_raw_uplink(tmp_path):
     r.raw("telemetry_rx", good[:37])
     r.raw("telemetry_rx", good[37:] + bad)
     r.raw("telemetry_tx", rocket_packet("zero_alt"))
-    r.sample(ZephyrusDecoder().feed(good)[0])
+    r.sample(TelemetryDecoder().feed(good)[0])
     r.close()
     assert not r.error
     for name in ("telemetry.csv", "telemetry_badpackets.csv"):
@@ -248,7 +248,7 @@ def test_every_legacy_control_and_confirmation(qtbot, tmp_path, monkeypatch):
         for name in ["zero_pitchYawRoll", "zero_alt", "zero_velo", "zero_servos", "pd_activate"]:
             p.buttons[name].click()
             assert packets.pop() == rocket_packet(name)
-        for name in ["set_roll_control_servo_angle", "set_airbrakes_angle"]:
+        for name in ["set_roll_control_servo_angle"]:
             p.servo_inputs[name].setText("-12.5")
             p.buttons[name].click()
             assert packets.pop() == rocket_packet(name, -12.5)

@@ -15,19 +15,18 @@ The startup wizard chooses **Launch station** or **Away 1–4**, **Telemetry** o
 
 Serial ports and cameras cannot be assigned to two active local devices. Video capture/recording works independently of serial telemetry. Settings (**⌘,** / **Ctrl+,**) include the OpenRocket JAR, simulation time limit, recording folder and appearance. Original serial and pointer shortcuts remain available in their applicable roles.
 
-Launch has one telemetry board and exclusive uplink authority, with an undefined firmware switch to enable uplink. Its LIVE command controls therefore remain locked; DEMO simulates the switch. Iris Sustainer/Booster selection is also a labelled firmware placeholder. Launch has no local antenna pointer: it selects a future communication route through one of the four Away stations. Wi-Fi selection records the desired Away network and opens operating-system network settings; it does not claim to join or configure the LTU equipment.
+Launch has one telemetry board and exclusive uplink authority, with an undefined firmware switch to enable uplink. Its command controls therefore remain locked until the firmware interface is defined. Iris Sustainer/Booster selection is also a labelled firmware placeholder. Launch has no local antenna pointer: it selects a future communication route through one of the four Away stations. Wi-Fi selection records the desired Away network and opens operating-system network settings; it does not claim to join or configure the LTU equipment.
 
 ## Telemetry, visualization and recorded flights
 
-- Decode and record the existing Zephyrus telemetry/pointer protocols, including legacy good/rejected-packet CSVs, raw serial data, indexed replay, power/BMS/recovery values and command history.
-- Rehearse with bundled **GS1/GS2/GS3** Zephyrus test-launch recordings (GS2 by default). DEMO opens no physical serial transport; its video is an explicitly labelled test pattern.
+- Decode and record the existing telemetry/pointer protocols, including legacy good/rejected-packet CSVs, raw serial data, indexed replay, power/BMS/recovery values and command history.
 - Configure launch coordinates using latitude/longitude, MGRS or Plus Codes, and Away antenna locations using latitude/longitude, MGRS or launch-relative heading/distance/height. URRG presets cover the launch pad and all stations; elevations remain manual.
 - Run the team OpenRocket fork with manual/imported/online wind and view a georeferenced trajectory, rocket orientation and recorded simulation motor/recovery events. Use a virtual Away pointer for trajectory-following rehearsal.
 - Save/open a portable **`.rktflight`** containing the mission, model/motors, reference and available recordings. Recorded flights reopen paused in REPLAY with hardware disconnected.
 
-**Zephyrus roll/pitch/yaw fields are cumulative body-gyro integrals, not Euler attitude.** The compact rocket pane preserves these numeric readouts and shows a muted neutral model labelled **ORIENTATION UNAVAILABLE**. It rotates only when an adapter provides an explicitly validated orientation, or when the operator selects an OpenRocket reference. Current telemetry also lacks confirmed motor-burning/parachute-deployment fields; those remain unknown. The compact view has an upright azimuth slider only. Antenna and full-trajectory views retain orbit/zoom.
+**Current telemetry roll/pitch/yaw fields are cumulative body-gyro integrals, not Euler attitude.** The compact rocket pane preserves these numeric readouts and shows a muted neutral model labelled **ORIENTATION UNAVAILABLE**. It rotates only when an adapter provides an explicitly validated orientation, or when the operator selects an OpenRocket reference. Current telemetry also lacks confirmed motor-burning/parachute-deployment fields; those remain unknown. The compact view has an upright azimuth slider only. Antenna and full-trajectory views retain orbit/zoom. Away telemetry gives the rocket pane and vertical-profile plot equal height.
 
-The four-station telemetry/video/control transport, LTU metrics, analog receiver tuning and sensor fusion are not implemented. The existing LAN connection exchanges one peer's read-only snapshots and never feeds remote data into hardware control. APRS reception uses externally configured Dire Wolf KISS TCP. See the station guide for precise supported and unavailable behavior.
+The four-station telemetry/video/control transport, LTU metrics, analog receiver tuning and sensor fusion are not implemented. The existing LAN connection exchanges one peer's read-only snapshots and never feeds remote data into hardware control. APRS reception is available for Iris only and uses externally configured Dire Wolf KISS TCP. See the station guide for precise supported and unavailable behavior.
 
 ## Run from source
 
@@ -36,7 +35,6 @@ Use a native 64-bit Python 3.12 or 3.13 environment. From the repository root:
 ```sh
 make setup PYTHON=python3.13
 make run
-make demo STATION=launch
 make test
 make lint
 ```
@@ -66,4 +64,4 @@ Use `OPENROCKET_JAR=/path/to/OpenRocket-MIT-v6.2.jar` for a local engine or `OPE
 
 Generated environments, downloaded vendor runtimes, package outputs and verification captures are ignored. They are rebuilt locally instead of being committed. Historical planning documents, old validation screenshots and the superseded v0 LaTeX report remain in the original repository.
 
-[Migration validation](docs/MIGRATION_VALIDATION.md) · [Station setup and current capabilities](docs/V0A_STATION_MODES.md) · [Operator reference](docs/OPERATOR_GUIDE.md) · [Developer guide](docs/DEVELOPER.md) · [Build guide](docs/BUILD.md) · [macOS universal build](docs/MAC_UNIVERSAL.md) · [Wire protocol](docs/PROTOCOL.md) · [Legacy parity and shortcuts](docs/LEGACY_PARITY.md) · [Demo provenance](docs/DEMO_DATA.md) · [Third-party notices](docs/THIRD_PARTY_NOTICES.md)
+[Migration validation](docs/MIGRATION_VALIDATION.md) · [Station setup and current capabilities](docs/V0A_STATION_MODES.md) · [Operator reference](docs/OPERATOR_GUIDE.md) · [Developer guide](docs/DEVELOPER.md) · [Build guide](docs/BUILD.md) · [macOS universal build](docs/MAC_UNIVERSAL.md) · [Wire protocol](docs/PROTOCOL.md) · [Legacy parity and shortcuts](docs/LEGACY_PARITY.md) · [Recording test fixtures](docs/RECORDING_FIXTURES.md) · [Third-party notices](docs/THIRD_PARTY_NOTICES.md)

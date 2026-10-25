@@ -33,8 +33,8 @@ EXTRA_PROFILES = {
     "station-base-telemetry-iris": dict(station="base", role="telemetry", vehicle="iris", launch_site="custom"),
     "station-away4-telemetry-iris": dict(station="away4", role="telemetry", vehicle="iris", launch_site="custom"),
 }
-IRIS_DEMO_PROFILE = dict(station="away2", role="video", vehicle="iris", launch_site="custom")
-IRIS_BOOSTER_DEMO_PROFILE = dict(station="away4", role="video", vehicle="iris", launch_site="custom")
+IRIS_REPLAY_PROFILE = dict(station="away2", role="video", vehicle="iris", launch_site="custom")
+IRIS_BOOSTER_REPLAY_PROFILE = dict(station="away4", role="video", vehicle="iris", launch_site="custom")
 SETUP_PROFILE = dict(station="base", role="video", vehicle="iris", launch_site="urrg")
 
 
@@ -120,7 +120,7 @@ def validate_station_report(report, station, profile=None):
         or not same_inventory(report.get("serial_roles"), serial_roles)
         or not same_inventory(report.get("visible_serial_roles"), serial_roles if station != "video" else [])
         or not same_inventory(report.get("iris_link_boards"), iris_boards)
-        or report.get("iris_simulated_targets") != dict.fromkeys(iris_boards)
+        or report.get("iris_hardware_targets") != dict.fromkeys(iris_boards)
         or report.get("iris_switch_buttons_enabled") != dict.fromkeys(iris_boards, False)
     ):
         raise SystemExit(f"Packaged {station} station workspace failed")
@@ -155,18 +155,19 @@ def validate_setup_report(report):
         raise SystemExit("Packaged startup wizard failed")
 
 
-def validate_video_demo(report, profile):
+def validate_video_replay(report, profile):
     if (
         not valid_profile_report(report, profile)
-        or report.get("mode") != "DEMO"
+        or report.get("mode") != "REPLAY"
         or report.get("station_mode") != "video"
         or report.get("hardware_open") is not False
-        or report.get("demo_progress_samples", 0) <= 20
+        or report.get("replay_samples", 0) <= 0
+        or report.get("replay_playing") is not True
         or not isinstance(report.get("video_streams"), dict)
         or set(report["video_streams"]) != set(profile_local_channels(profile))
-        or any(v.get("frames", 0) <= 0 or v.get("error") for v in report["video_streams"].values())
+        or any(v.get("frames", 0) <= 1 or v.get("error") for v in report["video_streams"].values())
     ):
-        raise SystemExit("Packaged Video station demo channels failed")
+        raise SystemExit("Packaged Video station replay channels failed")
 
 
 def main():
@@ -245,8 +246,8 @@ def main():
             ],
         ),
         (
-            "demo",
-            ["--smoke-test", "--station", "video", "--data-dir", str(output / "demo"),
+            "replay",
+            ["--replay-smoke", "--station", "video", "--data-dir", str(output / "replay"),
              "--screenshot", str(output / "window.png")],
         ),
         ("simulation", ["--simulation-smoke", str(model), "--data-dir", str(output / "simulation")]),
@@ -278,12 +279,12 @@ def main():
     )
     commands.extend([
         ("setup", ["--setup-smoke", *profile_arguments(SETUP_PROFILE), "--data-dir", str(output / "setup")]),
-        ("demo-iris", ["--smoke-test", *profile_arguments(IRIS_DEMO_PROFILE),
-                       "--data-dir", str(output / "demo-iris"),
-                       "--screenshot", str(output / "demo-iris.png")]),
-        ("demo-iris-booster", ["--smoke-test", *profile_arguments(IRIS_BOOSTER_DEMO_PROFILE),
-                               "--data-dir", str(output / "demo-iris-booster"),
-                               "--screenshot", str(output / "demo-iris-booster.png")]),
+        ("replay-iris", ["--replay-smoke", *profile_arguments(IRIS_REPLAY_PROFILE),
+                       "--data-dir", str(output / "replay-iris"),
+                       "--screenshot", str(output / "replay-iris.png")]),
+        ("replay-iris-booster", ["--replay-smoke", *profile_arguments(IRIS_BOOSTER_REPLAY_PROFILE),
+                               "--data-dir", str(output / "replay-iris-booster"),
+                               "--screenshot", str(output / "replay-iris-booster.png")]),
     ])
     if args.model:
         commands.append(
@@ -304,13 +305,13 @@ def main():
         (output / (name + ".log")).write_bytes(run.stdout + run.stderr)
         if run.returncode:
             raise SystemExit(f"{name} failed ({run.returncode}); see {output}")
-    demo = json.loads((output / "demo" / "smoke-report.json").read_text())
+    replay = json.loads((output / "replay" / "smoke-report.json").read_text())
     startup = json.loads((output / "startup" / "smoke-report.json").read_text())
     flight = json.loads((output / "flight" / "flight-smoke-report.json").read_text())
     virtual = json.loads((output / "virtual-pointer" / "virtual-pointer-smoke-report.json").read_text())
     scene = json.loads((output / "flight-3d" / "flight-3d-smoke-report.json").read_text())
-    iris_demo = json.loads((output / "demo-iris" / "smoke-report.json").read_text())
-    iris_booster_demo = json.loads((output / "demo-iris-booster" / "smoke-report.json").read_text())
+    iris_replay = json.loads((output / "replay-iris" / "smoke-report.json").read_text())
+    iris_booster_replay = json.loads((output / "replay-iris-booster" / "smoke-report.json").read_text())
     setup = json.loads((output / "setup" / "setup-smoke-report.json").read_text())
     validate_setup_report(setup)
     for page in ("station", "role", "vehicle", "launch_site"):
@@ -383,37 +384,9 @@ def main():
     ):
         raise SystemExit("Packaged application did not start in locked Live mode")
     simulation = json.loads((output / "simulation" / "simulation-smoke-report.json").read_text())
-    validate_video_demo(demo, LEGACY_PROFILES["video"])
-    validate_video_demo(iris_demo, IRIS_DEMO_PROFILE)
-    validate_video_demo(iris_booster_demo, IRIS_BOOSTER_DEMO_PROFILE)
-    demo_manifest = json.loads((contents / "resources" / "demo" / "manifest.json").read_text())
-    if demo.get("demo_recording") != dict(station="GS2", **demo_manifest["GS2"]) or not demo.get(
-        "latest_demo_row"
-    ):
-        raise SystemExit("Packaged demo did not play the bundled Zephyrus GS2 recording")
-    if iris_demo.get("demo_recording") != dict(station="GS2", **demo_manifest["GS2"]) or not iris_demo.get("latest_demo_row"):
-        raise SystemExit("Packaged Iris demo did not play the bundled Zephyrus GS2 recording")
-    if iris_booster_demo.get("demo_recording") != dict(station="GS2", **demo_manifest["GS2"]) or not iris_booster_demo.get("latest_demo_row"):
-        raise SystemExit("Packaged Iris booster-station demo did not play the bundled Zephyrus GS2 recording")
-    # Exercise every receiver log in the actual packaged process, not the source tree.
-    receiver_demos = {}
-    for station in ("GS1", "GS3"):
-        result = subprocess.run(
-            [*launch, "--smoke-test", "--station", "video", "--demo-station", station,
-             "--data-dir", str(output / station)],
-            cwd=package,
-            env=environment,
-            capture_output=True,
-            timeout=60,
-        )
-        (output / (station + ".log")).write_bytes(result.stdout + result.stderr)
-        if result.returncode:
-            raise SystemExit(f"Packaged {station} demo failed")
-        report = json.loads((output / station / "smoke-report.json").read_text())
-        if report.get("demo_recording") != dict(station=station, **demo_manifest[station]):
-            raise SystemExit(f"Packaged {station} recording identity mismatch")
-        validate_video_demo(report, LEGACY_PROFILES["video"])
-        receiver_demos[station] = report
+    validate_video_replay(replay, LEGACY_PROFILES["video"])
+    validate_video_replay(iris_replay, IRIS_REPLAY_PROFILE)
+    validate_video_replay(iris_booster_replay, IRIS_BOOSTER_REPLAY_PROFILE)
     if simulation["rows"] < 2 or not math.isfinite(simulation["apogee_m"]) or simulation["apogee_m"] <= 0:
         raise SystemExit("Packaged simulation did not produce a usable example trajectory")
     if simulation["manifest"]["name"] != "OpenRocket nominal · A simple model rocket":
@@ -433,7 +406,7 @@ def main():
                 package=str(package),
                 architecture=architecture,
                 minimal_path=True,
-                check_count=len(commands) + len(receiver_demos),
+                check_count=len(commands),
                 station_workspaces=stations,
                 station_profiles=profile_stations,
                 setup=setup,
@@ -441,17 +414,16 @@ def main():
                 flight=flight,
                 virtual_pointer=virtual,
                 flight_3d=scene,
-                demo=demo,
-                iris_demo=iris_demo,
-                iris_booster_demo=iris_booster_demo,
-                receiver_demos=receiver_demos,
+                replay=replay,
+                iris_replay=iris_replay,
+                iris_booster_replay=iris_booster_replay,
                 simulation=simulation,
                 selected_model=selected_model,
             ),
             indent=2,
         )
     )
-    print(f"{len(commands) + len(receiver_demos)} packaged checks passed: startup wizard, station profiles, video wall, Sustainer/Booster playback and OpenRocket: {output}")
+    print(f"{len(commands)} packaged checks passed: startup wizard, station profiles, video wall, Sustainer/Booster playback and OpenRocket: {output}")
 
 
 if __name__ == "__main__":

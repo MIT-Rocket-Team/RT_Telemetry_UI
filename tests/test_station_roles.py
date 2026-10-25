@@ -16,6 +16,14 @@ def offline_wifi_status(monkeypatch):
     monkeypatch.setattr('rocket_gnc_monitor.wifi_panel.read_wifi_status', WifiSnapshot)
 
 
+@pytest.fixture(autouse=True)
+def finish_prior_window_destruction(qapp):
+    # pytest-qt schedules deletion after each test. Finish native plot/menu
+    # destruction before Python can collect those wrappers during a new build.
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    gc.collect()
+
+
 @pytest.mark.parametrize('site,vehicle,channels', [
     ('away1', 'balius', {'digital', 'analog'}),
     ('away2', 'iris', {'digital', 'analog'}),
@@ -24,8 +32,6 @@ def offline_wifi_status(monkeypatch):
     ('base', 'iris', {'digital'}),
 ])
 def test_video_role_uses_only_its_local_receivers_and_remote_wall(qtbot, tmp_path, monkeypatch, site, vehicle, channels):
-    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
-    gc.collect()
     profile = StationProfile(station=site, role='video', vehicle=vehicle)
     w = StationWindow(tmp_path, profile=profile, auto_place=False)
     qtbot.addWidget(w)
@@ -77,8 +83,6 @@ def test_video_role_uses_only_its_local_receivers_and_remote_wall(qtbot, tmp_pat
 
 
 def test_away_telemetry_retains_selected_station_number(qtbot, tmp_path):
-    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
-    gc.collect()
     profile = StationProfile(station='away3', role='telemetry', vehicle='balius')
     w = StationWindow(tmp_path, profile=profile, auto_place=False)
     qtbot.addWidget(w)
@@ -99,9 +103,7 @@ def test_away_telemetry_retains_selected_station_number(qtbot, tmp_path):
         w.close()
 
 
-def test_launch_wall_local_source_labels_follow_demo_file_and_paused_replay(qtbot, tmp_path):
-    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
-    gc.collect()
+def test_launch_wall_local_source_labels_follow_file_and_paused_replay(qtbot, tmp_path):
     w = StationWindow(tmp_path, profile=StationProfile('base', 'video', 'iris'), auto_place=False)
     qtbot.addWidget(w)
     try:
@@ -110,7 +112,6 @@ def test_launch_wall_local_source_labels_follow_demo_file_and_paused_replay(qtbo
         frame = QPixmap(32, 18)
         frame.fill()
         for mode, config, playing, expected in [
-            ('DEMO', None, False, 'Demo'),
             ('LIVE', ('file', 'example.mp4'), False, 'Local video file'),
             ('REPLAY', None, False, 'Replay · paused'),
             ('REPLAY', None, True, 'Replay · playing'),
@@ -133,8 +134,6 @@ def test_launch_wall_local_source_labels_follow_demo_file_and_paused_replay(qtbo
     ('away4', 'iris', {'telemetry', 'pointer'}, {'downlink'}),
 ])
 def test_telemetry_station_board_inventory_and_iris_placeholders(qtbot, tmp_path, site, vehicle, serial_roles, switches):
-    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
-    gc.collect()
     w = StationWindow(tmp_path, profile=StationProfile(site, 'telemetry', vehicle), auto_place=False)
     qtbot.addWidget(w)
     try:

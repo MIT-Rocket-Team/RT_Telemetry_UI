@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 from pytestqt.exceptions import TimeoutError as QtTimeoutError
 from rocket_gnc_monitor.controller import Controller
-from rocket_gnc_monitor.domain import demo_sample
+from recorded_flight import sample_fixture, video_fixture
 from rocket_gnc_monitor.recording import SessionReader, SessionRecorder
 from rocket_gnc_monitor.ui import MainWindow
 
@@ -126,7 +126,7 @@ def test_legacy_video_is_digital_and_stream_gaps_remain_separate(qtbot, tmp_path
     c = Controller(tmp_path / "app")
     r = SessionRecorder(tmp_path / "recordings", c.mission, "LIVE")
     for i in range(10):
-        sample = demo_sample(i, i)
+        sample = sample_fixture(i, i)
         sample.received = r.start + i
         r.sample(sample)
     for name, start, stream in [
@@ -205,7 +205,8 @@ def test_both_streams_record_and_round_trip_in_a_flight(qtbot, tmp_path):
             pytest.fail(f"Video frames not ready within {timeout} ms:\n{diagnostics()}", pytrace=False)
 
     try:
-        c.switch_mode("DEMO")
+        for channel in c.video_channels:
+            c.start_video("file", video_fixture(tmp_path / channel), stream=channel)
         wait_for_frames(6000)
         c.start_recording(tmp_path / "recordings")
         # Recording restarts each input. Graceful stop/terminate/kill can use
@@ -284,7 +285,7 @@ def test_dual_panels_do_not_overlap_at_minimum_window_size(qtbot, tmp_path):
         window.resize(1120, 800)
         window.pages.setCurrentIndex(1)
         window.show()
-        for mode in ("LIVE", "DEMO"):
+        for mode in ("LIVE", "REPLAY"):
             window.controller.switch_mode(mode)
             window.last_ui = 0
             window.refresh()

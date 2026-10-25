@@ -141,10 +141,13 @@ def test_recording_requires_received_video_and_replay_stays_read_only(qtbot, tmp
 
 
 def test_video_only_session_finalizes_and_replays_without_telemetry(qtbot, tmp_path, monkeypatch):
-    # Replace only the physical USB input with FFmpeg's generated frames. Codec,
+    # Replace only the physical USB input with a generated video file. Codec,
     # worker lifecycle, session writer, finalized segment and replay remain real.
+    from recorded_flight import video_fixture
+    fixture = video_fixture(tmp_path)
+
     def synthetic_receiver(kind, source="", record_dir=None, seek=0, speed=1, single_frame=False):
-        return VideoWorker("demo" if kind == "camera" else kind, source,
+        return VideoWorker("file" if kind == "camera" else kind, fixture if kind == "camera" else source,
                            record_dir, seek, speed, single_frame)
 
     monkeypatch.setattr("rocket_gnc_monitor.controller.VideoWorker", synthetic_receiver)

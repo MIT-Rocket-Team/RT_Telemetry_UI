@@ -1,6 +1,6 @@
 # Standalone migration validation
 
-Validation date: **25 October 2026**. This record covers migration into `MIT-Rocket-Team/RT_Telemetry_UI`; it does not claim new hardware acceptance.
+Validation date: **25 October 2026**. This record covers migration into `MIT-Rocket-Team/RT_Telemetry_UI`; it does not claim new hardware acceptance. These results describe the original migration builds, before subsequent mode and interface simplification; they are not validation results for later changes.
 
 ## Scope and provenance
 
@@ -23,7 +23,7 @@ Validation date: **25 October 2026**. This record covers migration into `MIT-Roc
 | Relocation/runtime independence | Both packaged runs used a fresh path containing spaces and a minimal system PATH, with bundled Python/Qt/FFmpeg/Java/OpenRocket. |
 | Final DMG audit | Mounted contents match the relocated verified app: **1,743 files/symlinks** checked. Deep/strict code-signature verification passed. |
 
-Packaged checks include startup/wizard, station and video-role inventories, locked LIVE mode, all three recorded Zephyrus demos, portable flights, URRG, virtual pointing, 3D ignition/recovery events and both example/Zephyrus OpenRocket models. They exercise the private OpenRocket-MIT **v6.2** engine. Detailed local evidence was produced under ignored `build/migration/`; this compact record retains the acceptance results without committing captures or generated sessions.
+Packaged checks include startup/wizard, station and video-role inventories, locked LIVE mode, all three recorded test-flight sources, portable flights, URRG, virtual pointing, 3D ignition/recovery events and both example/OpenRocket models. They exercise the private OpenRocket-MIT **v6.2** engine. Detailed local evidence was produced under ignored `build/migration/`; this compact record retains the acceptance results without committing captures or generated sessions.
 
 Final Mac artifact:
 

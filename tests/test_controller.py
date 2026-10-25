@@ -2,7 +2,7 @@ from types import SimpleNamespace
 import time
 import pytest
 from rocket_gnc_monitor.controller import Controller
-from rocket_gnc_monitor.domain import demo_sample
+from recorded_flight import sample_fixture
 
 
 @pytest.fixture
@@ -48,19 +48,16 @@ def test_ground_loss_discards_pending_tracking_command(controller):
         c.workers["pointer"] = None
 
 
-def test_demo_and_replay_have_no_physical_motion_path(controller, monkeypatch):
+def test_replay_has_no_physical_motion_path(controller, monkeypatch):
     c = controller
-    c.switch_mode("DEMO")
+    c.switch_mode("REPLAY")
 
     def forbidden(*args, **kwargs):
         raise AssertionError("Physical worker constructed")
 
     monkeypatch.setattr("rocket_gnc_monitor.controller.SerialWorker", forbidden)
-    c.point(90, 45)
-    assert c.pointer_sent == (90, 45)
     with pytest.raises(ValueError):
         c.connect("pointer", "COM1")
-    c.switch_mode("REPLAY")
     with pytest.raises(ValueError):
         c.point(90, 45)
     with pytest.raises(ValueError):
@@ -71,12 +68,12 @@ def test_demo_and_replay_have_no_physical_motion_path(controller, monkeypatch):
 def test_stale_target_stops_tracking_and_requires_explicit_resume(controller):
     c = controller
     c.switch_mode("LIVE")
-    c.latest = demo_sample(10, 1)
+    c.latest = sample_fixture(10, 1)
     c.latest.received = time.monotonic() - 30
     c.tracking = True
     c.tick()
     assert not c.tracking and "stale" in c.pointer_status
-    c.latest = demo_sample(10, 2)
+    c.latest = sample_fixture(10, 2)
     c.tick()
     assert not c.tracking
 
@@ -84,7 +81,7 @@ def test_stale_target_stops_tracking_and_requires_explicit_resume(controller):
 def test_queued_old_connection_sample_cannot_repopulate(controller):
     c = controller
     c.switch_mode("LIVE")
-    c.messages.put((123, "telemetry", "sample", demo_sample(10, 1)))
+    c.messages.put((123, "telemetry", "sample", sample_fixture(10, 1)))
     c.tick()
     assert c.latest is None
 
@@ -104,9 +101,9 @@ def test_replay_seek_clears_future_track(controller, tmp_path):
     from rocket_gnc_monitor.recording import SessionRecorder
 
     c = controller
-    r = SessionRecorder(tmp_path, c.mission, "DEMO")
+    r = SessionRecorder(tmp_path, c.mission, "LIVE")
     for i in range(30):
-        s = demo_sample(i, i)
+        s = sample_fixture(i, i)
         s.received = r.start + i
         r.sample(s)
     r.close()
@@ -121,14 +118,14 @@ def test_replay_seek_clears_future_track(controller, tmp_path):
 def test_joining_midflight_does_not_invent_launch_time(controller):
     c = controller
     c.switch_mode("LIVE")
-    s = demo_sample(30, 1)
+    s = sample_fixture(30, 1)
     s.phase = "Flight"
     c.accept(s)
     assert not c.time_aligned
-    s = demo_sample(31, 2)
+    s = sample_fixture(31, 2)
     s.phase = "Preflight"
     c.accept(s)
-    s = demo_sample(32, 3)
+    s = sample_fixture(32, 3)
     s.phase = "Flight"
     c.accept(s)
     assert c.time_aligned and c.flight_zero == 32
@@ -155,7 +152,7 @@ def test_hold_retains_a_command_already_dispatched(controller):
 def test_battery_alert_has_dwell_hysteresis_and_acknowledgment(controller):
     c = controller
     c.switch_mode("LIVE")
-    c.latest = demo_sample(10, 1)
+    c.latest = sample_fixture(10, 1)
     c.latest.battery = 8
     now = time.monotonic()
     c.update_alerts(now)
@@ -178,7 +175,7 @@ def test_replay_applies_pointer_events_when_playing(controller, tmp_path):
     c = controller
     r = SessionRecorder(tmp_path, c.mission, "LIVE", time_aligned=False)
     for i in range(20):
-        s = demo_sample(i, i)
+        s = sample_fixture(i, i)
         s.received = r.start + i
         r.sample(s)
     r.put("event", {"name": "Pointer command sent", "data": {"angles": [25, 30]}}, r.start + 2)
@@ -195,7 +192,7 @@ def test_replay_applies_pointer_events_when_playing(controller, tmp_path):
 
 def test_async_result_from_previous_mode_is_rejected(controller, qtbot):
     c = controller
-    c.switch_mode("DEMO")
+    c.switch_mode("REPLAY")
     results = []
     c.task_done.connect(lambda name, result: results.append((name, result)))
     c.submit("weather", lambda: {"layers": []})

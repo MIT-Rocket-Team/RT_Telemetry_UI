@@ -16,7 +16,7 @@ import urllib.request
 import zipfile
 import numpy as np
 from .settings import AppSettings, runtime_root, validate_engine_jar
-from .domain import demo_sample, finite, validate_wind, wind_from, write_json
+from .domain import finite, validate_wind, wind_from, write_json
 from .media import popen_options
 
 
@@ -85,21 +85,6 @@ class Trajectory:
             or not -180 <= origin[1] <= 180
         ):
             raise ValueError("Reference needs a finite [latitude, longitude, ellipsoid altitude] origin")
-
-    @classmethod
-    def demo(cls):
-        return cls(
-            [[t, *demo_sample(t, int(t)).enu] for t in np.linspace(0, 140, 281)],
-            dict(
-                schema_version=1,
-                frame="ENU",
-                units="m,s",
-                name="Illustrative demo trajectory",
-                synthetic=True,
-                altitude_datum="launch_relative",
-                origin=None,
-            ),
-        )
 
     @classmethod
     def load(cls, path):

@@ -1,10 +1,10 @@
-"""Decode saved Zephyrus CSV rows without evaluating Python/NumPy expressions."""
+"""Decode saved telemetry CSV rows without evaluating Python/NumPy expressions."""
 
 from __future__ import annotations
 import ast
 import math
 from .domain import Sample, finite
-from .zephyrus import CSV_FIELDS, PHASES, PHASE_ENUM
+from .rocket_protocol import CSV_FIELDS, PHASES, PHASE_ENUM
 
 
 def numeric_list(text, *, boolean=False):

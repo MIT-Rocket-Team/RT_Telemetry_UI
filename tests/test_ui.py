@@ -25,8 +25,11 @@ def test_mount_compass_chirality_and_command_headings():
             assert np.linalg.det(rotation @ tilt) == pytest.approx(1)  # No reflection in the model.
 
 
-def test_recorded_demo_controls_and_legacy_readouts(qtbot, tmp_path):
-    window = MainWindow(tmp_path)
+def test_file_replay_controls_and_recorded_readouts(qtbot, tmp_path):
+    from recorded_flight import recorded_session
+
+    session, _ = recorded_session(tmp_path / "recording", "GS3")
+    window = MainWindow(tmp_path / "app")
     qtbot.addWidget(window)
     window.resize(1120, 800)
     window.show()
@@ -37,33 +40,24 @@ def test_recorded_demo_controls_and_legacy_readouts(qtbot, tmp_path):
         window.last_ui = window.last_table = 0
         window.refresh()
 
-    window.mode.setCurrentText("DEMO")
+    assert [window.mode.itemText(i) for i in range(window.mode.count())] == ["LIVE", "REPLAY"]
+    c.open_replay(session)
     refresh()
-    assert window.demo_bar.isVisible() and not window.serial_bar.isVisible()
-    assert window.demo_station.currentText() == "GS2"
-    assert "RECORDED TELEMETRY" in window.connection_tiles["rocket"].text()
-    qtbot.mouseClick(window.demo_play, Qt.MouseButton.LeftButton)
-    assert not c.demo_playing
-    qtbot.mouseClick(window.demo_start, Qt.MouseButton.LeftButton)
-    assert c.demo_playing and c.demo_time == 0
-    assert c.latest.sequence == 9814
-    window.demo_speed.setCurrentIndex(4)
-    assert c.demo_speed == 4
-    window.demo_station.setCurrentText("GS3")
-    refresh()
-    assert c.latest.details["demo_station"] == "GS3"
+    assert c.mode == "REPLAY" and window.serial_bar.isVisible()
+    assert "RECORDED" in window.connection_tiles["rocket"].text()
     assert not window.track_button.isEnabled()
+    assert not any(control.isEnabled() for control in window.rocket_panel.controls)
     panel = window.rocket_panel
     assert panel.power.item(1, 2).text() == "True"
     assert panel.pyros.item(0, 2).text() == "CONNECTED"
-    window.pages.setCurrentIndex(1)
+    window.pages.setCurrentIndex(5)
     qtbot.wait(30)
-    assert window.size().toTuple() == (1120, 800)
-    assert window.pages.currentWidget().height() > 500
-    assert window.demo_slider.width() > 150
+    assert window.play.isEnabled() and window.replay_slider.isEnabled()
+    assert window.replay_slider.maximum() > 0
     window.mode.setCurrentText("LIVE")
     refresh()
-    assert not window.demo_bar.isVisible() and window.serial_bar.isVisible()
+    assert window.serial_bar.isVisible()
+    assert c.reader is None and c.latest is None
     assert not window.record_button.isEnabled() and not window.point_button.isEnabled()
     window.close()
 

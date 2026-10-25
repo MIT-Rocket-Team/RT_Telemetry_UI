@@ -68,7 +68,7 @@ Equivalent Windows preparation and packaging:
 .venv\Scripts\python.exe scripts/build.py runtime
 .venv\Scripts\python.exe scripts/build.py bridge --download v6.2
 .venv\Scripts\python.exe scripts/build.py package --platform Windows
-.venv\Scripts\python.exe scripts/verify_package.py --model tests\fixtures\zephy_testlaunch.ork
+.venv\Scripts\python.exe scripts/verify_package.py --model tests\fixtures\test_launch.ork
 ```
 
 Outputs are ignored under `dist/`:
@@ -88,13 +88,13 @@ Run `make test` and `make lint`, then verify the actual distributable after relo
 ```sh
 .venv/bin/python scripts/verify_package.py \
   --package "/path with spaces/RocketGNCMonitor-v0a.app" \
-  --model tests/fixtures/zephy_testlaunch.ork \
+  --model tests/fixtures/test_launch.ork \
   --output build/package-verification
 ```
 
 On Windows replace the interpreter with `.venv\Scripts\python.exe` and `--package` with the extracted `RocketGNCMonitor-v0a` directory. Use native desktop Qt for Windows verification; do not set `QT_QPA_PLATFORM=offscreen`. On Mac, offscreen Qt is useful for isolated unit tests but does not replace native visual/package checks.
 
-The verifier checks the startup wizard, station roles, camera inventories, locked LIVE startup, all three demo recordings, portable flights, URRG, virtual pointing, simulation and 3D events. Its reports/logs/screenshots go to the selected output directory. No serial hardware opens. Synthetic video does not establish real USB receiver compatibility; physical board/camera/network acceptance is separate.
+The verifier checks the startup wizard, station roles, camera inventories, locked LIVE startup, recorded-file replay, portable flights, URRG, virtual pointing, simulation and 3D events. Its reports/logs/screenshots go to the selected output directory. No serial hardware opens. Synthetic video does not establish real USB receiver compatibility; physical board/camera/network acceptance is separate.
 
 The package keeps `vendor/build-manifest.json`, engine/bridge hashes, Java provenance, FFmpeg configuration, dependency metadata and notices. Simulation jobs also retain their exact model/motor inputs, request, output and worker log. Rebuild the bridge after editing `simulation_bridge/src/RocketBridge.java`.
 

@@ -151,11 +151,11 @@ jobs:
               verification = root / "build" / "package-verification"
               run("verify-package", python, "scripts/verify_package.py",
                   "--package", package,
-                  "--model", root / "tests" / "fixtures" / "zephy_testlaunch.ork",
+                  "--model", root / "tests" / "fixtures" / "test_launch.ork",
                   "--output", verification)
               report = json.loads((verification / "report.json").read_text())
-              if report.get("check_count") != 20 or report.get("minimal_path") is not True:
-                  raise RuntimeError("Expected all 20 packaged checks with a minimal system PATH")
+              if report.get("check_count") != 18 or report.get("minimal_path") is not True:
+                  raise RuntimeError("Expected all 18 packaged checks with a minimal system PATH")
               write_json(evidence / "verified-package.json", {
                   "source_commit": source_commit,
                   "file": archive.name,

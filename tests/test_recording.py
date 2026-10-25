@@ -1,13 +1,14 @@
 import json
 import pytest
-from rocket_gnc_monitor.domain import Mission, demo_sample
+from rocket_gnc_monitor.domain import Mission
+from recorded_flight import sample_fixture
 from rocket_gnc_monitor.recording import SessionRecorder, SessionReader, read_raw
 
 
 def test_session_replay_seek_export_and_raw_recovery(tmp_path):
-    recorder = SessionRecorder(tmp_path, Mission(), "DEMO")
+    recorder = SessionRecorder(tmp_path, Mission(), "LIVE")
     for i in range(20):
-        s = demo_sample(i * 0.05, i)
+        s = sample_fixture(i * 0.05, i)
         s.received = recorder.start + i * 0.05
         recorder.sample(s)
     recorder.raw("telemetry_rx", b"abc\x00\xff")
@@ -31,8 +32,8 @@ def test_session_replay_seek_export_and_raw_recovery(tmp_path):
 
 
 def test_incomplete_manifest_still_allows_committed_replay(tmp_path):
-    recorder = SessionRecorder(tmp_path, Mission(), "DEMO")
-    recorder.sample(demo_sample(0, 1))
+    recorder = SessionRecorder(tmp_path, Mission(), "LIVE")
+    recorder.sample(sample_fixture(0, 1))
     recorder.close()
     path = recorder.path / "manifest.json"
     data = json.loads(path.read_text())
@@ -44,10 +45,10 @@ def test_incomplete_manifest_still_allows_committed_replay(tmp_path):
 
 
 def test_close_drains_a_large_pending_batch(tmp_path):
-    from rocket_gnc_monitor.domain import demo_sample
+    from recorded_flight import sample_fixture
 
-    r = SessionRecorder(tmp_path, Mission(), "DEMO")
-    sample = demo_sample(1, 1)
+    r = SessionRecorder(tmp_path, Mission(), "LIVE")
+    sample = sample_fixture(1, 1)
     for i in range(2500):
         sample.sequence = i
         sample.received = r.start + i * 0.01

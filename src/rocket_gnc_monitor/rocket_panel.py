@@ -1,4 +1,4 @@
-"""Every operator control and telemetry table from the original Zephyrus UI."""
+"""Every operator control and telemetry table from the original telemetry UI."""
 
 from __future__ import annotations
 import time
@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QMessageBox,
 )
-from .zephyrus import legacy_values
+from .rocket_protocol import legacy_values
 from .domain import finite
 from .widgets import COLORS
 from .table_cells import clear_cells, set_cell
@@ -147,7 +147,6 @@ class RocketPanel(QWidget):
         self.servo_inputs = {}
         for title, name in [
             ("Roll control angle (deg)", "set_roll_control_servo_angle"),
-            ("Airbrakes angle (deg)", "set_airbrakes_angle"),
         ]:
             row = QHBoxLayout()
             row.addWidget(QLabel(title))
@@ -285,10 +284,7 @@ class RocketPanel(QWidget):
             control.setEnabled(self.c.can_command)
             control.setToolTip(self.c.command_block_reason)
         self.status.setText(
-            "Demo · commands simulated"
-            if self.c.mode == "DEMO"
-            and self.c.can_command
-            else "Uplink board connected" if self.c.can_command and self.c.board_layout == "base"
+            "Uplink board connected" if self.c.can_command and self.c.board_layout == "base"
             else "Ground station connected" if self.c.can_command
             else self.c.command_block_reason
         )

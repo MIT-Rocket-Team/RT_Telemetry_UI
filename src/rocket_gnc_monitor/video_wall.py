@@ -250,11 +250,11 @@ class VideoWall(QWidget):
         self._refresh_feed(LOCAL_DIGITAL)
 
     def set_local_source(self, label, live=False):
-        """Describe local camera/demo/file/replay truthfully; only cameras age.
+        """Describe local camera/file/replay truthfully; only cameras age.
 
         Call this when the source or playback state changes, even if no new frame
         arrives (for example when pausing replay). ``live=True`` is reserved for
-        an actual connected camera, never a demo or a decoded recording.
+        an actual connected camera, never a decoded recording.
         """
         if not isinstance(label, str) or not label.strip() or type(live) is not bool:
             raise ValueError("Local video source needs a label and a boolean live flag")

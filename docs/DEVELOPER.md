@@ -9,8 +9,8 @@ The repository root is the application root. There are no imports from the forme
 | Entry point, CLI and smoke checks | `__main__.py` |
 | Wizard, station identity, role routing | `startup_wizard.py`, `station_profile.py`, `station_workspace.py` |
 | Shared state and lifecycle | `controller.py`, `domain.py` |
-| Legacy serial framing and commands | `protocol.py`, `zephyrus.py`, `legacy.py`, `devices.py` |
-| Legacy CSV and recorded launch demo | `legacy_sample.py`, `demo.py` |
+| Legacy serial framing and commands | `protocol.py`, `rocket_protocol.py`, `legacy.py`, `devices.py` |
+| Legacy CSV decoding | `legacy_sample.py` |
 | Recording, replay and portable flight files | `recording.py`, `flight.py` |
 | USB video/FFmpeg and Launch video wall | `media.py`, `video_wall.py` |
 | Mission coordinates and presets | `location.py`, `location_ui.py`, `site_presets.py` |
@@ -28,9 +28,9 @@ The repository root is the application root. There are no imports from the forme
 
 The startup wizard finishes before the controller is constructed. `StationProfile` is immutable for the session. Its historical internal key `base` remains in persistence for compatibility; normal public UI says **Launch station** and maps to the single-board `launch` controller layout. `base`/`legacy` controller layouts remain compatibility APIs, not the normal wizard architecture. Do not remove an old saved-file key merely to rename a label.
 
-LIVE, DEMO and REPLAY are source modes, separate from station/role. DEMO and REPLAY cannot construct physical serial transports. Disconnection and invalid/stale telemetry stop tracking; resumption is explicit. A serial write means dispatched, not acknowledged. Never retry uncertain partial command writes automatically. Original command vectors, shortcuts and CSV mapping are regression fixtures in `tests/fixtures/legacy_reference.json`.
+LIVE and REPLAY are source modes, separate from station/role. REPLAY cannot construct physical serial transports. Disconnection and invalid/stale telemetry stop tracking; resumption is explicit. A serial write means dispatched, not acknowledged. Never retry uncertain partial command writes automatically. Original command vectors, shortcuts and CSV mapping are regression fixtures in `tests/fixtures/legacy_reference.json`.
 
-Launch owns one local telemetry board and no local physical or virtual pointer. Away owns downlink and pointer workers. Launch-only uplink enable and Iris target switching are labelled firmware placeholders; DEMO logs their simulated state changes and LIVE emits no invented switch commands. A selected Away route and received LAN data cannot unlock controls.
+Launch owns one local telemetry board and no local physical or virtual pointer. Away owns downlink and pointer workers. Launch-only uplink enable and Iris target switching are disabled firmware placeholders; no invented switch commands are emitted. A selected Away route and received LAN data cannot unlock controls.
 
 ## Geometry and coordinate frames
 
@@ -40,7 +40,7 @@ The physical antenna description is defined in **`mount_geometry.py`**, includin
 
 Trajectory positions use east/north/up relative to a WGS84 launch origin. Geographic transforms use ellipsoid height; weather uses separately supplied MSL elevation. Keep the legacy physical pointing convention (frozen receiver latitude/longitude, receiver altitude zero, barometric rocket height) separate from mission/reference transforms. Its historical height discrepancy is documented in [PROTOCOL.md](PROTOCOL.md).
 
-The rocket mesh's nose is body **+Z**. Current Zephyrus `Sample.attitude` values are independent cumulative body-gyro integrals in degrees; the field name is historical. Do not compose them into an Euler rotation or infer orientation from flight phase, climb/descent or a simulation. The compact pane uses a neutral model with **ORIENTATION UNAVAILABLE** unless a decoder provides:
+The rocket mesh's nose is body **+Z**. Current telemetry `Sample.attitude` values are independent cumulative body-gyro integrals in degrees; the field name is historical. Do not compose them into an Euler rotation or infer orientation from flight phase, climb/descent or a simulation. The compact pane uses a neutral model with **ORIENTATION UNAVAILABLE** unless a decoder provides:
 
 ```python
 sample.details["orientation"] = {
@@ -60,7 +60,7 @@ The validator requires finite scalar-first quaternion components with norm withi
 
 ## Network and future interfaces
 
-`station_io.py` currently implements receive-only uncompressed APRS through KISS TCP and an explicit one-peer LAN snapshot connection. Snapshots are bounded/versioned/read-only. They remain separate from local telemetry/control; no video, audio or hardware commands traverse this protocol. Wi-Fi selection stores the desired SSID and displays the current OS connection separately; the monitor stores no Wi-Fi password.
+`station_io.py` currently implements Iris-only receive-only uncompressed APRS through KISS TCP and an explicit one-peer LAN snapshot connection for both vehicles. Balius has no APRS controls or active receiver, and its snapshots omit APRS fixes. Snapshots are bounded/versioned/read-only. They remain separate from local telemetry/control; no video, audio or hardware commands traverse this protocol. Wi-Fi selection stores the desired SSID and displays the current OS connection separately; the monitor stores no Wi-Fi password.
 
 `video_wall.py` validates station/channel routing and presents remote slots but starts no network transport. A future transport supplies decoded frames on the GUI thread through `update_remote_frame(station, channel, QPixmap, quality="", received=None)`; `received` is local monotonic receive time. Station IDs are `away1`–`away4`; channel IDs are `digital`, `analog`, `analog2`. Reject unsupported station/channel pairs and call `mark_remote_unavailable` on link loss. Frames age stale after five seconds. Double-click promotion replaces only the matching large channel. Define transport provenance, frame timing and recording semantics before enabling remote feeds.
 

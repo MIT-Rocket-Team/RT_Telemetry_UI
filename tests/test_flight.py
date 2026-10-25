@@ -8,8 +8,9 @@ import pytest
 from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 from rocket_gnc_monitor.controller import Controller
-from rocket_gnc_monitor.demo import DemoFlight
-from rocket_gnc_monitor.domain import Mission, demo_sample
+from recorded_flight import recorded_session, video_fixture
+from rocket_gnc_monitor.domain import Mission
+from recorded_flight import sample_fixture
 from rocket_gnc_monitor.flight import save_flight, load_flight
 from rocket_gnc_monitor.location import decode_mgrs
 from rocket_gnc_monitor.recording import SessionRecorder, SessionReader, read_raw
@@ -20,7 +21,7 @@ from rocket_gnc_monitor.ui import MainWindow
 def test_planned_flight_portable_assets_and_urrg(tmp_path):
     point = decode_mgrs("18TUN2061530290")
     model = tmp_path / "rocket.ork"
-    model.write_bytes((Path(__file__).parent / "fixtures" / "zephy_testlaunch.ork").read_bytes())
+    model.write_bytes((Path(__file__).parent / "fixtures" / "test_launch.ork").read_bytes())
     motor = tmp_path / "custom.eng"
     motor.write_bytes(b"motor curve fixture")
     mission = Mission(
@@ -68,7 +69,7 @@ def test_live_snapshot_preserves_matching_database_raw_and_csv_without_stopping(
     recorder = SessionRecorder(tmp_path, Mission(), "LIVE")
     try:
         for index in range(200):
-            sample = demo_sample(index * 0.01, index)
+            sample = sample_fixture(index * 0.01, index)
             sample.received = recorder.start + index * 0.001
             recorder.sample(sample)
             recorder.raw("pointer_rx", bytes([index % 256]) * 7)
@@ -76,7 +77,7 @@ def test_live_snapshot_preserves_matching_database_raw_and_csv_without_stopping(
         save_flight(archive, Mission(), session=recorder.path, active=True, scope="Recording snapshot")
         assert recorder.thread.is_alive() and not recorder.closed
         for index in range(200, 400):
-            recorder.sample(demo_sample(index * 0.01, index))
+            recorder.sample(sample_fixture(index * 0.01, index))
         loaded = load_flight(archive, tmp_path / "opened")
         reader = SessionReader(loaded.session)
         try:
@@ -131,14 +132,14 @@ def test_failed_save_preserves_previous_file(tmp_path):
     assert not list(tmp_path.glob(".flight-*"))
 
 
-def test_full_demo_export_and_replay_position(qtbot, tmp_path):
+def test_full_recorded_export_and_replay_position(qtbot, tmp_path):
     c = Controller(tmp_path / "app")
     try:
-        c.switch_mode("DEMO")
-        c.play_demo(False)
-        c.seek_demo(c.demo.launch_time + 3)
+        session, recording = recorded_session(tmp_path / "recorded")
+        c.open_replay(session)
+        c.seek(recording.launch_time + 3)
         expected_sample = c.latest.to_dict()
-        archive = tmp_path / "zephyrus.rktflight"
+        archive = tmp_path / "test_flight.rktflight"
         c.save_flight(archive)
         qtbot.waitUntil(lambda: not c.flight_busy, timeout=60000)
         assert archive.exists()
@@ -148,7 +149,7 @@ def test_full_demo_export_and_replay_position(qtbot, tmp_path):
         c.open_flight(archive)
         qtbot.waitUntil(lambda: not c.flight_busy, timeout=10000)
         assert c.mode == "REPLAY" and not c.replay_playing and not any(c.workers.values())
-        assert c.reader.count == len(DemoFlight("GS2").rows)
+        assert c.reader.count == len(recording.rows)
         assert c.latest.sequence == expected_sample["sequence"]
         assert c.latest.enu == expected_sample["enu"]
         assert c.latest.details == expected_sample["details"]
@@ -165,7 +166,7 @@ def test_buffered_telemetry_save_and_invalid_open_keeps_current_flight(qtbot, tm
     c.task_done.connect(lambda name, result: results.append((name, result)))
     try:
         for index in range(10):
-            sample = demo_sample(index * 0.1, index)
+            sample = sample_fixture(index * 0.1, index)
             sample.received = 100 + index * 0.1
             c.history.append(sample)
         archive = tmp_path / "buffer.rktflight"
@@ -189,7 +190,7 @@ def test_buffered_telemetry_save_and_invalid_open_keeps_current_flight(qtbot, tm
 def test_save_completed_capture_includes_final_video_segment(qtbot, tmp_path):
     c = Controller(tmp_path / "app")
     try:
-        c.switch_mode("DEMO")
+        c.start_video("file", video_fixture(tmp_path))
         qtbot.waitUntil(lambda: c.video is not None and c.video.received_frames > 3, timeout=5000)
         c.start_recording(tmp_path / "recordings")
         qtbot.wait(1000)

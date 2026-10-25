@@ -53,10 +53,10 @@ def test_actual_csv_unknown_state_never_appears_as_ground_testing(qtbot):
     assert item.details["state_code"] == 0  # Existing import fallback must not be trusted here.
     badge = RocketStateBadge()
     qtbot.addWidget(badge)
-    badge.update_state(item, mode="DEMO")
+    badge.update_state(item, mode="REPLAY")
     assert badge.state_name == "NEW_FIRMWARE_STATE"
     assert badge.background_color == UNKNOWN_COLORS[0]
-    assert badge.status_label.text() == "DEMO · Telemetry"
+    assert badge.status_label.text() == "REPLAY · Telemetry"
 
 
 @pytest.mark.parametrize("code", [-1, 6, 255, 256, None, True, False, "0", "FLIGHT", 0.0, 2.0, [], {}, float("nan")])
@@ -96,8 +96,8 @@ def test_stale_state_remains_visible_and_no_sample_resets_black(qtbot):
 
 
 @pytest.mark.parametrize("mode,source,expected", [
-    ("DEMO", "LEGACY_CSV", "DEMO"), ("REPLAY", "LIVE", "REPLAY"),
-    ("LIVE", "DEMO", "DEMO"), ("LIVE", "REPLAY", "REPLAY"),
+    ("REPLAY", "LIVE", "REPLAY"),
+    ("LIVE", "ARCHIVED", "REPLAY"), ("LIVE", "REPLAY", "REPLAY"),
     ("LIVE", "LEGACY_CSV", "REPLAY"), ("unknown", "LIVE", "UNKNOWN SOURCE"),
 ])
 def test_source_captions_never_call_recorded_samples_live(qtbot, mode, source, expected):

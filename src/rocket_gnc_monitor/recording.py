@@ -16,8 +16,8 @@ import uuid
 import zlib
 from . import __version__
 from .domain import Sample, write_json
-from .zephyrus import CSV_FIELDS, legacy_values
-from .protocol import ZephyrusDecoder
+from .rocket_protocol import CSV_FIELDS, legacy_values
+from .protocol import TelemetryDecoder
 
 RAW_HEADER = struct.Struct("<4sddBI")
 RAW_ROLES = {"telemetry_rx": 1, "pointer_rx": 2, "pointer_tx": 3, "telemetry_tx": 4}
@@ -101,10 +101,10 @@ class SessionRecorder:
                 bad_csv.writeheader()
 
                 def bad_packet(payload, trailer, count):
-                    sample = ZephyrusDecoder().decode(payload, trailer)
+                    sample = TelemetryDecoder().decode(payload, trailer)
                     bad_csv.writerow(legacy_values(sample, count, rejected=True))
 
-                raw_decoder = ZephyrusDecoder(on_rejected=bad_packet)
+                raw_decoder = TelemetryDecoder(on_rejected=bad_packet)
                 while not self.closed or not self.queue.empty():
                     try:
                         kind, received, data = self.queue.get(timeout=0.1)

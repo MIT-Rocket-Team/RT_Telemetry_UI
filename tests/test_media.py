@@ -1,9 +1,10 @@
 import time
 from rocket_gnc_monitor.media import VideoWorker, WIDTH, HEIGHT
+from recorded_flight import video_fixture
 
 
 def test_video_records_even_when_display_queue_is_not_consumed(tmp_path):
-    worker = VideoWorker("demo", record_dir=tmp_path / "video")
+    worker = VideoWorker("file", video_fixture(tmp_path), record_dir=tmp_path / "video")
     deadline = time.monotonic() + 6
     try:
         while worker.received_frames < 35 and not worker.error and time.monotonic() < deadline:

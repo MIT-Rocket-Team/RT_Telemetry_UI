@@ -1,8 +1,8 @@
 # Legacy UI feature parity
 
-The original Zephyrus wire commands, values and shortcuts remain implemented. Normal station profiles apply the current hardware roles: Launch has one telemetry board, exclusive uplink authority and a pending software-enable protocol; Away has downlink and a pointer. LIVE Launch rocket commands remain locked until that switch is defined; DEMO exercises the placeholder. The former pages are distributed across the Launch Flight/Systems windows; Away telemetry is reduced, and Video is its own role. See [station modes](V0A_STATION_MODES.md) for placement and availability.
+The supported legacy wire commands, values and shortcuts remain implemented. Normal station profiles apply the current hardware roles: Launch has one telemetry board, exclusive uplink authority and a pending software-enable protocol; Away has downlink and a pointer. LIVE Launch rocket commands remain locked until that switch is defined. The former pages are distributed across the Launch Flight/Systems windows; Away telemetry is reduced, and Video is its own role. See [station modes](V0A_STATION_MODES.md) for placement and availability.
 
-The previous `ground_station/UI.py`, `rocket.py`, and `pointer.py` are the behavioral reference. Existing source, images and planning documents are reference material; the user's instruction to retain all old functionality takes precedence over the earlier revamp's proposed restrictions. The original files are unchanged.
+The previous `ground_station/UI.py`, `rocket.py`, and `pointer.py` are the behavioral reference. Existing source, images and planning documents are reference material; the current requested feature set takes precedence over historical controls. The original files are unchanged.
 
 ## Feature inventory
 
@@ -19,7 +19,7 @@ The previous `ground_station/UI.py`, `rocket.py`, and `pointer.py` are the behav
 | Six power rail requests/readbacks, total current, power temperature | Systems → power rails/BMS; 3.3 V request remains fixed on, Total remains read-only aggregate |
 | BMS enabled/triggered status | Systems → power rails/BMS; all eight bits are visible |
 | State advance, zero P/Y/Roll, altitude, velocity, servos, PD Activate | Systems → rocket commands |
-| Roll and airbrake servo angle entry/send | Systems → rocket commands; same float32 wire values |
+| Roll servo angle entry/send | Systems → rocket commands; same float32 wire values |
 | VTX power 1/3/5/8 W | Systems → rocket commands |
 | Six pyro selections, continuity, arm/fire readbacks, resistance | Systems → recovery |
 | ARM/FIRE selected pyros | Same channel mask and original confirmation/no-selection behavior |
@@ -47,7 +47,7 @@ Actions are bound once, so repeated status refreshes cannot duplicate transmissi
 
 ## Reference-based verification
 
-`tests/fixtures/legacy_reference.json` captures outputs from the actual original class methods: 118 rocket packets covering all 18 opcodes plus the zero-roll alias, all 64 converter masks, each pyro channel and grouped masks, all VTX choices, state advances, and several signed servo angles; eight pointer packet cases; three geographic tracking cases; every CSV column; and the ten shortcut strings read from the original UI. The fixture records SHA-256 hashes of all three reference files.
+`tests/fixtures/legacy_reference.json` retains outputs from the actual original class methods for supported commands: all 64 converter masks, each pyro channel and grouped masks, all VTX choices, state advances, the zero-roll alias and several signed roll-servo angles; eight pointer packet cases; three geographic tracking cases; every CSV column; and the ten shortcut strings read from the original UI. The fixture records SHA-256 hashes of all three reference files.
 
 The fixture was captured from the original class methods with physical connection methods removed and in-memory byte streams substituted. The historical capture helper remains in the original repository; the retained fixture runs without that helper or the reference source folder.
 

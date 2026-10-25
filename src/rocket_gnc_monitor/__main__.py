@@ -29,7 +29,7 @@ def station_board_report(window):
         serial_roles=list(window.controller.workers),
         visible_serial_roles=[role for role, (selector, _, _) in window.port_widgets.items() if selector.isVisible()],
         iris_link_boards=list(panel.selectors) if panel is not None else [],
-        iris_simulated_targets=dict(panel.simulated_targets) if panel is not None else {},
+        iris_hardware_targets=dict.fromkeys(panel.selectors) if panel is not None else {},
         iris_switch_buttons_enabled={board: button.isEnabled() for board, button in panel.buttons.items()} if panel is not None else {},
         launch_station=window.launch_station,
         selected_away_pointer=window.controller.selected_away_station,
@@ -40,7 +40,7 @@ def station_board_report(window):
         launch_uplink_switch=dict(
             visible=window.launch_uplink is not None and window.launch_uplink.isVisible(),
             hardware_state=None,
-            simulated_enabled=window.controller.simulated_uplink_enabled,
+            switch_enabled=window.launch_uplink.toggle.isEnabled() if window.launch_uplink else False,
         ),
         rocket_state_badge=dict(
             visible=window.rocket_state_badge.isVisible(),
@@ -84,9 +84,7 @@ def argument_parser():
     parser.add_argument("--remember-setup", action=argparse.BooleanOptionalAction, default=None,
                         help="Remember (or forget) startup choices; otherwise use the wizard checkbox")
     startup = parser.add_mutually_exclusive_group()
-    startup.add_argument("--demo", action="store_true", help="Play the recorded Zephyrus test flight")
-    parser.add_argument("--demo-station", choices=["GS1", "GS2", "GS3"], default="GS2")
-    startup.add_argument("--smoke-test", action="store_true", help="Exercise recorded demo playback and exit")
+    startup.add_argument("--replay-smoke", action="store_true", help="Verify file replay and recorded video inputs, then exit")
     startup.add_argument("--startup-smoke", action="store_true", help="Verify locked Live startup and exit")
     startup.add_argument("--station-smoke", action="store_true", help="Verify station workspace layout and exit")
     startup.add_argument("--setup-smoke", action="store_true", help="Render the startup wizard without opening instruments")
@@ -110,6 +108,50 @@ def argument_parser():
         help="Test the private engine using a model and synthetic launch coordinates",
     )
     return parser
+
+
+def verification_session(directory, mission, channels):
+    """Create an explicit on-disk test fixture, then use ordinary replay input.
+
+    This is invoked only by the packaging verification flag. No generated stream
+    type or synthetic telemetry mode is registered with the monitor.
+    """
+    import csv
+    import shutil
+    import subprocess
+    from .domain import Sample, write_json
+    from .media import ffmpeg, popen_options
+    from .recording import SessionRecorder
+
+    directory.mkdir(parents=True, exist_ok=True)
+    video = directory / "camera-fixture.mp4"
+    subprocess.run([ffmpeg(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi",
+                    "-i", "testsrc2=size=960x540:rate=30", "-t", "6", "-c:v", "mpeg4",
+                    "-q:v", "4", str(video)], check=True, **popen_options())
+    recorder = SessionRecorder(directory, mission, "LIVE")
+    try:
+        for channel in channels:
+            folder = recorder.path / f"video_{channel}"
+            folder.mkdir()
+            shutil.copyfile(video, folder / "segment.mp4")
+            with (folder / "segments.csv").open("w", newline="") as handle:
+                csv.writer(handle).writerow(["segment.mp4", 0, 6])
+            recorder.put("event", {"name": "Video recording started", "data": {
+                "directory": folder.name, "kind": "file", "stream": channel}}, recorder.start)
+        for index in range(61):
+            recorder.sample(Sample(t=index / 10, sequence=index, source="LIVE", altitude=float(index),
+                                   received=recorder.start + index / 10, phase="PREFLIGHT",
+                                   details={"fixture": "Package replay verification"}))
+    finally:
+        recorder.close()
+    if recorder.error:
+        raise RuntimeError(recorder.error)
+    manifest_path = recorder.path / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest.update(duration=6, verification_fixture=True, raw_packets_available=False)
+    write_json(manifest_path, manifest)
+    video.unlink()
+    return recorder.path
 
 
 def main():
@@ -152,7 +194,7 @@ def main():
     if args.remember_setup is not None:
         remember_choices = args.remember_setup
     smoke = any((
-        args.smoke_test, args.startup_smoke, args.station_smoke, args.virtual_pointer_smoke,
+        args.replay_smoke, args.startup_smoke, args.station_smoke, args.virtual_pointer_smoke,
         args.flight_3d_smoke, args.flight_smoke, args.setup_smoke,
     ))
     if args.setup_smoke or not (args.skip_setup or smoke):
@@ -222,10 +264,6 @@ def main():
         from dataclasses import asdict
 
         profile_fields["startup_mission"] = asdict(window.controller.mission)
-    if args.demo or args.smoke_test:
-        window.controller.demo_station = args.demo_station
-        window.controller.switch_mode("DEMO")
-        window.pages.setCurrentIndex(1)
     window.show()
     if args.station_smoke:
         def station_check():
@@ -379,7 +417,7 @@ def main():
         )
     if args.flight_smoke:
         from .flight import save_flight, load_flight
-        from .demo import DemoFlight
+        from .domain import Sample
         from .trajectory import Trajectory
         from .ui import MissionDialog
         from .domain import to_enu
@@ -425,18 +463,13 @@ def main():
         assert abs(antenna_enu[0] - 500) < 1e-4 and abs(antenna_enu[1]) < 1e-4
         assert c.mission.pointer_altitude == c.mission.altitude + 5
         assert Path(c.mission.model).is_file()
-        demo = DemoFlight("GS2")
-        archive = data / "zephyrus.rktflight"
+        samples = [Sample(t=float(i), sequence=i, source="LIVE", altitude=10 * i,
+                          phase="PREFLIGHT", details={"fixture": "Portable flight verification"})
+                   for i in range(3)]
+        archive = data / "recorded-flight.rktflight"
         save_flight(
-            archive,
-            mission,
-            reference,
-            demo=demo,
-            position=demo.launch_time + 2,
-            mode="DEMO",
-            flight_zero=demo.flight_zero,
-            time_aligned=True,
-            scope="Complete Zephyrus GS2 dataset",
+            archive, mission, reference, samples=samples, elapsed=[0, 1, 2], position=1,
+            mode="LIVE", flight_zero=0, time_aligned=True, scope="Verification recording",
         )
         loaded = load_flight(archive, data / "opened")
         c.apply_flight(loaded)
@@ -461,7 +494,7 @@ def main():
             ),
             model_exists=Path(c.mission.model).is_file(),
             reference_rows=len(c.reference.points),
-            latest_row=c.latest.details["demo_row"],
+            latest_sequence=c.latest.sequence,
         )
         (data / "flight-smoke-report.json").write_text(json.dumps(report, indent=2))
         if args.screenshot:
@@ -470,26 +503,32 @@ def main():
         window.close()
         return (
             0
-            if report["samples"] == len(demo.rows) and report["paused"] and not report["hardware_open"]
+            if report["samples"] == len(samples) and report["latest_sequence"] == 1 and report["paused"] and not report["hardware_open"]
             else 1
         )
-    if args.smoke_test or args.startup_smoke:
+    if args.replay_smoke or args.startup_smoke:
         from time import monotonic
 
+        if args.replay_smoke:
+            path = verification_session(data, window.controller.mission, window.controller.video_channels)
+            window.controller.open_replay(path)
+            window.controller.seek(1)
+            window.controller.replay_speed = 0.1
+            window.toggle_replay()
         smoke_started = monotonic()
         smoke_deadline = smoke_started + 30
 
-        def complete():
+        def complete_report():
             from .location import decode_mgrs, decode_plus_code
 
             c = window.controller
-            ready = c.demo_replayed_rows > 20 and all(
-                state.worker and state.worker.received_frames > 0 and not state.worker.error
+            ready = c.reader is not None and c.latest is not None and all(
+                state.worker and state.worker.received_frames > 1 and not state.worker.error
                 for state in c.video_streams.values()
             )
             # Native video startup can take longer under CPU emulation. Wait for
             # the same required evidence, with a bound, instead of a fixed race.
-            if args.smoke_test and monotonic() < smoke_deadline:
+            if args.replay_smoke and monotonic() < smoke_deadline:
                 failed = any(
                     state.error or (state.worker and state.worker.error)
                     for state in c.video_streams.values()
@@ -511,7 +550,7 @@ def main():
                 **profile_fields,
                 **station_board_report(window),
                 smoke_elapsed_s=monotonic() - smoke_started,
-                smoke_readiness_timeout=bool(args.smoke_test and not ready and monotonic() >= smoke_deadline),
+                smoke_readiness_timeout=bool(args.replay_smoke and not ready and monotonic() >= smoke_deadline),
                 settings=settings_check,
                 samples=len(c.history),
                 mode=c.mode,
@@ -526,9 +565,10 @@ def main():
                     for stream, state in c.video_streams.items()
                 },
                 hardware_open=any(c.workers.values()),
-                demo_recording=dict(station=c.demo.station, **c.demo.metadata) if c.demo else None,
-                demo_progress_samples=c.demo_replayed_rows,
-                latest_demo_row=c.latest.details.get("demo_row") if c.latest else None,
+                replay_samples=c.reader.count if c.reader else 0,
+                replay_playing=c.replay_playing,
+                replay_position=c.replay_time if c.reader else None,
+                latest_sequence=c.latest.sequence if c.latest else None,
                 latest_recorded_utc=c.latest.utc if c.latest else None,
                 controls_locked=not window.record_button.isEnabled() and not window.point_button.isEnabled(),
                 font_family=QFontInfo(app.font()).family(),
@@ -550,13 +590,24 @@ def main():
                 and all(v["frames"] == 0 for v in report["video_streams"].values())
                 and report["controls_locked"]
                 if args.startup_smoke
-                else report["mode"] == "DEMO"
-                and report["demo_progress_samples"] > 20
-                and all(v["frames"] > 0 and not v["error"] for v in report["video_streams"].values())
+                else report["mode"] == "REPLAY"
+                and report["replay_samples"] > 0
+                and report["latest_sequence"] >= 10
+                and report["replay_playing"]
+                and all(v["frames"] > 1 and not v["error"] for v in report["video_streams"].values())
             )
             app.exit(0 if valid and not report["hardware_open"] else 1)
 
-        QTimer.singleShot(1000 if args.startup_smoke else 4500, complete)
+        def complete():
+            try:
+                complete_report()
+            except Exception:
+                import traceback
+                traceback.print_exc()
+                window.close()
+                app.exit(1)
+
+        QTimer.singleShot(1000, complete)
     return app.exec()
 
 

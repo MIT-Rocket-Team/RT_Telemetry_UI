@@ -8,7 +8,7 @@ from PySide6.QtCore import Qt, QCoreApplication, QEvent
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QListWidget, QStackedWidget, QTabWidget
 
-from rocket_gnc_monitor.protocol import ZephyrusDecoder
+from rocket_gnc_monitor.protocol import TelemetryDecoder
 from rocket_gnc_monitor.flight_view import Flight3DDialog
 from rocket_gnc_monitor.station_workspace import StationWindow
 from rocket_gnc_monitor.virtual_pointer import VIRTUAL_POINTER_DEVICE
@@ -79,8 +79,10 @@ def test_base_exposes_all_categories_and_complete_instrument_tables(station, qtb
             if widget.objectName() == "navigation"
         )
 
-    c.switch_mode("DEMO")
-    c.play_demo(False)
+    from recorded_flight import recorded_session
+
+    session, _ = recorded_session(c.data_dir / "recording")
+    c.open_replay(session)
     refresh(w)
     qtbot.wait(150)
     refresh(w)
@@ -108,7 +110,7 @@ def test_station_switch_keeps_live_pointer_and_flight_state(station, qtbot):
     c.manual_point(90, 30)
     c.tick()
     pointer.advance(2)
-    sample = ZephyrusDecoder().feed(frame())[0]
+    sample = TelemetryDecoder().feed(frame())[0]
     c.accept(sample)
     history = list(c.history)
     mission = c.mission
@@ -181,16 +183,30 @@ def test_secondary_window_dispatches_shared_shortcuts_once(station, qtbot):
     assert c.mode == "LIVE" and c.pointer_connected
 
 
-def test_companion_cannot_hide_base_information_and_owner_stops_all_timers(station, qtbot):
+@pytest.mark.parametrize("size", [(1280, 800), (1600, 1000), (1920, 1080)])
+def test_away_rocket_and_vertical_profile_share_height_equally(station, qtbot, size):
+    station.set_station_mode("away")
+    station.resize(*size)
+    qtbot.wait(50)
+    upper, lower = station.cards["attitude"], station.cards["altitude"]
+    assert upper.isVisible() and lower.isVisible()
+    assert abs(upper.height() - lower.height()) <= 2
+    assert station.attitude.azimuth.isVisible()
+    assert station.attitude.view.height() > 130
+    assert station.altitude_plot.height() > 150
+
+
+def test_companion_closes_independently_and_owner_stops_all_timers(station, qtbot):
     w, c = station, station.controller
     assert c.timer.isActive()
     assert w.mount.animation.isActive()
     assert w.flight_3d_dialog.timer.isActive()
     assert w.network_panel.timer.isActive()
-    assert not w.companion.close()
+    assert w.companion.close()
     qtbot.wait(40)
-    assert w.companion.isVisible() and not getattr(c, "_shutdown", False)
-    assert "Away station" in w.companion.statusBar().currentMessage()
+    assert not w.companion.isVisible() and not getattr(c, "_shutdown", False)
+    w.arrange_displays()
+    assert w.companion.isVisible()
     w.close()
     qtbot.wait(40)
     assert not w.isVisible() and not w.companion.isVisible()

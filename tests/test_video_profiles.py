@@ -1,3 +1,4 @@
+from recorded_flight import video_fixture
 """Station video inputs stay distinct through capture, recording and portable replay."""
 
 import gc
@@ -139,7 +140,7 @@ def test_third_camera_reservation_survives_pending_close(qtbot, tmp_path, monkey
         c.shutdown()
 
 
-def test_digital_only_profile_rejects_inactive_inputs_and_demo_starts_only_digital(qtbot, tmp_path, monkeypatch):
+def test_digital_only_profile_rejects_inactive_inputs_and_opens_only_digital(qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr("rocket_gnc_monitor.controller.VideoWorker", CameraStub)
     c = Controller(tmp_path, video_channels=("digital",))
     resets = []
@@ -156,13 +157,13 @@ def test_digital_only_profile_rejects_inactive_inputs_and_demo_starts_only_digit
         with pytest.raises(ValueError, match="active video channel"):
             c.start_video("camera", "0", stream=None)
         assert not c.futures
-        c.switch_mode("DEMO")
+        c.start_video("camera", "0")
         qtbot.waitUntil(lambda: c.video is not None)
         assert c.video_channels == ("digital",) and tuple(c.video_streams) == ("digital",)
-        assert c.video.kind == "demo" and c.video.source == "digital"
+        assert c.video.kind == "camera" and c.video.source == "0"
         assert set(resets) == {"digital"}
-        assert c.video_config == ("demo", "digital")
-        c.switch_mode("LIVE")
+        assert c.video_config == ("camera", "0")
+        c.switch_mode("REPLAY")
         assert c.video_config is None
     finally:
         c.shutdown()
@@ -211,9 +212,10 @@ def test_video_profile_recording_round_trip_and_single_channel_replay(qtbot, tmp
                    for state in c.video_streams.values())
 
     try:
-        # Real bundled FFmpeg generators exercise the selected encoders without USB hardware.
+        # Distinct recorded files exercise selected decoders without USB hardware.
         for channel in channels:
-            c.start_video("demo", channel, stream=channel)
+            pattern = {"digital": "testsrc2", "analog": "smptebars", "analog2": "testsrc"}[channel]
+            c.start_video("file", video_fixture(tmp_path / channel, pattern=pattern), stream=channel)
         qtbot.waitUntil(all_frames, timeout=10000)
         qtbot.waitUntil(lambda: set(first_frames) == set(channels), timeout=10000)
         assert len(set(first_frames.values())) == len(channels)

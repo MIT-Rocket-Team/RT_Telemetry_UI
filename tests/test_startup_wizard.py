@@ -221,7 +221,7 @@ def test_launch_wizard_describes_one_local_board_and_remote_pointer(qtbot):
     assert "Ethernet / PoE to four LTU-XR links" in summary
     assert "Choose an away antenna pointer" in summary
     assert "One telemetry board: downlink reception and polling." in summary
-    assert "Uplink enable: firmware pending; DEMO simulation only." in summary
+    assert "Uplink enable: unavailable until the firmware protocol is defined." in summary
     assert "One shared board target." in summary
     assert "no local antenna pointer" in summary
     assert "Base" not in summary

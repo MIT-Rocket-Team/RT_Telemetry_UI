@@ -162,7 +162,7 @@ def test_legacy_station_constructor_preserves_local_board_api(qtbot, tmp_path):
 
 
 def test_systems_badge_tracks_decoded_state_and_marks_stale_telemetry(qtbot, tmp_path):
-    from rocket_gnc_monitor.protocol import ZephyrusDecoder
+    from rocket_gnc_monitor.protocol import TelemetryDecoder
     from test_protocol import frame
 
     w = StationWindow(tmp_path, profile=StationProfile("launch", "telemetry", "iris"), auto_place=False)
@@ -174,7 +174,7 @@ def test_systems_badge_tracks_decoded_state_and_marks_stale_telemetry(qtbot, tmp
         assert badge.isVisible() and badge.window() is w.companion
         assert badge.state_name == "NO TELEMETRY"
         assert badge.background_color == "#000000"
-        c.latest = ZephyrusDecoder().feed(frame())[0]
+        c.latest = TelemetryDecoder().feed(frame())[0]
         c.mode = "REPLAY"
         w.last_ui = 0
         w.refresh()
@@ -196,9 +196,9 @@ def test_systems_badge_tracks_decoded_state_and_marks_stale_telemetry(qtbot, tmp
 
 
 @pytest.mark.parametrize("vehicle", ["balius", "iris"])
-def test_launch_serial_shortcuts_feed_both_displays_and_uplink_switch_is_demo_only(qtbot, tmp_path, monkeypatch, vehicle):
+def test_launch_serial_shortcuts_feed_both_displays_and_uplink_remains_unavailable(qtbot, tmp_path, monkeypatch, vehicle):
     from PySide6.QtCore import Qt
-    from rocket_gnc_monitor.protocol import ZephyrusDecoder
+    from rocket_gnc_monitor.protocol import TelemetryDecoder
     from test_board_roles import Board
     from test_protocol import frame
 
@@ -224,7 +224,7 @@ def test_launch_serial_shortcuts_feed_both_displays_and_uplink_switch_is_demo_on
         w.legacy_actions["poll"].trigger()
         board = c.workers["telemetry"]
         assert c.polling and board.polling
-        sample = ZephyrusDecoder().feed(frame())[0]
+        sample = TelemetryDecoder().feed(frame())[0]
         c.enqueue(board.generation, "telemetry", "sample", sample)
         c.tick()
         w.last_ui = w.last_table = 0
@@ -239,8 +239,6 @@ def test_launch_serial_shortcuts_feed_both_displays_and_uplink_switch_is_demo_on
         assert not board.sent
         for table in (w.actuators, w.rocket_panel.telemetry, w.rocket_panel.pyros):
             assert table.verticalScrollBar().maximum() == 0
-        c.switch_mode("DEMO")
-        c.play_demo(False)
         c.select_away_station("away3")
         w.last_ui = 0
         w.refresh()
@@ -249,15 +247,12 @@ def test_launch_serial_shortcuts_feed_both_displays_and_uplink_switch_is_demo_on
         for label in w.launch_links.findChildren(QLabel):
             assert label.height() >= label.heightForWidth(label.width()), label.text()
         qtbot.mouseClick(w.launch_uplink.toggle, Qt.MouseButton.LeftButton)
-        assert c.simulated_uplink_enabled and c.can_command
-        c.send_rocket("zero_alt")
-        qtbot.mouseClick(w.launch_uplink.toggle, Qt.MouseButton.LeftButton)
-        assert not c.simulated_uplink_enabled and not c.can_command
-        assert not board.sent
-        c.switch_mode("LIVE")
+        assert not c.can_command and not board.sent
+        assert "UNKNOWN" in w.launch_uplink.status.text()
+        c.switch_mode("REPLAY")
         w.last_ui = 0
         w.refresh()
-        assert not c.simulated_uplink_enabled and not c.ground_connected
-        assert "UNKNOWN" in w.launch_uplink.status.text()
+        assert not w.launch_uplink.toggle.isEnabled()
+        assert not c.ground_connected and "UNKNOWN" in w.launch_uplink.status.text()
     finally:
         w.close()

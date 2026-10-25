@@ -1,4 +1,4 @@
-"""Independent bounded serial workers for Zephyrus telemetry/uplink and pointer commands."""
+"""Independent bounded serial workers for rocket telemetry/uplink and pointer commands."""
 
 from __future__ import annotations
 import queue
@@ -6,7 +6,7 @@ import threading
 import time
 import serial
 from serial.tools import list_ports
-from .protocol import ZephyrusDecoder
+from .protocol import TelemetryDecoder
 
 
 def serial_device_key(device):
@@ -37,7 +37,7 @@ class SerialWorker:
         self.stop_event = threading.Event()
         self.poll_event = threading.Event()
         self.commands = queue.Queue(maxsize=1 if role == "pointer" else 64)
-        self.decoder = ZephyrusDecoder() if role == "telemetry" else None
+        self.decoder = TelemetryDecoder() if role == "telemetry" else None
         self.connection = None
         self.thread = threading.Thread(target=self.run, name=f"{role}-serial", daemon=True)
         self.thread.start()

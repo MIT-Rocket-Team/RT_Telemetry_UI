@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from PySide6.QtCore import QCoreApplication, QEvent
 
-from rocket_gnc_monitor.protocol import ZephyrusDecoder
+from rocket_gnc_monitor.protocol import TelemetryDecoder
 from rocket_gnc_monitor.rocket_pose_panel import RocketPosePanel
 from rocket_gnc_monitor.station_profile import StationProfile
 from rocket_gnc_monitor.station_workspace import StationWindow
@@ -43,7 +43,7 @@ def test_all_telemetry_workspaces_replace_horizon_with_slider_controlled_rocket(
     assert panel.source.currentData() == "telemetry"
     assert not hasattr(w, "attitude_label")
     c.mode = "REPLAY"
-    sample = ZephyrusDecoder().feed(frame())[0]
+    sample = TelemetryDecoder().feed(frame())[0]
     sample.attitude = [25., 15., 40.]
     c.latest = sample
     panel.refresh()
@@ -70,7 +70,7 @@ def test_reference_events_follow_existing_player_without_becoming_telemetry(pose
     w, c = pose_window, pose_window.controller
     panel = w.attitude
     c.reference = reference()
-    c.latest = ZephyrusDecoder().feed(frame())[0]
+    c.latest = TelemetryDecoder().feed(frame())[0]
     c.mode = "REPLAY"
     panel.source.setCurrentIndex(panel.source.findData("openrocket"))
     dialog = (w.away_flight_dialog if getattr(w, "profile_locked", False)

@@ -10,7 +10,7 @@ import pytest
 from rocket_gnc_monitor.domain import Mission
 from rocket_gnc_monitor.trajectory import SimulationJob, bundled_motor_files, runtime_root
 
-FIXTURE = Path(__file__).parent / "fixtures" / "zephy_testlaunch.ork"
+FIXTURE = Path(__file__).parent / "fixtures" / "test_launch.ork"
 MOTOR_DIGEST = "057a820844b93fe3307401623a92d4c6"
 RUNTIME = runtime_root()
 ENGINE_AVAILABLE = all(
@@ -37,7 +37,7 @@ def test_bundled_curve_has_original_bytes_and_matches_the_model():
 
 
 @engine
-def test_zephyrus_simulates_with_bundled_motor_without_user_configuration(tmp_path):
+def test_recorded_rocket_simulates_with_bundled_motor_without_user_configuration(tmp_path):
     mission = Mission(model=str(FIXTURE), site_configured=True, latitude=42.7042296, longitude=-77.1919152)
     assert mission.motor_files == []
     result = SimulationJob(mission, tmp_path).run()
