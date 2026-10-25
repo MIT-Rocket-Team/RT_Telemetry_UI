@@ -427,9 +427,9 @@ class StationWindow(InstrumentWindow):
         self.flight_grid.setRowStretch(1, 4)
         sections = {
             "systems": (
-                ("commands", 0, 0), ("recovery", 1, 0, 2, 1),
+                ("commands", 0, 0), ("cells", 1, 0, 2, 1),
                 ("power", 0, 1, 2, 1), ("bms", 2, 1),
-                ("servos", 0, 2), ("cells", 1, 2, 2, 1),
+                ("recovery", 0, 2, 3, 1),
                 ("actuators", 3, 0, 1, 3),
                 ("gnc_rates", 4, 0), ("gnc_angles", 4, 1, 1, 2),
             ),
