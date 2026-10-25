@@ -2,7 +2,8 @@ from dataclasses import replace
 import math
 from types import SimpleNamespace
 import pytest
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QCoreApplication, Qt
+from PySide6.QtWidgets import QScrollArea
 from rocket_gnc_monitor.controller import Controller
 from rocket_gnc_monitor.domain import Mission, pointing
 from rocket_gnc_monitor.flight import save_flight, load_flight
@@ -186,8 +187,9 @@ def test_virtual_ui_connect_shortcuts_and_trajectory_controls(qtbot, tmp_path, m
     monkeypatch.setattr("rocket_gnc_monitor.ui.ports", lambda: [])
     w = MainWindow(tmp_path)
     qtbot.addWidget(w)
-    w.show()
     w.controller.timer.stop()
+    with qtbot.waitExposed(w):
+        w.show()
     c = w.controller
     c.mission = mission()
     c.reference = reference()
@@ -196,18 +198,32 @@ def test_virtual_ui_connect_shortcuts_and_trajectory_controls(qtbot, tmp_path, m
         w.last_ui = 0
         w.refresh()
 
+    def click_pointer_control(control):
+        # Connecting hides its button and reveals a new panel. Native Windows
+        # lays out that panel asynchronously, so click only a realized viewport
+        # location, just as an operator would after scrolling it into view.
+        QCoreApplication.processEvents()
+        scroll = next(area for area in w.pages.currentWidget().findChildren(QScrollArea)
+                      if area.isAncestorOf(control))
+        scroll.ensureWidgetVisible(control)
+        QCoreApplication.processEvents()
+        qtbot.waitUntil(lambda: control.isVisible() and control.isEnabled()
+                        and control.visibleRegion().contains(control.rect().center()))
+        with qtbot.waitSignal(control.clicked):
+            qtbot.mouseClick(control, Qt.MouseButton.LeftButton, pos=control.rect().center())
+
     try:
         pointer = w.port_widgets["pointer"][0]
         ground = w.port_widgets["telemetry"][0]
         assert pointer.findData(VIRTUAL_POINTER_DEVICE) >= 0 and ground.findData(VIRTUAL_POINTER_DEVICE) < 0
         w.pages.setCurrentIndex(2)
-        qtbot.mouseClick(w.virtual_connect, Qt.MouseButton.LeftButton)
+        click_pointer_control(w.virtual_connect)
         c.tick()
         refresh()
         assert w.virtual_panel.isVisible() and w.point_button.isEnabled()
         assert not w.record_button.isEnabled() and not w.track_button.isVisible()
         assert "VIRTUAL" in w.connection_tiles["pointer"].text()
-        qtbot.mouseClick(w.virtual_follow, Qt.MouseButton.LeftButton)
+        click_pointer_control(w.virtual_follow)
         assert c.virtual_flight.playing
         w.virtual_speed.setCurrentIndex(4)
         assert c.virtual_flight.speed == 4
@@ -215,7 +231,7 @@ def test_virtual_ui_connect_shortcuts_and_trajectory_controls(qtbot, tmp_path, m
         c.tick()
         refresh()
         assert c.virtual_flight.time >= 4 and w.reference_marker.getData()[0].size == 1
-        qtbot.mouseClick(w.virtual_follow, Qt.MouseButton.LeftButton)
+        click_pointer_control(w.virtual_follow)
         assert not c.virtual_flight.playing
         w.virtual_slider.setValue(5000)
         assert c.virtual_flight.time == 5
