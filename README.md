@@ -4,11 +4,12 @@ The MIT Rocket Team's native **Rocket GNC Monitor v0a** for macOS and Windows. T
 
 ## Station workspaces
 
-The startup wizard chooses **Launch station** or **Away 1–4**, **Telemetry** or **Video**, **Balius** or **Iris**, and **URRG** or a custom site. Remembering choices is optional and off by default. Every normal session begins in **LIVE**, with devices disconnected.
+The startup wizard chooses **Launch station**, **Base station · Launch v2**, or **Away 1–4**, **Telemetry** or **Video**, **Balius** or **Iris**, and **URRG** or a custom site. Remembering choices is optional and off by default. Every normal session begins in **LIVE**, with devices disconnected.
 
 | Station / role | Workspace |
 | --- | --- |
 | Launch / Telemetry | Two coordinated windows: Flight and Systems. One local telemetry board, rocket telemetry/state/GNC, simulation, recording/replay, power/recovery, diagnostics and remote antenna-route selection. |
+| Base · Launch v2 / Telemetry | Same launch-site hardware in one window. Rocket state, key metrics and Away route selection stay visible; Flight, Systems, Mission & replay, Network and 3D simulation use tabs. The large antenna illustration is omitted. |
 | Away / Telemetry | One window with main rocket telemetry and the local physical or virtual antenna pointer. |
 | Away / Video | Two local USB inputs. Balius: Digital + Analog. Iris Away 1–3: Sustainer Digital + Sustainer Analog; Away 4: Sustainer Digital + Booster Analog. |
 | Launch / Video | Two Balius or three Iris primary channels above the Away thumbnails. Local Digital input only; double-click a thumbnail to replace its matching large channel. Remote video transport remains pending. |
@@ -45,6 +46,8 @@ Preselect the wizard or bypass it explicitly:
 
 ```sh
 .venv/bin/python -m rocket_gnc_monitor --site away3 --role telemetry --vehicle iris --launch-site urrg --skip-setup
+# Single-display Base station:
+.venv/bin/python -m rocket_gnc_monitor --station launch-v2 --vehicle balius --launch-site urrg --skip-setup
 ```
 
 Use `--site launch|away1|away2|away3|away4`, `--role telemetry|video`, `--vehicle balius|iris` and `--launch-site urrg|custom`. Omit `--skip-setup` to review the selections. The old `base` argument remains a compatibility alias. **File → Forget setup on next launch** clears saved wizard choices without changing the current session.

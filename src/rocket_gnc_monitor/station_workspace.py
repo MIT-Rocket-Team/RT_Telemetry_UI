@@ -2,7 +2,7 @@
 
 The v0 widgets remain the single source of control callbacks and telemetry state.
 Only their presentation changes: no second Controller, duplicate serial worker,
-hidden operational tab, or separate command implementation is introduced here.
+or separate command implementation is introduced here.
 """
 
 import json
@@ -24,10 +24,12 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QHeaderView,
     QFileDialog,
+    QTabWidget,
+    QScrollArea,
 )
 
 from .ui import MainWindow as InstrumentWindow, button, label
-from .widgets import ComboBox
+from .widgets import COLORS, ComboBox
 from .flight_view import Flight3DDialog
 from .media import WIDTH, HEIGHT, camera_devices
 from .domain import finite
@@ -96,7 +98,6 @@ class StationWindow(InstrumentWindow):
         self.closing = False
         self.auto_place = auto_place
         self.station_mode = "base"
-        self.profile_locked = profile is not None
         self.station_path = Path(data_dir) / "station-layout.json"
         if profile is not None:
             station = profile.layout
@@ -105,12 +106,19 @@ class StationWindow(InstrumentWindow):
                 station = json.loads(self.station_path.read_text()).get("station", "base")
             except (OSError, ValueError, AttributeError):
                 station = "base"
+        if profile is None and station in ("launch-v2", "launch_v2"):
+            profile = StationProfile(display_mode="launch_v2")
+            station = profile.layout
+        self.profile_locked = profile is not None
         self.profile = profile or StationProfile(
             station="away1" if station in ("away", "video") else "base",
             role="video" if station == "video" else "telemetry",
         )
         self.video_wall = None
         self.away_flight_dialog = None
+        self.base_tabs = None
+        self.base_grids = {}
+        self.base_route = None
         self.launch_station = self.profile_locked and self.profile.station == "base"
         self.launch_links = None
         self.launch_uplink = None
@@ -141,7 +149,7 @@ class StationWindow(InstrumentWindow):
         self.workspace_ready = True
         self.set_daylight(self.controller.settings.daylight, persist=False)
         self.refresh_actuators()
-        self.set_station_mode(station if station in ("base", "away", "video") else "base", persist=False)
+        self.set_station_mode(station if station in ("base", "away", "video", "launch_v2") else "base", persist=False)
         self.last_ui = 0
         self.refresh()
         QApplication.instance().screenAdded.connect(self.screens_changed)
@@ -306,6 +314,8 @@ class StationWindow(InstrumentWindow):
         self.build_pointer_cards()
         self.build_system_cards()
         self.build_operations_cards()
+        if self.profile.layout == "launch_v2":
+            self.build_base_station_tabs(outer)
         self.rocket_panel.setParent(self.companion)
         self.rocket_panel.hide()
         for parent in (self, self.companion):
@@ -338,6 +348,108 @@ class StationWindow(InstrumentWindow):
         for menu_action in self.menuBar().actions():
             if menu_action.menu():
                 self.companion.menuBar().addMenu(menu_action.menu())
+
+    def build_base_station_tabs(self, outer):
+        """Keep flight essentials in view; share the existing cards across tabs."""
+        self.station_identity.setText(f"Launch v2 · Telemetry · {self.profile.vehicle_label}")
+        self.mission_label.setMinimumWidth(0)
+        self.mission_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.health.setWordWrap(True)
+        self.launch_network_notice.hide()
+        outer.removeWidget(self.usb_strip)
+        connection = self.card("connection", "LOCAL TELEMETRY / connection & uplink")
+        self.attach(connection, self.usb_strip)
+        if self.iris_links is not None:
+            outer.removeWidget(self.iris_links)
+            self.attach(connection, self.iris_links)
+
+        self.base_route = ComboBox()
+        self.base_route.setModel(self.launch_links.selector.model())
+        self.base_route.setAccessibleName("Base station away antenna route")
+        self.base_route.currentIndexChanged.connect(self.launch_links.selector.setCurrentIndex)
+        route = row(label("COMMUNICATION ROUTE", "eyebrow"), self.base_route)
+        route.addWidget(label("Ethernet / PoE · 4 × LTU-XR · transport pending", "muted"), 1)
+        outer.insertLayout(1, route)
+
+        # Two compact rows leave room for a large state badge on a laptop display.
+        metrics = self.metric_strip.layout()
+        readings = QWidget()
+        grid = QGridLayout(readings)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setSpacing(5)
+        for i in range(metrics.count()):
+            grid.addWidget(metrics.takeAt(0).widget(), i // 3, i % 3)
+        for i in range(3):
+            grid.setColumnStretch(i, 1)
+        metrics.addWidget(self.rocket_state_badge)
+        metrics.addWidget(readings, 1)
+
+        index = outer.indexOf(self.flight_board)
+        outer.removeWidget(self.flight_board)
+        self.base_tabs = QTabWidget()
+        self.base_tabs.setAccessibleName("Base station workspace")
+        self.base_tabs.setDocumentMode(True)
+        self.base_tabs.tabBar().setDrawBase(False)
+        self.base_tabs.addTab(self.flight_board, "Flight")
+        for key, title in (
+            ("systems", "Systems"),
+            ("mission", "Mission && replay"),
+            ("network", "Network"),
+            ("simulation", "3D simulation"),
+        ):
+            page = QWidget()
+            grid = QGridLayout(page)
+            grid.setContentsMargins(0, 7, 0, 0)
+            grid.setSpacing(7)
+            self.base_grids[key] = grid
+            scroll = QScrollArea()
+            scroll.setFrameShape(QFrame.Shape.NoFrame)
+            scroll.setWidgetResizable(True)
+            scroll.setWidget(page)
+            self.base_tabs.addTab(scroll, title)
+        outer.insertWidget(index, self.base_tabs, 1)
+        self.flight_grid.setContentsMargins(0, 7, 0, 0)
+
+    def place_base_station_cards(self):
+        self.setWindowTitle("Rocket GNC Monitor v0a · Base station / Launch v2")
+        self.companion.hide()
+        for args in (
+            ("attitude", 0, 0, 2, 1),
+            ("altitude", 0, 1),
+            ("trajectory", 1, 1),
+            ("telemetry", 0, 2),
+            ("gps", 1, 2),
+        ):
+            self.place(self.flight_grid, *args)
+        for i, weight in enumerate((29, 38, 33)):
+            self.flight_grid.setColumnStretch(i, weight)
+        self.flight_grid.setRowStretch(0, 6)
+        self.flight_grid.setRowStretch(1, 4)
+        sections = {
+            "systems": (
+                ("commands", 0, 0), ("recovery", 1, 0, 2, 1),
+                ("power", 0, 1, 2, 1), ("bms", 2, 1),
+                ("servos", 0, 2), ("cells", 1, 2, 2, 1),
+                ("actuators", 3, 0, 1, 3),
+                ("gnc_rates", 4, 0), ("gnc_angles", 4, 1, 1, 2),
+            ),
+            "mission": (("mission", 0, 0, 2, 1), ("sessions", 0, 1), ("diagnostics", 1, 1)),
+            "network": (("connection", 0, 0, 1, 2), ("pointing", 1, 0), ("network", 1, 1)),
+            "simulation": (("flight3d", 0, 0),),
+        }
+        for section, cards in sections.items():
+            grid = self.base_grids[section]
+            for args in cards:
+                self.place(grid, *args)
+            for column in range(max(item[2] + (item[4] if len(item) > 4 else 1) for item in cards)):
+                grid.setColumnStretch(column, 1)
+            for r in range(max(item[1] + (item[3] if len(item) > 3 else 1) for item in cards)):
+                grid.setRowStretch(r, 1)
+        self.base_grids["systems"].setRowMinimumHeight(4, 210)
+        self.base_grids["mission"].setRowStretch(1, 3)
+        self.base_grids["network"].setRowStretch(0, 0)
+        if not self.flight_3d_dialog.isVisible():
+            self.flight_3d_dialog.timer.stop()
 
     def build_flight_cards(self):
         self.flight_3d_dialog = EmbeddedFlightView(self.controller, self)
@@ -611,7 +723,7 @@ class StationWindow(InstrumentWindow):
         self.network_panel = StationNetworkPanel(self.controller)
         if self.launch_station:
             self.network_panel.topology.setText(
-                "Launch station: Ethernet / PoE to four LTU-XR links.\n"
+                f"{self.profile.station_label}: Ethernet / PoE to four LTU-XR links.\n"
                 "This manual peer link is read-only; operational station transport is pending."
             )
             self.network_panel.topology.setToolTip("The existing manual status link does not enable uplink, remote pointer control or video relay.")
@@ -630,14 +742,16 @@ class StationWindow(InstrumentWindow):
     def set_station_mode(self, value, persist=True):
         if not self.workspace_ready:
             return
-        if value not in ("base", "away", "video"):
-            raise ValueError("Station mode must be base, away or video")
+        if value not in ("base", "away", "video", "launch_v2"):
+            raise ValueError("Station mode must be base, launch_v2, away or video")
         if self.profile_locked and value != self.profile.layout:
             return
+        if value == "launch_v2" and self.base_tabs is None:
+            raise ValueError("Choose Base station · Launch v2 at startup to configure its launch hardware")
         self.station_mode = value
         video = value == "video"
         self.setMinimumSize(*(1000, 600) if video else (1280, 800))
-        self.workspace_title.setText("VIDEO / v0a" if video else "ROCKET / v0a")
+        self.workspace_title.setText("BASE STATION" if value == "launch_v2" else "VIDEO / v0a" if video else "ROCKET / v0a")
         for widget in (self.mission_label, self.poll_button, self.health, self.metric_strip, self.banner):
             widget.setVisible(not video)
         # Playback controls have one owner and retain their signals and state.
@@ -645,7 +759,7 @@ class StationWindow(InstrumentWindow):
         self.replay_controls.show()
         self.align_time_button.setVisible(not video)
         self.mount.zoom = 1.4 if value == "base" else 1.0
-        for grid in (self.flight_grid, self.systems_grid):
+        for grid in (self.flight_grid, self.systems_grid, *self.base_grids.values()):
             while grid.count():
                 item = grid.takeAt(0)
                 if item.widget():
@@ -695,6 +809,8 @@ class StationWindow(InstrumentWindow):
                 self.systems_grid.setColumnStretch(i, weight)
             if self.isVisible():
                 self.companion.show()
+        elif value == "launch_v2":
+            self.place_base_station_cards()
         elif value == "away":
             self.setWindowTitle("Rocket GNC Monitor v0a · Away station")
             self.companion.hide()
@@ -749,7 +865,9 @@ class StationWindow(InstrumentWindow):
             self.away_flight_dialog.raise_()
             self.away_flight_dialog.activateWindow()
             return
-        if self.station_mode != "base":
+        if self.station_mode == "launch_v2":
+            self.base_tabs.setCurrentIndex(4)
+        elif self.station_mode != "base":
             self.set_station_mode("base")
         self.flight_3d_dialog.load_reference()
         self.flight_3d_dialog.tick()
@@ -948,6 +1066,10 @@ class StationWindow(InstrumentWindow):
         if self.launch_station:
             self.launch_links.refresh()
             selected = c.selected_away_station
+            if self.base_route is not None:
+                previous = self.base_route.blockSignals(True)
+                self.base_route.setCurrentIndex(max(0, self.base_route.findData(selected)))
+                self.base_route.blockSignals(previous)
             self.remote_pointer_caption.setText(
                 f"Away station {selected[-1]} · illustration only · remote pose unavailable"
                 if selected else "Select an away pointer · pose unavailable"
@@ -955,6 +1077,8 @@ class StationWindow(InstrumentWindow):
             self.mount.setVisible(selected is not None)
             local_status = " / ".join(self.connection_tiles[k].text().replace("● ", "") for k in ("ground", "rocket"))
             self.health.setText("LOCAL TELEMETRY · " + local_status + "   /   AWAY NETWORK · four links · transport pending")
+            if self.station_mode == "launch_v2" and self.iris_links is not None:
+                self.health.setText(self.health.text() + "   /   IRIS BOARD TARGET · UNKNOWN")
             if c.mode == "LIVE":
                 self.banner.setText(self.banner.text() + " · UPLINK SWITCH PROTOCOL PENDING")
         self.secondary_health.setText(c.mode + " · " + self.connection_tiles["rocket"].text())
@@ -1058,6 +1182,15 @@ class StationWindow(InstrumentWindow):
             style = self.styleSheet() + COMPACT_STYLE
             self.setStyleSheet(style)
             self.companion.setStyleSheet(style)
+            if self.base_tabs is not None:
+                self.base_tabs.tabBar().setStyleSheet(
+                    f"QTabBar {{ background: {COLORS['bg']}; }}"
+                    f"QTabBar::tab {{ background: {COLORS['panel']}; color: {COLORS['muted']};"
+                    " padding: 7px 15px; margin-right: 4px; border-top-left-radius: 5px; border-top-right-radius: 5px; }"
+                    f"QTabBar::tab:selected {{ color: {COLORS['accent']}; background: {COLORS['raised']};"
+                    f" border-bottom: 2px solid {COLORS['accent']}; }}"
+                    f"QTabBar::tab:hover {{ color: {COLORS['text']}; }}"
+                )
 
     def closeEvent(self, event):
         if self.closing:

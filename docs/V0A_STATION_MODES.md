@@ -1,12 +1,12 @@
 # v0a station workspaces and ground-station connections
 
-v0a organizes the monitor by station and operator role. One Launch station and four numbered Away stations each offer Telemetry or Video. Balius has two system video channels; Iris has three, distributed across the stations.
+v0a organizes the monitor by station and operator role. The launch-site computer offers the original two-display **Launch station** layout and the single-display **Base station · Launch v2** layout. Four numbered Away stations each offer Telemetry or Video. Balius has two system video channels; Iris has three, distributed across the stations.
 
 ## Startup wizard
 
 Every normal launch asks for:
 
-1. **Station**: Launch station, or Away 1, 2, 3 or 4.
+1. **Station**: Launch station (two displays), Base station · Launch v2 (one display), or Away 1, 2, 3 or 4.
 2. **Role**: Telemetry or Video.
 3. **Vehicle**: Balius (Digital + Analog) or Iris (Sustainer Digital + Sustainer Analog + Booster Analog).
 4. **Launch site**: URRG or a custom location.
@@ -19,6 +19,8 @@ A new mission is named **Balius Launch** or **Iris Launch**, according to the se
 
 **Launch station / Telemetry** opens Flight and Systems windows sharing one mission and controller. Put one on each display. Both windows can be moved and resized on a single display for preparation. The second window creates no duplicate serial workers or recording sessions.
 
+**Base station · Launch v2 / Telemetry** uses the same launch-site hardware configuration in one window. It keeps rocket state, key telemetry and the Away communication-route selector visible while tabs expose supporting instruments. Its Video role uses the existing launch-site video workspace.
+
 **Away / Telemetry** opens one reduced workspace with main rocket telemetry, the compact 3D rocket pose and antenna pointing.
 
 **Away / Video** opens one simplified window with its two assigned USB camera inputs. **Launch station / Video** shows the primary channels and all four Away stations below them; the Launch station has only a local Digital USB camera.
@@ -30,13 +32,16 @@ Video does not appear in either telemetry workspace. The video operator does not
 ```sh
 .venv/bin/python -m rocket_gnc_monitor --site away3 --role video --vehicle iris --launch-site urrg --skip-setup
 
+# Single-display Base station:
+.venv/bin/python -m rocket_gnc_monitor --station launch-v2 --vehicle balius --launch-site urrg --skip-setup
+
 # Packaged Mac app:
 dist/RocketGNCMonitor-v0a.app/Contents/MacOS/RocketGNCMonitor-v0a --site away3 --role video --vehicle iris --launch-site urrg --skip-setup
 ```
 
 `--site` accepts `launch`, `away1`, `away2`, `away3`, `away4`; `--role` accepts `telemetry`, `video`; `--vehicle` accepts `balius`, `iris`; `--launch-site` accepts `urrg`, `custom`. The previous `base` argument remains an alias for `launch`, including with the legacy `--station` flag. These flags override the corresponding defaults or explicitly remembered choices. Omit `--skip-setup` to review them in the wizard; include it to start directly with the resolved profile. Adjust the executable path if the Mac app has been installed elsewhere, keeping it inside its complete `.app` bundle.
 
-`--remember-setup` checks the remembering option; `--no-remember-setup` clears it. With `--skip-setup`, these explicitly save the resolved profile or remove the remembered startup choices, respectively. Without either flag, skipping setup leaves the remembering preference and saved choices unchanged. The legacy `--station launch|away|video` preselects Launch Telemetry, Away 1 Telemetry or Away 1 Video; it does not bypass setup. Smoke-test flags bypass setup, except the dedicated controller-free `--setup-smoke`.
+`--remember-setup` checks the remembering option; `--no-remember-setup` clears it. With `--skip-setup`, these explicitly save the resolved profile or remove the remembered startup choices, respectively. Without either flag, skipping setup leaves the remembering preference and saved choices unchanged. `--station launch|launch-v2|away|video` preselects two-display Launch Telemetry, single-display Base Telemetry, Away 1 Telemetry or Away 1 Video; it does not bypass setup. Smoke-test flags bypass setup, except the dedicated controller-free `--setup-smoke`.
 
 Station layout and data mode are separate decisions:
 
@@ -44,6 +49,18 @@ Station layout and data mode are separate decisions:
 | --- | --- |
 | LIVE | Physical connections start closed. Launch connects one telemetry board for downlink reception/polling. Away stations connect their downlink board, pointer and cameras explicitly. Launch selects an Away communication route; the interstation transport and software uplink enable protocol remain pending. |
 | REPLAY | A saved flight/session, with playback controls and physical command isolation. |
+
+## Base station · Launch v2: one display
+
+The Base station layout keeps the rocket-state badge, key flight metrics and the Away 1–4 communication-route selector visible above five tabs:
+
+- **Flight**: rocket orientation, vertical profile, ground track, full telemetry and GPS.
+- **Systems**: commands, power, battery/BMS, recovery, actuator readouts and GNC plots.
+- **Mission & replay**: launch setup, wind, OpenRocket simulation, saved-flight controls and diagnostics.
+- **Network**: USB telemetry connection, uplink and Iris target placeholders, Away links and the manual status link, with APRS available for Iris only.
+- **3D simulation**: the full reference-trajectory renderer and playback controls.
+
+The large antenna illustration is omitted to make room for the flight instruments; route selection remains available. Supporting panels are reached through tabs instead of a second display. This changes presentation only: Base station still has one local telemetry board, no local antenna pointer, the same URRG site reference and the same uplink and remote-control protocol limitations as Launch station. The original two-display Launch station mode remains available in the wizard.
 
 ## Launch station: Flight display
 
@@ -187,7 +204,7 @@ To rehearse without hardware at an Away station: load or simulate a reference, s
 
 ## Developer integration
 
-`station_profile.py` owns the immutable `StationProfile` and its validated, atomic JSON persistence, including the launch-site choice. The internal station key `base` is retained for saved-profile compatibility; public `launch` values normalize to that key and display as Launch station. Explicitly remembered startup choices use `startup-choices.json` in the application data directory; legacy `station-profile.json` and `station-layout.json` do not seed startup defaults. `startup_wizard.py` is a controller-free four-page Qt wizard; `__main__.py` resolves opted-in/CLI defaults and waits for acceptance before constructing `StationWindow`. Startup configuration supplies the new mission's vehicle-based name and optional URRG launch/Away-pointer positions; loading an existing mission or flight remains authoritative. Smoke flags bypass interactive setup, while `--setup-smoke` only renders the wizard.
+`station_profile.py` owns the immutable `StationProfile` and its validated, atomic JSON persistence, including the launch-site choice. The internal station key `base` is retained for saved-profile compatibility; public `launch` values normalize to that key and display as Launch station. The optional `display_mode="launch_v2"` keeps that hardware identity but labels it Base station and selects the single-window telemetry layout. The default `standard` display mode is omitted from saved JSON for compatibility, and Away profiles reset it to `standard`. Explicitly remembered startup choices use `startup-choices.json` in the application data directory; legacy `station-profile.json` and `station-layout.json` do not seed startup defaults. `startup_wizard.py` is a controller-free four-page Qt wizard; `__main__.py` resolves opted-in/CLI defaults and waits for acceptance before constructing `StationWindow`. Startup configuration supplies the new mission's vehicle-based name and optional URRG launch/Away-pointer positions; loading an existing mission or flight remains authoritative. Smoke flags bypass interactive setup, while `--setup-smoke` only renders the wizard.
 
 `station_workspace.py` assembles the role-specific cards over one inherited instrument owner. An explicit profile fixes identity and role for the window lifetime. Video role gates hidden serial menu actions and connection callbacks; it keeps recording shortcuts and file/replay controls. Telemetry retains the original shortcuts and device gating. The legacy constructor without an explicit profile supports prior layout-switching integrations.
 

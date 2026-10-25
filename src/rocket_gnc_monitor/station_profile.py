@@ -10,6 +10,7 @@ STATIONS = ("base", "away1", "away2", "away3", "away4")
 ROLES = ("telemetry", "video")
 VEHICLES = ("balius", "iris")
 LAUNCH_SITES = ("custom", "urrg")
+DISPLAY_MODES = ("standard", "launch_v2")
 PROFILE_FILENAME = "station-profile.json"
 STARTUP_CHOICES_FILENAME = "startup-choices.json"
 
@@ -20,20 +21,27 @@ class StationProfile:
     role: str = "telemetry"
     vehicle: str = "balius"
     launch_site: str = "custom"
+    display_mode: str = "standard"
 
     def __post_init__(self):
         # Keep saved profiles and existing integrations compatible with the old ID.
         if self.station == "launch":
             object.__setattr__(self, "station", "base")
         for name, choices in (("station", STATIONS), ("role", ROLES), ("vehicle", VEHICLES),
-                              ("launch_site", LAUNCH_SITES)):
+                              ("launch_site", LAUNCH_SITES), ("display_mode", DISPLAY_MODES)):
             value = getattr(self, name)
             if not isinstance(value, str) or value not in choices:
                 raise ValueError(f"Unknown {name}: {value!r}; choose {', '.join(choices)}")
+        if self.station != "base":
+            object.__setattr__(self, "display_mode", "standard")
 
     @property
     def layout(self):
-        return "video" if self.role == "video" else "base" if self.station == "base" else "away"
+        if self.role == "video":
+            return "video"
+        if self.station == "base":
+            return "launch_v2" if self.display_mode == "launch_v2" else "base"
+        return "away"
 
     @property
     def channels(self):
@@ -62,7 +70,9 @@ class StationProfile:
 
     @property
     def station_label(self):
-        return "Launch station" if self.station == "base" else f"Away station {self.station[-1]}"
+        if self.station == "base":
+            return "Base station" if self.display_mode == "launch_v2" else "Launch station"
+        return f"Away station {self.station[-1]}"
 
     @property
     def vehicle_label(self):
@@ -75,12 +85,15 @@ class StationProfile:
         return {"digital": "Digital", "analog": "Analog"}
 
     def to_dict(self):
-        return asdict(self)
+        value = asdict(self)
+        if self.display_mode == "standard":
+            value.pop("display_mode")
+        return value
 
     @classmethod
     def from_dict(cls, value):
-        if not isinstance(value, dict) or set(value) - {"station", "role", "vehicle", "launch_site"}:
-            raise ValueError("A station profile must contain station, role, vehicle and launch-site choices")
+        if not isinstance(value, dict) or set(value) - {"station", "role", "vehicle", "launch_site", "display_mode"}:
+            raise ValueError("A station profile must contain station, role, vehicle, launch-site and display choices")
         return cls(**value)
 
     @classmethod
@@ -92,14 +105,16 @@ class StationProfile:
 
 
 def profile_for_layout(layout, profile=None):
-    """Translate the original three workspace flags without changing the vehicle."""
+    """Translate workspace choices without changing the vehicle or launch site."""
     profile = profile or StationProfile()
     values = {"launch": ("base", "telemetry"), "base": ("base", "telemetry"),
+              "launch-v2": ("base", "telemetry"), "launch_v2": ("base", "telemetry"),
               "away": ("away1", "telemetry"), "video": ("away1", "video")}
     if layout not in values:
         raise ValueError(f"Unknown station layout: {layout!r}")
     station, role = values[layout]
-    return replace(profile, station=station, role=role)
+    display_mode = "launch_v2" if layout in {"launch-v2", "launch_v2"} else "standard"
+    return replace(profile, station=station, role=role, display_mode=display_mode)
 
 
 def load_profile(data_dir):

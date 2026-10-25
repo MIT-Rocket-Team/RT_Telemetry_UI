@@ -35,7 +35,8 @@ def test_topology_follows_station_role_and_vehicle(station, role, vehicle):
 
 
 @pytest.mark.parametrize("field,value", [("station", "away5"), ("role", "pilot"), ("vehicle", "Balius"),
-                                        ("vehicle", None), ("launch_site", "URRG"), ("launch_site", None)])
+                                        ("vehicle", None), ("launch_site", "URRG"), ("launch_site", None),
+                                        ("display_mode", "unknown"), ("display_mode", None)])
 def test_profile_rejects_invalid_choices(field, value):
     with pytest.raises(ValueError):
         StationProfile(**{field: value})
@@ -141,3 +142,32 @@ def test_launch_identity_accepts_new_name_and_preserves_existing_saved_profiles(
     assert resolve_profile(args, tmp_path) == profile
     help_text = argument_parser().format_help()
     assert "--site {launch,away1,away2,away3,away4}" in help_text
+
+
+def test_launch_v2_keeps_launch_hardware_and_round_trips_only_nondefault_display_mode(tmp_path):
+    original = StationProfile("base", "telemetry", "iris", "urrg")
+    profile = profile_for_layout("launch-v2", original)
+    assert profile.station == "base"
+    assert profile.station_label == "Base station"
+    assert profile.layout == "launch_v2"
+    assert profile.telemetry_targets == original.telemetry_targets
+    assert profile.local_channels == original.local_channels
+    assert profile.to_dict() == {**original.to_dict(), "display_mode": "launch_v2"}
+    assert "display_mode" not in original.to_dict()
+    save_startup_choices(profile, tmp_path, True)
+    assert load_startup_choices(tmp_path) == (profile, True)
+    assert profile_for_layout("launch", profile) == original
+    assert dataclasses.replace(profile, station="away3").display_mode == "standard"
+    assert dataclasses.replace(profile, role="video").layout == "video"
+
+
+def test_cli_launch_v2_preserves_vehicle_and_site_and_explicit_away_resets_layout(tmp_path):
+    args = argument_parser().parse_args([
+        "--station", "launch-v2", "--vehicle", "iris", "--launch-site", "urrg", "--skip-setup",
+    ])
+    profile = resolve_profile(args, tmp_path)
+    assert profile == StationProfile("base", "telemetry", "iris", "urrg", "launch_v2")
+    save_startup_choices(profile, tmp_path, True)
+    assert resolve_profile(argument_parser().parse_args([]), tmp_path) == profile
+    args = argument_parser().parse_args(["--site", "away2"])
+    assert resolve_profile(args, tmp_path) == StationProfile("away2", "telemetry", "iris", "urrg")

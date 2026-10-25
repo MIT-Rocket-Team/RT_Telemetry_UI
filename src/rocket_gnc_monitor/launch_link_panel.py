@@ -22,12 +22,12 @@ class LaunchLinkPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
-        layout.addWidget(text_label("Launch computer → Ethernet / PoE adapter\n4 × LTU-XR → Away stations 1–4"))
+        layout.addWidget(text_label(f"{profile.station_label} → Ethernet / PoE adapter\n4 × LTU-XR → Away stations 1–4"))
         self.site = text_label()
         layout.addWidget(self.site)
         layout.addWidget(text_label("Antenna pointer to use for communication"))
         self.selector = ComboBox()
-        self.selector.setAccessibleName("Away antenna pointer for launch-station communication")
+        self.selector.setAccessibleName(f"Away antenna pointer for {profile.station_label.lower()} communication")
         self.selector.addItem("Choose an away-station pointer…", None)
         for number in range(1, 5):
             self.selector.addItem(f"Away station {number} · antenna pointer", f"away{number}")
@@ -45,7 +45,7 @@ class LaunchLinkPanel(QWidget):
         layout.addLayout(paths)
         self.status = text_label()
         layout.addWidget(self.status)
-        self.uplink = text_label("Uplink authority: Launch station only · local telemetry board\nUplink switch protocol pending · transmission unavailable")
+        self.uplink = text_label(f"Uplink authority: {profile.station_label} only · local telemetry board\nUplink switch protocol pending · transmission unavailable")
         layout.addWidget(self.uplink)
         layout.addWidget(text_label("Selecting a pointer chooses the intended route. It does not connect a link, move an antenna or transmit a command."))
         layout.addStretch()
@@ -67,7 +67,7 @@ class LaunchLinkPanel(QWidget):
             label.setText("Selected route · unavailable" if key == selected else "Link status unavailable")
             label.setStyleSheet("color: #79d4c8;" if key == selected else "")
         self.site.setText(
-            f"URRG launch station: {URRG_STATION_MGRS['base']}\nStation reference only · no local antenna pointer"
+            f"URRG {self.profile.station_label.lower()}: {URRG_STATION_MGRS['base']}\nStation reference only · no local antenna pointer"
             if self.controller.mission.launch_site_name == "URRG" else
             "One local telemetry board · no local antenna pointer"
         )

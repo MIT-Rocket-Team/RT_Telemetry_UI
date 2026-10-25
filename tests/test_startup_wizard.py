@@ -16,7 +16,7 @@ def test_wizard_preserves_defaults_and_presents_four_required_pages(qtbot):
     assert wizard.profile == profile
     assert not wizard.remember_choices
     assert len(wizard.pageIds()) == 4
-    assert len(wizard.choices["station"]) == 5
+    assert len(wizard.choices["station"]) == 6
     assert wizard.currentId() == 0
     assert wizard.button(QWizard.WizardButton.CancelButton).isVisible()
     wizard.next()
@@ -237,3 +237,27 @@ def test_launch_wizard_limits_board_description_to_telemetry_role(qtbot):
     assert "Local USB inputs: Digital." in wizard.summary.text()
     assert "One telemetry board" not in wizard.summary.text()
     assert "Uplink enable" not in wizard.summary.text()
+
+
+def test_base_station_wizard_restores_one_display_and_keeps_launch_hardware(qtbot):
+    profile = StationProfile("base", "telemetry", "iris", "urrg", "launch_v2")
+    wizard = StartupWizard(profile)
+    qtbot.addWidget(wizard)
+    assert wizard.choices["station"]["launch_v2"].isChecked()
+    assert wizard.profile == profile
+    assert "Base station · Telemetry · Iris" in wizard.summary.text()
+    assert "One display · Ethernet / PoE to four LTU-XR links" in wizard.summary.text()
+    assert "Two displays" not in wizard.summary.text()
+    assert "One telemetry board: downlink reception and polling." in wizard.summary.text()
+    assert "Base station reference: 18TUN2063730181" in wizard.summary.text()
+    assert "Choose an away antenna pointer" in wizard.summary.text()
+    wizard.choices["role"]["video"].setChecked(True)
+    assert wizard.profile.layout == "video"
+    assert wizard.profile.station_label == "Base station"
+    assert "Local USB inputs: Sustainer Digital." in wizard.summary.text()
+    wizard.choices["station"]["away2"].setChecked(True)
+    assert wizard.profile.display_mode == "standard"
+    wizard.choices["role"]["telemetry"].setChecked(True)
+    wizard.choices["station"]["base"].setChecked(True)
+    assert wizard.profile.layout == "base"
+    assert "Two displays" in wizard.summary.text()

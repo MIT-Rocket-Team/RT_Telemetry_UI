@@ -70,8 +70,8 @@ def argument_parser():
     )
     parser.add_argument("--data-dir", type=Path)
     parser.add_argument(
-        "--station", choices=["launch", "base", "away", "video"], metavar="{launch,away,video}",
-        help="Legacy workspace choice; preselects the startup wizard (base remains an alias for launch)",
+        "--station", choices=["launch", "launch-v2", "base", "away", "video"], metavar="{launch,launch-v2,away,video}",
+        help="Workspace choice; launch-v2 opens Base station on one display (base remains an alias for launch)",
     )
     parser.add_argument("--site", choices=["launch", "base", "away1", "away2", "away3", "away4"],
                         metavar="{launch,away1,away2,away3,away4}",

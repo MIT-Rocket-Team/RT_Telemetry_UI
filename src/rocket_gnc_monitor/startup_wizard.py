@@ -43,10 +43,11 @@ class StartupWizard(QWizard):
         self.groups = {}
         self.add_choices(
             "station", "01 / STATION", "Where is this computer?",
-            "Assign this computer to the launch station or one of the four away stations.",
-            [("base", "Launch station", "One telemetry board · four LTU-XR links · no local pointer")]
+            "Choose the launch-site display layout or one of the four away stations.",
+            [("base", "Launch station", "Two displays · One telemetry board · four LTU-XR links"),
+             ("launch_v2", "Base station · Launch v2", "One display · same launch-site hardware · no local pointer")]
             + [(f"away{i}", f"Away station {i}", "Local Wi-Fi · downlink board and antenna pointer") for i in range(1, 5)],
-            profile.station,
+            "launch_v2" if profile.display_mode == "launch_v2" else profile.station,
         )
         self.add_choices(
             "role", "02 / ROLE", "What will this computer display?",
@@ -120,10 +121,13 @@ class StartupWizard(QWizard):
 
     @property
     def profile(self):
-        return StationProfile(**{
+        choices = {
             key: next(value for value, control in choices.items() if control.isChecked())
             for key, choices in self.choices.items()
-        })
+        }
+        if choices["station"] == "launch_v2":
+            choices.update(station="base", display_mode="launch_v2")
+        return StationProfile(**choices)
 
     def update_summary(self, *_):
         if not hasattr(self, "summary"):
@@ -136,9 +140,11 @@ class StartupWizard(QWizard):
             if profile.station == "base":
                 text += " Away-station feeds: connection pending."
         else:
-            text += ("\nTwo displays · Ethernet / PoE to four LTU-XR links."
-                     if profile.station == "base" else
-                     "\nOne display · Wi-Fi, downlink board and antenna control.")
+            if profile.station == "base":
+                displays = "One display" if profile.display_mode == "launch_v2" else "Two displays"
+                text += f"\n{displays} · Ethernet / PoE to four LTU-XR links."
+            else:
+                text += "\nOne display · Wi-Fi, downlink board and antenna control."
             if profile.station == "base":
                 text += "\nOne telemetry board: downlink reception and polling."
                 text += "\nUplink enable: unavailable until the firmware protocol is defined."
@@ -149,7 +155,7 @@ class StartupWizard(QWizard):
                 text += " One shared board target."
         text += f"\nMission: {profile.vehicle_label} Launch."
         if profile.launch_site == "urrg":
-            site_label = "Launch station reference" if profile.station == "base" else profile.station_label
+            site_label = f"{profile.station_label} reference" if profile.station == "base" else profile.station_label
             text += (f"\nURRG launch pad: {URRG_LAUNCH_MGRS}"
                      f"\n{site_label}: {URRG_STATION_MGRS[profile.station]}")
             text += ("\nSet launch elevation in Mission profile; no local antenna pointer."
