@@ -8,6 +8,7 @@ dist/
 vendor/
 *.egg-info/
 .DS_Store
+.idea/
 sessions/
 local-config.json
 

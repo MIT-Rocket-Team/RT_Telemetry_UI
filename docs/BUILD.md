@@ -98,6 +98,12 @@ The verifier checks the startup wizard, station roles, camera inventories, locke
 
 The package keeps `vendor/build-manifest.json`, engine/bridge hashes, Java provenance, FFmpeg configuration, dependency metadata and notices. Simulation jobs also retain their exact model/motor inputs, request, output and worker log. Rebuild the bridge after editing `simulation_bridge/src/RocketBridge.java`.
 
+## Manual Windows CI build
+
+The manual [Windows workflow](../.github/workflows/build-windows.yml) is a fallback when no local Windows build machine is available. In GitHub **Actions → Build and verify Windows package → Run workflow**, choose the source branch and run it. It uses a fresh `windows-2025` runner, x64 Python 3.13, Temurin JDK 17 and the pinned dependency file, prepares OpenRocket-MIT v6.2, runs the full tests/lint, then builds and verifies the extracted package with native Windows Qt and a minimal system PATH.
+
+On success, download **Windows-x64-package** for the ZIP and checksum. **Windows-x64-verification** contains source hashes, runner/runtime provenance and test/package logs, including available failure logs. Both artifacts expire after **one day**; download deliverables promptly. The workflow creates no release and runs only when manually requested. Its hosted runner validates software behavior, not physical USB cameras/boards or the launch network. Actual native Python/Java versions and the checked-out commit are recorded with each run.
+
 ## Signing and cleanup
 
 Mac development packages use ad-hoc signing. `MAC_SIGN_IDENTITY` selects a configured Developer ID identity; notarization is a separate distribution step. Windows packages are unsigned unless a separate signing process is applied. No signing credentials belong in the repository.
