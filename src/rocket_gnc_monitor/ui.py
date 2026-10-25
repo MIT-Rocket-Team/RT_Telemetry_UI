@@ -1694,7 +1694,8 @@ class MainWindow(QMainWindow):
             )
             self.flight_file_status.setText(f"Opened {result.path.name} · {result.metadata['scope']}")
             self.statusBar().showMessage(f"Opened {result.path}")
-            self.setWindowTitle(f"Rocket GNC Monitor · {result.path.name}")
+            if not hasattr(self, "profile"):
+                self.setWindowTitle(f"Rocket GNC Monitor · {result.path.name}")
             self.pages.setCurrentIndex(5 if c.reader else 4)
             self.refresh_plots(force=True)
         elif name == "flight_saved":
@@ -1703,7 +1704,8 @@ class MainWindow(QMainWindow):
                 message += " · Video includes finished segments; stop logging and save again to include the last segment."
             self.flight_file_status.setText(message)
             self.statusBar().showMessage(f"Saved {result['path']}")
-            self.setWindowTitle(f"Rocket GNC Monitor · {Path(result['path']).name}")
+            if not hasattr(self, "profile"):
+                self.setWindowTitle(f"Rocket GNC Monitor · {Path(result['path']).name}")
         if name == "cameras":
             self.camera_devices = list(
                 dict.fromkeys((description, str(source)) for description, source in result)

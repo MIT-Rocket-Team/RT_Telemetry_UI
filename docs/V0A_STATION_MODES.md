@@ -67,7 +67,9 @@ The large antenna illustration is omitted to make room for the flight instrument
 
 ## Base station: main live workspace
 
-The main Base station uses one window without tabs. Telemetry and GPS, rocket pose, power and battery/BMS readouts, command controls and recovery information remain together. The rocket-state badge sits at the top-right beside Settings, and the recovery panel occupies the upper-right part of the instrument area.
+The main Base station uses one window without tabs. Telemetry and GPS, rocket pose, power and battery/BMS readouts, command controls and recovery information remain together. The rocket-state badge sits at the top-right beside Settings. Recovery is a compact upper-right panel, with BMS spanning beneath both Batteries and Recovery. Diagnostics occupies the bottom-right corner, and each live plot has its legend beside its title. Beneath the rocket, an empty **Manual status link** panel reserves a 3:4 width-to-height area; its former network/APRS controls are not exposed in this workspace while its replacement is being designed. Launch v2 retains its existing network controls.
+
+Window titles identify the station, role and vehicle, for example **Base Station Telemetry (Balius)** or **Away Station 1 (GS1) Video (Iris)**. Opening or saving a flight does not replace this identity with a filename.
 
 **Canards / Tabs** replaces the legacy GNC block in this workspace. With the default four-canard configuration it has eight rows, **Canard1–4** and **Tab1–4**, with an actual-angle readout and an angle/Send control for each. An actual angle requires matching named telemetry; missing feedback remains unavailable. The current firmware protocol does not define independent commands for these channels, so the angle entries and Send buttons remain disabled even if command permissions are otherwise satisfied. The UI does not substitute the grouped roll-angle command, assign legacy unnamed channels to surfaces, or treat a requested angle as measured feedback.
 

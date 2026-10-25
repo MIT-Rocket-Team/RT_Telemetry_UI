@@ -22,6 +22,8 @@ def test_topology_follows_station_role_and_vehicle(station, role, vehicle):
     assert profile.local_channels == (("digital",) if station == "base" and role == "video" else expected_local)
     assert profile.station_label == ("Base station" if station == "base" else f"Away station {station[-1]}")
     assert profile.vehicle_label == vehicle.title()
+    title_station = "Base Station" if station == "base" else f"Away Station {station[-1]} (GS{station[-1]})"
+    assert profile.window_title == f"{title_station} {role.title()} ({vehicle.title()})"
     assert set(profile.channel_labels) == set(profile.channels)
     assert profile.channel_labels["analog"] == ("Sustainer Analog" if vehicle == "iris" else "Analog")
     assert set(profile.away_channels) == {"away1", "away2", "away3", "away4"}
@@ -150,6 +152,7 @@ def test_launch_v2_keeps_launch_hardware_and_round_trips_only_nondefault_display
     assert profile.station == "base"
     assert profile.station_label == "Base station"
     assert profile.layout == "launch_v2"
+    assert profile.window_title == "Base Station Telemetry (Iris)"
     assert profile.telemetry_targets == original.telemetry_targets
     assert profile.local_channels == original.local_channels
     assert profile.to_dict() == {**original.to_dict(), "display_mode": "launch_v2"}

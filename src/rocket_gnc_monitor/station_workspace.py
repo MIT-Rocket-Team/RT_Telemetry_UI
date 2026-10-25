@@ -34,7 +34,7 @@ from .flight_view import Flight3DDialog
 from .media import WIDTH, HEIGHT, camera_devices
 from .domain import finite
 from .table_cells import set_cell
-from .station_profile import StationProfile
+from .station_profile import StationProfile, profile_for_layout
 from .site_presets import mission_for_station
 from .rocket_state_badge import RocketStateBadge
 
@@ -76,6 +76,23 @@ class EmbeddedFlightView(Flight3DDialog):
         super().keyPressEvent(event)
 
 
+class AspectRatioSlot(QWidget):
+    """Fit a reserved panel inside its column without stretching its proportions."""
+
+    def __init__(self, panel, width=3, height=4):
+        super().__init__()
+        self.panel = panel
+        self.ratio = width / height
+        panel.setParent(self)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        width = min(self.width(), round(self.height() * self.ratio))
+        height = round(width / self.ratio)
+        self.panel.setGeometry((self.width() - width) // 2, 0, width, height)
+
+
 class StationDisplay(QMainWindow):
     """A closable companion display sharing the primary window's controller."""
 
@@ -83,7 +100,7 @@ class StationDisplay(QMainWindow):
         super().__init__(owner, Qt.WindowType.Window)
         self.owner = owner
         self.controller = owner.controller
-        self.setWindowTitle("Rocket GNC Monitor v0a · 2 / Systems")
+        self.setWindowTitle(f"{owner.profile.window_title} · Systems")
         self.setWindowIcon(owner.windowIcon())
         self.resize(1920, 1020)
         self.setMinimumSize(1280, 800)
@@ -131,7 +148,7 @@ class StationWindow(InstrumentWindow):
                                        else "away") if self.profile_locked else "legacy",
                          vehicle=self.profile.vehicle,
                          initial_mission=mission_for_station(self.profile) if self.profile_locked else None)
-        self.setWindowTitle("Rocket GNC Monitor v0a · 1 / Flight & links" if self.launch_station else "Rocket GNC Monitor v0a · 1 / Flight & antenna")
+        self.setWindowTitle(self.profile.window_title)
         self.setMinimumSize(1280, 800)
         self.resize(1920, 1020)
         # Keep old containers alive: their child widgets and signals are reused.
@@ -365,6 +382,7 @@ class StationWindow(InstrumentWindow):
     def build_main_base_workspace(self, outer, heading):
         """Main live desk: all instruments in one window, without navigation tabs."""
         from .canard_table import CanardTable
+        from .plot_header import PlotHeader
 
         self.rocket_panel.configure_base_controls()
         while heading.count():
@@ -419,17 +437,22 @@ class StationWindow(InstrumentWindow):
         self.altitude_reference.hide()
         plots = QHBoxLayout()
         plots.setSpacing(8)
-        for title, plot in (("ALTITUDE / m", self.altitude_plot),
-                            ("ANGULAR RATE / °/s", self.rate_plot),
-                            ("INTEGRATED ANGLES / °", self.angle_plot)):
+        axes = ("X/roll", "Y/pitch", "Z/yaw")
+        self.live_plot_headers = []
+        for title, plot, entries in (
+            ("ALTITUDE / m", self.altitude_plot, [("Telemetry", self.altitude_curve)]),
+            ("ANGULAR RATE / °/s", self.rate_plot, list(zip(axes, self.rate_curves))),
+            ("INTEGRATED ANGLES / °", self.angle_plot, list(zip(axes, self.angle_curves))),
+        ):
             column = QVBoxLayout()
-            column.addWidget(label(title, "eyebrow"))
+            header = PlotHeader(title, entries)
+            self.live_plot_headers.append(header)
+            column.addWidget(header)
             self.attach(column, plot, 1)
             plots.addLayout(column, 1)
         self.card("live_plots", "LIVE FLIGHT / telemetry history").addLayout(plots, 1)
         for plot in (self.rate_plot, self.angle_plot):
-            plot.plotItem.legend.setColumnCount(3)
-            plot.plotItem.legend.setLabelTextSize("9px")
+            plot.plotItem.legend.hide()
         for pane in (self.details, self.log_view, self.timeline):
             pane.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
         diagnostics = self.cards["diagnostics"].layout()
@@ -441,20 +464,30 @@ class StationWindow(InstrumentWindow):
         acknowledge = alerts.takeAt(0).widget()
         alerts.setParent(None)
         alerts.deleteLater()
-        summary = row(title, alert, stats, acknowledge)
-        summary.setStretch(2, 1)
+        title.setText("DIAGNOSTICS")
+        summary = row(title, acknowledge)
+        summary.setStretch(0, 1)
         diagnostics.addLayout(summary)
+        for reading in (alert, stats):
+            reading.setWordWrap(True)
+            reading.setMinimumWidth(0)
+            reading.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+            diagnostics.addWidget(reading)
         diagnostics.addLayout(panes, 1)
 
-        # Existing network callbacks remain intact; omit duplicate headings and
-        # topology prose so both Iris APRS and LAN controls fit the live desk.
-        network = self.network_panel
-        network.layout().itemAt(0).widget().hide()
-        network.topology.hide()
-        network.layout().setContentsMargins(0, 0, 0, 0)
-        network.layout().setAlignment(Qt.AlignmentFlag.AlignTop)
-        network.peer_status.setMinimumHeight(0)
-        network.aprs_status.setMinimumHeight(0)
+        # Reserve this space for the next status-link design. The shared network
+        # widget remains owned and available in other workspaces.
+        self.network_panel.setParent(self.instrument_storage)
+        self.network_panel.hide()
+        self.cards["network"].layout().itemAt(0).widget().setText("Manual status link")
+        self.cards["network"].layout().addStretch()
+        self.main_left_column = QWidget()
+        left = QVBoxLayout(self.main_left_column)
+        left.setContentsMargins(0, 0, 0, 0)
+        left.setSpacing(7)
+        left.addWidget(self.cards["attitude"], 1)
+        self.manual_status_slot = AspectRatioSlot(self.cards["network"])
+        left.addWidget(self.manual_status_slot, 1)
 
         index = outer.indexOf(self.flight_board)
         outer.removeWidget(self.flight_board)
@@ -480,24 +513,23 @@ class StationWindow(InstrumentWindow):
                     action.setText("Fit Base station window")
 
     def place_main_base_cards(self):
-        self.setWindowTitle("Rocket GNC Monitor v0a · Base station")
         self.companion.hide()
+        self.flight_grid.addWidget(self.main_left_column, 0, 0, 4, 1)
+        for widget in (self.main_left_column, self.cards["attitude"], self.manual_status_slot, self.cards["network"]):
+            widget.show()
         for args in (
-            ("attitude", 0, 0, 3, 1),
             ("telemetry", 0, 1, 2, 1), ("gps", 2, 1),
             ("servos", 0, 2, 2, 1), ("power", 2, 2),
-            ("commands", 0, 3), ("cells", 1, 3), ("bms", 2, 3),
-            ("recovery", 0, 4, 3, 1),
-            ("live_plots", 3, 0, 1, 3), ("network", 3, 3, 1, 2),
-            ("diagnostics", 4, 0, 1, 5),
+            ("commands", 0, 3), ("cells", 1, 3), ("bms", 2, 3, 1, 2),
+            ("recovery", 0, 4, 2, 1),
+            ("live_plots", 3, 1, 1, 3), ("diagnostics", 3, 4),
         ):
             self.place(self.flight_grid, *args)
-        for i, weight in enumerate((22, 19, 20, 18, 21)):
+        for i, weight in enumerate((20, 19, 21, 19, 21)):
             self.flight_grid.setColumnStretch(i, weight)
-        for i, weight in enumerate((0, 0, 0, 1, 0)):
+        for i, weight in enumerate((0, 0, 0, 1)):
             self.flight_grid.setRowStretch(i, weight)
-        self.flight_grid.setRowMinimumHeight(3, 175)
-        self.flight_grid.setRowMinimumHeight(4, 65)
+        self.flight_grid.setRowMinimumHeight(3, 210)
         self.flight_3d_dialog.timer.stop()
 
     def build_base_station_tabs(self, outer):
@@ -562,7 +594,6 @@ class StationWindow(InstrumentWindow):
         self.flight_grid.setContentsMargins(0, 7, 0, 0)
 
     def place_base_station_cards(self):
-        self.setWindowTitle("Rocket GNC Monitor v0a · Base station / Launch v2")
         self.companion.hide()
         for args in (
             ("attitude", 0, 0, 2, 1),
@@ -923,7 +954,6 @@ class StationWindow(InstrumentWindow):
         if value == "base" and self.main_base:
             self.place_main_base_cards()
         elif value == "base":
-            self.setWindowTitle("Rocket GNC Monitor v0a · 1 / Flight & links" if self.launch_station else "Rocket GNC Monitor v0a · 1 / Flight & antenna")
             for args in (
                 ("flight3d", 0, 0, 2, 2),
                 ("trajectory", 2, 0, 1, 1),
@@ -965,7 +995,6 @@ class StationWindow(InstrumentWindow):
         elif value == "launch_v2":
             self.place_base_station_cards()
         elif value == "away":
-            self.setWindowTitle("Rocket GNC Monitor v0a · Away station")
             self.companion.hide()
             for args in (
                 ("antenna", 0, 0, 2, 1),
@@ -981,9 +1010,6 @@ class StationWindow(InstrumentWindow):
             for i, weight in enumerate((42, 30, 28)):
                 self.flight_grid.setColumnStretch(i, weight)
         else:
-            self.setWindowTitle(
-                f"Rocket GNC Monitor v0a · {self.profile.station_label} / {self.profile.vehicle_label} video"
-            )
             self.companion.hide()
             if self.video_wall is not None:
                 self.place(self.flight_grid, "video_wall", 0, 0)
@@ -993,6 +1019,9 @@ class StationWindow(InstrumentWindow):
                     self.place(self.flight_grid, stream, 0, column)
                     self.flight_grid.setColumnStretch(column, 1)
             self.flight_grid.setRowStretch(0, 1)
+        title_profile = self.profile if self.profile_locked else profile_for_layout(value, self.profile)
+        self.setWindowTitle(title_profile.window_title)
+        self.companion.setWindowTitle(f"{title_profile.window_title} · Systems")
         self.station_selector.blockSignals(True)
         self.station_selector.setCurrentIndex(self.station_selector.findData(value))
         self.station_selector.blockSignals(False)

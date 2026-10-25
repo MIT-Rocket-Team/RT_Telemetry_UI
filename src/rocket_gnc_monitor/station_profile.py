@@ -79,6 +79,14 @@ class StationProfile:
         return self.vehicle.title()
 
     @property
+    def window_title(self):
+        """Identify this computer's station, operating role and rocket."""
+        station = "Base Station" if self.station == "base" else (
+            f"Away Station {self.station[-1]} (GS{self.station[-1]})"
+        )
+        return f"{station} {self.role.title()} ({self.vehicle_label})"
+
+    @property
     def channel_labels(self):
         if self.vehicle == "iris":
             return {"digital": "Sustainer Digital", "analog": "Sustainer Analog", "analog2": "Booster Analog"}
