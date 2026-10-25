@@ -3,8 +3,8 @@
 import gc
 
 import pytest
-from PySide6.QtCore import QCoreApplication, QEvent
-from PySide6.QtWidgets import QLabel, QTabWidget
+from PySide6.QtCore import QCoreApplication, QEvent, QPoint
+from PySide6.QtWidgets import QTabWidget
 
 from rocket_gnc_monitor.station_profile import StationProfile
 from rocket_gnc_monitor.station_workspace import StationWindow
@@ -31,7 +31,7 @@ def test_launch_profile_has_one_telemetry_board_and_no_local_pointer(qtbot, tmp_
         assert w.launch_station and c.board_layout == "launch"
         assert set(w.port_widgets) == set(c.workers) == set(c.states) == {"telemetry"}
         assert c.workers == {"telemetry": None}
-        assert "Launch station" in w.station_identity.text()
+        assert "Base station" in w.station_identity.text()
         assert w.wifi_panel is None
         assert w.usb_strip.isVisible() is (role == "telemetry")
         assert w.poll_button.isVisible() is (role == "telemetry")
@@ -53,8 +53,9 @@ def test_launch_profile_has_one_telemetry_board_and_no_local_pointer(qtbot, tmp_
         assert not c.command_connected and not c.can_command
         assert c.command_block_reason == "Launch uplink switch protocol not defined"
         assert not any(button.isEnabled() for button in w.rocket_panel.buttons.values())
-        assert w.launch_links.isVisible() is (role == "telemetry")
-        assert w.companion.isVisible() is (role == "telemetry")
+        assert not w.launch_links.isVisible()
+        assert w.launch_links.selector.isVisible() is (role == "telemetry")
+        assert not w.companion.isVisible()
     finally:
         w.close()
 
@@ -82,13 +83,14 @@ def test_launch_route_selection_changes_intent_only_and_never_marks_links_connec
             assert c.workers == {"telemetry": None} and c.states == {"telemetry": "Disconnected"}
             assert c.latest is None
             assert not c.can_command
-            assert w.mount.isVisible() is (station is not None)
+            assert not w.mount.isVisible()
+            assert panel.selector.isVisible() and not panel.isVisible()
             assert "unavailable" in w.remote_pointer_caption.text()
             for key, label in panel.path_status.items():
                 assert "unavailable" in label.text()
                 assert ("Selected route" in label.text()) is (key == station)
         assert not attempted
-        assert "Launch station only" in panel.uplink.text()
+        assert "Base station only" in panel.uplink.text()
         assert "transmission unavailable" in panel.uplink.text()
     finally:
         w.close()
@@ -161,7 +163,7 @@ def test_legacy_station_constructor_preserves_local_board_api(qtbot, tmp_path):
         w.close()
 
 
-def test_systems_badge_tracks_decoded_state_and_marks_stale_telemetry(qtbot, tmp_path):
+def test_main_badge_tracks_decoded_state_and_marks_stale_telemetry(qtbot, tmp_path):
     from rocket_gnc_monitor.protocol import TelemetryDecoder
     from test_protocol import frame
 
@@ -171,7 +173,7 @@ def test_systems_badge_tracks_decoded_state_and_marks_stale_telemetry(qtbot, tmp
         w.show()
         c, badge = w.controller, w.rocket_state_badge
         c.timer.stop()
-        assert badge.isVisible() and badge.window() is w.companion
+        assert badge.isVisible() and badge.window() is w
         assert badge.state_name == "NO TELEMETRY"
         assert badge.background_color == "#000000"
         c.latest = TelemetryDecoder().feed(frame())[0]
@@ -196,8 +198,7 @@ def test_systems_badge_tracks_decoded_state_and_marks_stale_telemetry(qtbot, tmp
 
 
 @pytest.mark.parametrize("vehicle", ["balius", "iris"])
-def test_launch_serial_shortcuts_feed_both_displays_and_uplink_remains_unavailable(qtbot, tmp_path, monkeypatch, vehicle):
-    from PySide6.QtCore import Qt
+def test_launch_serial_shortcuts_feed_main_window_and_uplink_remains_unavailable(qtbot, tmp_path, monkeypatch, vehicle):
     from rocket_gnc_monitor.protocol import TelemetryDecoder
     from test_board_roles import Board
     from test_protocol import frame
@@ -208,7 +209,6 @@ def test_launch_serial_shortcuts_feed_both_displays_and_uplink_remains_unavailab
     try:
         w.show()
         w.resize(1920, 1020)
-        w.companion.resize(1920, 1020)
         c = w.controller
         c.timer.stop()
         w.serial_devices = [{"device": "/test/launch-board"}]
@@ -237,16 +237,16 @@ def test_launch_serial_shortcuts_feed_both_displays_and_uplink_remains_unavailab
         assert not w.launch_uplink.toggle.isEnabled() and not c.can_command
         assert "UNKNOWN" in w.launch_uplink.status.text()
         assert not board.sent
-        for table in (w.actuators, w.rocket_panel.telemetry, w.rocket_panel.pyros):
+        for table in (w.canard_panel.table, w.rocket_panel.telemetry, w.rocket_panel.pyros):
             assert table.verticalScrollBar().maximum() == 0
         c.select_away_station("away3")
         w.last_ui = 0
         w.refresh()
-        assert w.launch_uplink.isVisible() and not c.can_command
+        assert not w.launch_uplink.isVisible() and not c.can_command
+        assert "UPLINK UNKNOWN" in w.health.text()
         qtbot.wait(50)
-        for label in w.launch_links.findChildren(QLabel):
-            assert label.height() >= label.heightForWidth(label.width()), label.text()
-        qtbot.mouseClick(w.launch_uplink.toggle, Qt.MouseButton.LeftButton)
+        assert w.launch_links.selector.isVisible() and not w.launch_links.isVisible()
+        w.launch_uplink.toggle.click()
         assert not c.can_command and not board.sent
         assert "UNKNOWN" in w.launch_uplink.status.text()
         c.switch_mode("REPLAY")
@@ -254,5 +254,56 @@ def test_launch_serial_shortcuts_feed_both_displays_and_uplink_remains_unavailab
         w.refresh()
         assert not w.launch_uplink.toggle.isEnabled()
         assert not c.ground_connected and "UNKNOWN" in w.launch_uplink.status.text()
+    finally:
+        w.close()
+
+
+def test_main_base_is_live_only_with_one_window_and_visible_control_surface_rows(qtbot, tmp_path):
+    from dataclasses import replace
+    from rocket_gnc_monitor.balius_states import BALIUS_STATE_NAMES
+    from rocket_gnc_monitor.domain import Sample
+    from rocket_gnc_monitor.rocket_protocol import PHASE_ENUM
+
+    w = StationWindow(tmp_path, profile=StationProfile("base", "telemetry", "balius"), auto_place=False)
+    qtbot.addWidget(w)
+    try:
+        w.show()
+        w.resize(1920, 1020)
+        qtbot.wait(50)
+        c = w.controller
+        c.timer.stop()
+        assert w.main_base and w.base_tabs is None and c.mode == "LIVE"
+        assert not w.companion.isVisible()
+        assert not any(tab.isVisible() for tab in w.findChildren(QTabWidget))
+        assert {key for key, card in w.cards.items() if card.isVisible()} == {
+            "attitude", "telemetry", "gps", "servos", "power", "commands",
+            "cells", "bms", "recovery", "live_plots", "network", "diagnostics",
+        }
+        assert w.canard_panel.channels == tuple(f"Canard{i}" for i in range(1, 5)) + tuple(f"Tab{i}" for i in range(1, 5))
+        assert w.canard_panel.table.isVisible() and not w.rocket_panel.servos.isVisible()
+        assert all(not control.isEnabled() for controls in w.canard_panel.commands.values() for control in controls)
+        assert w.rocket_panel.buttons["pd_activate"].text() == "Activate Controls"
+        assert w.rocket_panel.buttons["advance_state"].objectName() == "danger"
+        badge = w.rocket_state_badge
+        assert badge.isVisible() and w.workspace_settings.isVisible()
+        assert badge.mapTo(w, QPoint()).x() > w.workspace_settings.mapTo(w, QPoint()).x()
+        recovery_position = w.flight_grid.getItemPosition(w.flight_grid.indexOf(w.cards["recovery"]))
+        rightmost_column = max(w.flight_grid.getItemPosition(i)[1] for i in range(w.flight_grid.count()))
+        assert recovery_position[0] == 0 and recovery_position[1] == rightmost_column
+        assert not any(control.isVisible() for control in (w.mode, w.record_button, w.attitude.source))
+        assert not any(action.isVisible() or action.isEnabled()
+                       for action in (*w.flight_actions.values(), w.legacy_actions["log"]))
+        assert not w.flight_3d_dialog.timer.isActive()
+        w.open_flight_3d()
+        assert not w.cards["flight3d"].isVisible() and not w.flight_3d_dialog.timer.isActive()
+        sample = Sample(0, 1, "LIVE")
+        for code, state in enumerate(BALIUS_STATE_NAMES):
+            c.accept(replace(sample, t=float(code), sequence=code, phase=PHASE_ENUM[code], details={"state_code": code}))
+            w.last_ui = w.last_table = 0
+            w.refresh()
+            assert badge.state_name == state
+            assert w.rocket_panel.telemetry.item(0, 1).text() == state
+            assert f"LIVE · {state}" in w.banner.text()
+        assert c.workers == {"telemetry": None} and not c.can_command
     finally:
         w.close()

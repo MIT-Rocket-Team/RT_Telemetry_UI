@@ -14,9 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 APP_NAME = "RocketGNCMonitor-v0a"
 STATION_CARDS = {
     "base": {
-        "flight3d", "trajectory", "altitude", "attitude", "antenna", "pointing",
-        "gnc_rates", "gnc_angles", "actuators", "telemetry", "gps", "servos", "cells",
-        "commands", "power", "bms", "recovery", "mission", "sessions", "diagnostics", "network",
+        "attitude", "telemetry", "gps", "servos", "cells", "commands",
+        "power", "bms", "recovery", "live_plots", "diagnostics", "network",
     },
     "away": {"antenna", "pointing", "altitude", "attitude", "telemetry", "gps"},
     "video": {"digital", "analog"},
@@ -108,7 +107,7 @@ def validate_station_report(report, station, profile=None):
         or report.get("station_mode") != station
         or report.get("source_mode") != "LIVE"
         or report.get("shared_controller") is not True
-        or report.get("window_count") != (2 if station == "base" else 1)
+        or report.get("window_count") != 1
         or not isinstance(report.get("visible_cards"), list)
         or set(report["visible_cards"]) != cards
         or report.get("hardware_open") is not False
@@ -229,6 +228,7 @@ def main():
             "flight",
             [
                 "--flight-smoke",
+                "--station", "launch-v2",
                 "--data-dir",
                 str(output / "flight"),
                 "--screenshot",
@@ -256,6 +256,7 @@ def main():
             [
                 "--flight-3d-smoke",
                 str(output / "simulation" / "trajectory.csv"),
+                "--station", "launch-v2",
                 "--data-dir",
                 str(output / "flight-3d"),
             ],

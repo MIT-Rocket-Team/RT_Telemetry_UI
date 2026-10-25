@@ -4,21 +4,27 @@ The MIT Rocket Team's native **Rocket GNC Monitor v0a** for macOS and Windows. T
 
 ## Station workspaces
 
-The startup wizard chooses **Launch station**, **Base station · Launch v2**, or **Away 1–4**, **Telemetry** or **Video**, **Balius** or **Iris**, and **URRG** or a custom site. Remembering choices is optional and off by default. Every normal session begins in **LIVE**, with devices disconnected.
+The startup wizard chooses **Base station**, **Base station · Launch v2**, or **Away 1–4**, **Telemetry** or **Video**, **Balius** or **Iris**, and **URRG** or a custom site. Remembering choices is optional and off by default. Every normal session begins in **LIVE**, with devices disconnected.
 
 | Station / role | Workspace |
 | --- | --- |
-| Launch / Telemetry | Two coordinated windows: Flight and Systems. One local telemetry board, rocket telemetry/state/GNC, simulation, recording/replay, power/recovery, diagnostics and remote antenna-route selection. |
+| Base / Telemetry | One live workspace without tabs: rocket telemetry/state, GPS, canard/tab readouts, commands, power/recovery and Away communication-route selection. One local telemetry board. |
 | Base · Launch v2 / Telemetry | Same launch-site hardware in one window. Rocket state, key metrics and Away route selection stay visible; Flight, Systems, Mission & replay, Network and 3D simulation use tabs. The large antenna illustration is omitted. |
 | Away / Telemetry | One window with main rocket telemetry and the local physical or virtual antenna pointer. |
 | Away / Video | Two local USB inputs. Balius: Digital + Analog. Iris Away 1–3: Sustainer Digital + Sustainer Analog; Away 4: Sustainer Digital + Booster Analog. |
-| Launch / Video | Two Balius or three Iris primary channels above the Away thumbnails. Local Digital input only; double-click a thumbnail to replace its matching large channel. Remote video transport remains pending. |
+| Base / Video | Two Balius or three Iris primary channels above the Away thumbnails. Local Digital input only; double-click a thumbnail to replace its matching large channel. Remote video transport remains pending. |
+
+The main **Base station** is LIVE-only: it omits the antenna illustration, simulation/reference comparison, recording, flight-file and replay controls, including their menu actions. **Launch v2** retains the existing simulation, recording and replay tools. The main view places recovery at the upper-right and the rocket-state badge beside Settings; **Canards / Tabs** provides eight channel rows, with unavailable feedback or command protocols explicitly indicated.
+
+Main Base station Balius state displays and Advance State use provisional codes `0–4`: **GROUND_TESTING → PREFLIGHT → FLIGHT → APOGEE → LOW_BATTERY**. Timer annotations are not states, and the codes remain subject to firmware changes. Launch v2 retains its existing state interpretation. Individual Canard/Tab Send controls remain unavailable until the firmware defines them.
 
 Serial ports and cameras cannot be assigned to two active local devices. Video capture/recording works independently of serial telemetry. Settings (**⌘,** / **Ctrl+,**) include the OpenRocket JAR, simulation time limit, recording folder and appearance. Original serial and pointer shortcuts remain available in their applicable roles.
 
-Launch has one telemetry board and exclusive uplink authority, with an undefined firmware switch to enable uplink. Its command controls therefore remain locked until the firmware interface is defined. Iris Sustainer/Booster selection is also a labelled firmware placeholder. Launch has no local antenna pointer: it selects a future communication route through one of the four Away stations. Wi-Fi selection records the desired Away network and opens operating-system network settings; it does not claim to join or configure the LTU equipment.
+Base has one telemetry board and exclusive uplink authority, with an undefined firmware switch to enable uplink. Its command controls therefore remain locked until the firmware interface is defined. Iris Sustainer/Booster selection is also a labelled firmware placeholder. Base has no local antenna pointer: it selects a future communication route through one of the four Away stations. Wi-Fi selection records the desired Away network and opens operating-system network settings; it does not claim to join or configure the LTU equipment.
 
 ## Telemetry, visualization and recorded flights
+
+Simulation and recorded-flight workflows remain available in **Launch v2** and other workspaces that expose those tools; they are absent from the main Base station's live workspace.
 
 - Decode and record the existing telemetry/pointer protocols, including legacy good/rejected-packet CSVs, raw serial data, indexed replay, power/BMS/recovery values and command history.
 - Configure launch coordinates using latitude/longitude, MGRS or Plus Codes, and Away antenna locations using latitude/longitude, MGRS or launch-relative heading/distance/height. URRG presets cover the launch pad and all stations; elevations remain manual.
@@ -46,7 +52,9 @@ Preselect the wizard or bypass it explicitly:
 
 ```sh
 .venv/bin/python -m rocket_gnc_monitor --site away3 --role telemetry --vehicle iris --launch-site urrg --skip-setup
-# Single-display Base station:
+# Main Base station, without tabs:
+.venv/bin/python -m rocket_gnc_monitor --station base --vehicle balius --launch-site urrg --skip-setup
+# Secondary tabbed Base station:
 .venv/bin/python -m rocket_gnc_monitor --station launch-v2 --vehicle balius --launch-site urrg --skip-setup
 ```
 

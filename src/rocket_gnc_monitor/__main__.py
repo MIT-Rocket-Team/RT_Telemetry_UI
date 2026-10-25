@@ -71,11 +71,11 @@ def argument_parser():
     parser.add_argument("--data-dir", type=Path)
     parser.add_argument(
         "--station", choices=["launch", "launch-v2", "base", "away", "video"], metavar="{launch,launch-v2,away,video}",
-        help="Workspace choice; launch-v2 opens Base station on one display (base remains an alias for launch)",
+        help="Base station workspace: launch or base uses no tabs; launch-v2 uses tabs; away/video keep their existing roles",
     )
     parser.add_argument("--site", choices=["launch", "base", "away1", "away2", "away3", "away4"],
                         metavar="{launch,away1,away2,away3,away4}",
-                        help="Launch station or numbered away station (1–4); base remains an alias for launch")
+                        help="Base station or numbered away station (1–4); launch and base name the same site")
     parser.add_argument("--role", choices=["telemetry", "video"], help="Computer's display and control role")
     parser.add_argument("--vehicle", choices=["balius", "iris"], help="Rocket and default mission name")
     parser.add_argument("--launch-site", choices=["urrg", "custom"],
@@ -272,7 +272,7 @@ def main():
                 window.companion.resize(1920, 1020)
                 app.processEvents()
                 window.grab().save(str(data / "display-1.png"))
-                if window.station_mode == "base":
+                if window.companion.isVisible():
                     window.companion.grab().save(str(data / "display-2.png"))
                 wall = window.video_wall
                 wall_report = None if wall is None else dict(

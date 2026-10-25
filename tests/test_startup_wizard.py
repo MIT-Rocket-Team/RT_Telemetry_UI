@@ -57,7 +57,7 @@ def test_wizard_selection_and_back_navigation_keep_station_identity(qtbot):
     assert "Local USB inputs: Sustainer Digital." in wizard.summary.text()
     assert "connection pending" in wizard.summary.text()
     assert "Booster Analog" not in wizard.summary.text()
-    assert "Launch station reference: 18TUN2063730181" in wizard.summary.text()
+    assert "Base station reference: 18TUN2063730181" in wizard.summary.text()
     wizard.choices["launch_site"]["custom"].setChecked(True)
     assert "URRG launch pad" not in wizard.summary.text()
     assert "Set the launch location in Mission profile; choose an away antenna in the workspace." in wizard.summary.text()
@@ -72,7 +72,7 @@ def test_wizard_summary_tracks_selected_station_and_vehicle(qtbot, station, code
     wizard = StartupWizard(StationProfile(launch_site="urrg"))
     qtbot.addWidget(wizard)
     wizard.choices["station"][station].setChecked(True)
-    site_label = "Launch station reference" if station == "base" else wizard.profile.station_label
+    site_label = "Base station reference" if station == "base" else wizard.profile.station_label
     assert f"{site_label}: {code}" in wizard.summary.text()
     assert "Mission: Balius Launch." in wizard.summary.text()
     wizard.choices["vehicle"]["iris"].setChecked(True)
@@ -214,9 +214,10 @@ def test_launch_wizard_describes_one_local_board_and_remote_pointer(qtbot):
     wizard = StartupWizard(StationProfile("launch", "telemetry", "iris", "urrg"))
     qtbot.addWidget(wizard)
     choice = wizard.choices["station"]["base"]
-    assert choice.accessibleName() == "Launch station"
+    assert choice.accessibleName() == "Base station"
     assert "four LTU-XR links" in choice.text()
-    assert "One telemetry board" in choice.text()
+    assert "one telemetry board" in choice.text()
+    assert "One display · no tabs" in choice.text()
     summary = wizard.summary.text()
     assert "Ethernet / PoE to four LTU-XR links" in summary
     assert "Choose an away antenna pointer" in summary
@@ -224,7 +225,9 @@ def test_launch_wizard_describes_one_local_board_and_remote_pointer(qtbot):
     assert "Uplink enable: unavailable until the firmware protocol is defined." in summary
     assert "One shared board target." in summary
     assert "no local antenna pointer" in summary
-    assert "Base" not in summary
+    assert "Base station" in summary
+    assert "Live instruments together without tabs." in summary
+    assert "Two displays" not in summary
     assert "uplink boards" not in summary
 
 
@@ -260,4 +263,5 @@ def test_base_station_wizard_restores_one_display_and_keeps_launch_hardware(qtbo
     wizard.choices["role"]["telemetry"].setChecked(True)
     wizard.choices["station"]["base"].setChecked(True)
     assert wizard.profile.layout == "base"
-    assert "Two displays" in wizard.summary.text()
+    assert "One display" in wizard.summary.text()
+    assert "Live instruments together without tabs." in wizard.summary.text()

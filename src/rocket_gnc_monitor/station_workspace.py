@@ -120,6 +120,8 @@ class StationWindow(InstrumentWindow):
         self.base_grids = {}
         self.base_route = None
         self.launch_station = self.profile_locked and self.profile.station == "base"
+        self.main_base = self.launch_station and self.profile.layout == "base"
+        self.canard_panel = None
         self.launch_links = None
         self.launch_uplink = None
         self.wifi_panel = None
@@ -205,11 +207,13 @@ class StationWindow(InstrumentWindow):
         self.station_identity.setVisible(self.profile_locked)
         self.station_selector.setVisible(not self.profile_locked)
         heading.addStretch()
-        heading.addWidget(label("DATA SOURCE", "eyebrow"))
+        self.source_heading = label("DATA SOURCE", "eyebrow")
+        heading.addWidget(self.source_heading)
         for widget in (self.mode, self.poll_button, self.record_button):
             heading.addWidget(widget)
             widget.show()
-        heading.addWidget(button("Settings…", self.open_settings))
+        self.workspace_settings = button("Settings…", self.open_settings)
+        heading.addWidget(self.workspace_settings)
         outer.addLayout(heading)
         if self.launch_station:
             self.launch_network_notice = label("LAUNCH NETWORK · Ethernet / PoE → four LTU-XR links → Away stations 1–4 · data transport pending", "eyebrow")
@@ -316,6 +320,8 @@ class StationWindow(InstrumentWindow):
         self.build_operations_cards()
         if self.profile.layout == "launch_v2":
             self.build_base_station_tabs(outer)
+        elif self.main_base:
+            self.build_main_base_workspace(outer, heading)
         self.rocket_panel.setParent(self.companion)
         self.rocket_panel.hide()
         for parent in (self, self.companion):
@@ -325,6 +331,11 @@ class StationWindow(InstrumentWindow):
                 table.verticalHeader().setDefaultSectionSize(20)
                 table.horizontalHeader().setMinimumSectionSize(28)
                 table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        if self.canard_panel is not None:
+            self.canard_panel.table.verticalHeader().setMinimumSectionSize(27)
+            self.canard_panel.table.verticalHeader().setDefaultSectionSize(27)
+            self.canard_panel.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+            self.canard_panel.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         view_menu = next(a.menu() for a in self.menuBar().actions() if a.text() == "View")
         if self.launch_station:
             for key, action in self.legacy_actions.items():
@@ -340,6 +351,8 @@ class StationWindow(InstrumentWindow):
                 if key != "log":
                     action.setVisible(False)
         view_menu.addAction("Arrange station displays", self.arrange_displays)
+        if self.main_base:
+            self.configure_main_base_actions()
         if not self.profile_locked:
             view_menu.addAction("Launch station · two displays", lambda: self.set_station_mode("base"))
             view_menu.addAction("Away station · one display", lambda: self.set_station_mode("away"))
@@ -348,6 +361,144 @@ class StationWindow(InstrumentWindow):
         for menu_action in self.menuBar().actions():
             if menu_action.menu():
                 self.companion.menuBar().addMenu(menu_action.menu())
+
+    def build_main_base_workspace(self, outer, heading):
+        """Main live desk: all instruments in one window, without navigation tabs."""
+        from .canard_table import CanardTable
+
+        self.rocket_panel.configure_base_controls()
+        while heading.count():
+            item = heading.takeAt(0)
+            if item.widget():
+                item.widget().hide()
+        controls = QVBoxLayout()
+        controls.setSpacing(5)
+        identity = row(self.workspace_title, self.station_identity, self.poll_button)
+        identity.addStretch()
+        controls.addLayout(identity)
+        outer.removeWidget(self.usb_strip)
+        if self.launch_uplink is not None:
+            self.usb_strip.layout().removeWidget(self.launch_uplink)
+            self.launch_uplink.setParent(self.instrument_storage)
+            self.launch_uplink.hide()
+        for combo, _, status in self.port_widgets.values():
+            combo.setMinimumWidth(100)
+            combo.setMaximumWidth(300)
+            status.setMinimumWidth(0)
+        for role, (_, connect, _) in self.port_widgets.items():
+            for control in (connect, self.refresh_buttons[role], self.disconnect_buttons[role]):
+                control.setMaximumWidth(90)
+        self.usb_strip.layout().addStretch(1)
+        controls.addWidget(self.usb_strip)
+        heading.addLayout(controls, 1)
+        heading.addWidget(self.workspace_settings)
+        self.workspace_settings.show()
+        heading.addWidget(self.rocket_state_badge)
+        self.launch_network_notice.hide()
+        if self.iris_links is not None:
+            self.iris_links.hide()
+        outer.removeWidget(self.health)
+        self.health.setMinimumWidth(0)
+        self.health.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.health.setWordWrap(True)
+        self.launch_links.selector.setMaximumWidth(280)
+        identity.insertWidget(3, label("AWAY ROUTE", "eyebrow"))
+        identity.insertWidget(4, self.launch_links.selector)
+        self.launch_links.selector.show()
+        self.usb_strip.layout().addWidget(self.health, 1)
+
+        # Replace only this mode's legacy table; other workspaces retain theirs.
+        self.rocket_panel.servos.setParent(self.instrument_storage)
+        self.rocket_panel.servos.hide()
+        self.cards["servos"].layout().itemAt(0).widget().setText("CANARDS/TABS")
+        self.canard_panel = CanardTable(self.controller, self.guard)
+        self.attach(self.cards["servos"].layout(), self.canard_panel, 1)
+        self.attitude.source.setCurrentIndex(0)
+        self.attitude.source.removeItem(self.attitude.source.findData("openrocket"))
+        self.attitude.source.hide()
+        self.altitude_reference.hide()
+        plots = QHBoxLayout()
+        plots.setSpacing(8)
+        for title, plot in (("ALTITUDE / m", self.altitude_plot),
+                            ("ANGULAR RATE / °/s", self.rate_plot),
+                            ("INTEGRATED ANGLES / °", self.angle_plot)):
+            column = QVBoxLayout()
+            column.addWidget(label(title, "eyebrow"))
+            self.attach(column, plot, 1)
+            plots.addLayout(column, 1)
+        self.card("live_plots", "LIVE FLIGHT / telemetry history").addLayout(plots, 1)
+        for plot in (self.rate_plot, self.angle_plot):
+            plot.plotItem.legend.setColumnCount(3)
+            plot.plotItem.legend.setLabelTextSize("9px")
+        for pane in (self.details, self.log_view, self.timeline):
+            pane.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        diagnostics = self.cards["diagnostics"].layout()
+        title = diagnostics.takeAt(0).widget()
+        alerts = diagnostics.takeAt(0).layout()
+        stats = diagnostics.takeAt(0).widget()
+        panes = diagnostics.takeAt(0).layout()
+        alert = alerts.takeAt(0).widget()
+        acknowledge = alerts.takeAt(0).widget()
+        alerts.setParent(None)
+        alerts.deleteLater()
+        summary = row(title, alert, stats, acknowledge)
+        summary.setStretch(2, 1)
+        diagnostics.addLayout(summary)
+        diagnostics.addLayout(panes, 1)
+
+        # Existing network callbacks remain intact; omit duplicate headings and
+        # topology prose so both Iris APRS and LAN controls fit the live desk.
+        network = self.network_panel
+        network.layout().itemAt(0).widget().hide()
+        network.topology.hide()
+        network.layout().setContentsMargins(0, 0, 0, 0)
+        network.layout().setAlignment(Qt.AlignmentFlag.AlignTop)
+        network.peer_status.setMinimumHeight(0)
+        network.aprs_status.setMinimumHeight(0)
+
+        index = outer.indexOf(self.flight_board)
+        outer.removeWidget(self.flight_board)
+        self.main_scroll = QScrollArea()
+        self.main_scroll.setWidgetResizable(True)
+        self.main_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.main_scroll.setWidget(self.flight_board)
+        outer.insertWidget(index, self.main_scroll, 1)
+
+    def configure_main_base_actions(self):
+        for action in (*self.flight_actions.values(), self.legacy_actions["log"]):
+            action.setVisible(False)
+            action.setEnabled(False)
+        for menu_action in self.menuBar().actions():
+            menu = menu_action.menu()
+            if menu is None:
+                continue
+            for action in menu.actions():
+                if action.text() in {"3D flight…", "Open session…", "Open mission…", "Save mission…"}:
+                    action.setVisible(False)
+                    action.setEnabled(False)
+                elif action.text() == "Arrange station displays":
+                    action.setText("Fit Base station window")
+
+    def place_main_base_cards(self):
+        self.setWindowTitle("Rocket GNC Monitor v0a · Base station")
+        self.companion.hide()
+        for args in (
+            ("attitude", 0, 0, 3, 1),
+            ("telemetry", 0, 1, 2, 1), ("gps", 2, 1),
+            ("servos", 0, 2, 2, 1), ("power", 2, 2),
+            ("commands", 0, 3), ("cells", 1, 3), ("bms", 2, 3),
+            ("recovery", 0, 4, 3, 1),
+            ("live_plots", 3, 0, 1, 3), ("network", 3, 3, 1, 2),
+            ("diagnostics", 4, 0, 1, 5),
+        ):
+            self.place(self.flight_grid, *args)
+        for i, weight in enumerate((22, 19, 20, 18, 21)):
+            self.flight_grid.setColumnStretch(i, weight)
+        for i, weight in enumerate((0, 0, 0, 1, 0)):
+            self.flight_grid.setRowStretch(i, weight)
+        self.flight_grid.setRowMinimumHeight(3, 175)
+        self.flight_grid.setRowMinimumHeight(4, 65)
+        self.flight_3d_dialog.timer.stop()
 
     def build_base_station_tabs(self, outer):
         """Keep flight essentials in view; share the existing cards across tabs."""
@@ -751,7 +902,7 @@ class StationWindow(InstrumentWindow):
         self.station_mode = value
         video = value == "video"
         self.setMinimumSize(*(1000, 600) if video else (1280, 800))
-        self.workspace_title.setText("BASE STATION" if value == "launch_v2" else "VIDEO / v0a" if video else "ROCKET / v0a")
+        self.workspace_title.setText("BASE STATION" if self.main_base or value == "launch_v2" else "VIDEO / v0a" if video else "ROCKET / v0a")
         for widget in (self.mission_label, self.poll_button, self.health, self.metric_strip, self.banner):
             widget.setVisible(not video)
         # Playback controls have one owner and retain their signals and state.
@@ -769,7 +920,9 @@ class StationWindow(InstrumentWindow):
                 grid.setColumnStretch(i, 0)
         for panel in self.cards.values():
             panel.hide()
-        if value == "base":
+        if value == "base" and self.main_base:
+            self.place_main_base_cards()
+        elif value == "base":
             self.setWindowTitle("Rocket GNC Monitor v0a · 1 / Flight & links" if self.launch_station else "Rocket GNC Monitor v0a · 1 / Flight & antenna")
             for args in (
                 ("flight3d", 0, 0, 2, 2),
@@ -854,7 +1007,7 @@ class StationWindow(InstrumentWindow):
         QTimer.singleShot(0, self.rescale_videos)
 
     def open_flight_3d(self):
-        if not self.workspace_ready:
+        if not self.workspace_ready or self.main_base:
             return
         if self.profile_locked and self.profile.role == "video":
             return
@@ -908,6 +1061,9 @@ class StationWindow(InstrumentWindow):
             return super().refresh_actuators()
         if self.station_mode == "video":
             return
+        if self.canard_panel is not None:
+            self.canard_panel.refresh()
+            return
         c = self.controller
         channels = {f"Canard {i + 1}": {} for i in range(c.mission.canard_count)}
         channels.update({f"Tab {i + 1}": {} for i in range(4)})
@@ -932,13 +1088,13 @@ class StationWindow(InstrumentWindow):
         second = next((s for s in screens if s is not primary), primary)
         windows = (
             ((self, primary), (self.companion, second))
-            if self.station_mode == "base" else ((self, primary),)
+            if self.station_mode == "base" and not self.main_base else ((self, primary),)
         )
         for window, screen in windows:
             rect = screen.availableGeometry()
             window.setGeometry(rect.adjusted(4, 4, -4, -4))
             window.show()
-        if second is primary and self.station_mode == "base":
+        if second is primary and self.station_mode == "base" and not self.main_base:
             self.companion.move(primary.availableGeometry().topLeft() + QPoint(28, 28))
             self.statusBar().showMessage(
                 "One display detected. Connect a second display, then choose Arrange displays.", 12000
@@ -951,7 +1107,7 @@ class StationWindow(InstrumentWindow):
     def showEvent(self, event):
         super().showEvent(event)
         if self.workspace_ready:
-            if self.station_mode == "base":
+            if self.station_mode == "base" and not self.main_base:
                 self.companion.show()
             if self.auto_place:
                 QTimer.singleShot(0, self.arrange_displays)
@@ -1037,9 +1193,18 @@ class StationWindow(InstrumentWindow):
             return
         c = self.controller
         video = self.station_mode == "video"
+        from .balius_states import balius_state_name
+
         self.rocket_state_badge.update_state(
-            c.latest, mode=c.mode, fresh=c.mode != "LIVE" or c.rocket_link_state()[0] == "RECEIVING"
+            c.latest, mode=c.mode, fresh=c.mode != "LIVE" or c.rocket_link_state()[0] == "RECEIVING",
+            state_name=balius_state_name(c.latest) if self.main_base and c.vehicle == "balius" else None,
         )
+        if self.main_base:
+            self.record_button.hide()
+            self.mode.hide()
+            self.mission_label.hide()
+            self.configure_main_base_actions()
+            self.canard_panel.refresh()
         self.update_local_video_context()
         if self.profile_locked and self.profile.role == "video":
             for key, action in self.legacy_actions.items():
@@ -1077,6 +1242,9 @@ class StationWindow(InstrumentWindow):
             self.mount.setVisible(selected is not None)
             local_status = " / ".join(self.connection_tiles[k].text().replace("● ", "") for k in ("ground", "rocket"))
             self.health.setText("LOCAL TELEMETRY · " + local_status + "   /   AWAY NETWORK · four links · transport pending")
+            if self.main_base:
+                self.health.setText(local_status + " · UPLINK UNKNOWN · AWAY TRANSPORT PENDING"
+                                    + (" · IRIS TARGET UNKNOWN" if self.iris_links is not None else ""))
             if self.station_mode == "launch_v2" and self.iris_links is not None:
                 self.health.setText(self.health.text() + "   /   IRIS BOARD TARGET · UNKNOWN")
             if c.mode == "LIVE":

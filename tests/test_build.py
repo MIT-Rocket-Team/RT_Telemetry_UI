@@ -176,7 +176,7 @@ def station_report(verifier, station, profile=None):
         station_mode=station,
         source_mode="LIVE",
         shared_controller=True,
-        window_count=2 if station == "base" else 1,
+        window_count=1,
         visible_cards=["video_wall"] if base_video else local if station == "video" else sorted(verifier.STATION_CARDS[station]),
         hardware_open=False,
         shortcuts_shared=True,

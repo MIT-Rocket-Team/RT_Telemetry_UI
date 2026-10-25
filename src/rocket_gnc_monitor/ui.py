@@ -164,6 +164,10 @@ class MissionDialog(QDialog):
             form = QFormLayout(page)
             form.setSpacing(11)
             for key, title, kind in fields:
+                if getattr(parent, "main_base", False) and key in {
+                    "rail_length", "rail_tilt", "rail_heading", "simulation_index", "seed", "video_offset",
+                }:
+                    continue
                 if kind == "location":
                     self.location = LaunchLocation(mission)
                     self.location.preset_selected.connect(
@@ -222,7 +226,7 @@ class MissionDialog(QDialog):
                 lambda: self.pointer_location.set_urrg_available(self.location.preset.currentData() == "URRG")
             )
         note = label(
-            "Launch station has no local antenna pointer. Select an away-station pointer in the communication panel; its location is configured at that away station."
+            "Base station has no local antenna pointer. Select an away-station pointer in the communication panel; its location is configured at that away station."
             if remote_only else
             "Set the antenna location for virtual trajectory tracking. Physical-board tracking retains the ground GPS set with Send to AntPtr.",
             "muted",
@@ -1934,7 +1938,12 @@ class MainWindow(QMainWindow):
         if c.mode == "REPLAY":
             issues.append("REPLAY · physical pointer disabled")
         else:
-            issues.append("LIVE · " + (s.phase if s else "awaiting telemetry"))
+            phase = s.phase if s else "awaiting telemetry"
+            if getattr(self, "main_base", False) and c.vehicle == "balius" and s is not None:
+                from .balius_states import balius_state_name
+
+                phase = balius_state_name(s)
+            issues.append("LIVE · " + phase)
             if c.virtual_pointer:
                 issues.append("VIRTUAL POINTER · SIMULATED MOTION")
             if not c.ground_connected:

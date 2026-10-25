@@ -1,28 +1,32 @@
 """Every operator control and telemetry table from the original telemetry UI."""
 
 from __future__ import annotations
+
 import time
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QGridLayout,
-    QFrame,
-    QLabel,
-    QPushButton,
-    QLineEdit,
-    QCheckBox,
-    QTabWidget,
-    QTableWidget,
-    QHeaderView,
     QAbstractItemView,
+    QCheckBox,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
     QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
 )
-from .rocket_protocol import legacy_values
+
+from .balius_states import BALIUS_STATE_NAMES, balius_state_name
 from .domain import finite
-from .widgets import COLORS
+from .rocket_protocol import PHASE_ENUM, legacy_values
 from .table_cells import clear_cells, set_cell
+from .widgets import COLORS
 
 
 def card(title):
@@ -55,6 +59,7 @@ class RocketPanel(QWidget):
     def __init__(self, controller, guard):
         super().__init__()
         self.c, self.guard = controller, guard
+        self.base_controls = False
         self.controls = []
         self.buttons = {}
         self.tabs = QTabWidget()
@@ -78,6 +83,9 @@ class RocketPanel(QWidget):
         return button
 
     def request(self, command, value=None, confirm=None, critical=False):
+        if command == "advance_state" and self.base_controls:
+            self.request_advance_state()
+            return
         if confirm:
             prompt = confirm(value) if callable(confirm) else confirm
             function = QMessageBox.critical if critical else QMessageBox.question
@@ -93,6 +101,74 @@ class RocketPanel(QWidget):
             ):
                 return
         self.guard(lambda: self.c.send_rocket(command, value))
+
+    def configure_base_controls(self):
+        """Apply the main Base workspace controls without changing Launch v2."""
+        self.base_controls = True
+        self.buttons["pd_activate"].setText("Activate Controls")
+        advance = self.buttons["advance_state"]
+        advance.setObjectName("danger")
+        advance.setStyleSheet(
+            "QPushButton { background: #b62f35; color: white; border: 1px solid #e45d64; }"
+            "QPushButton:hover { background: #cd3940; }"
+            "QPushButton:pressed { background: #91242a; }"
+            "QPushButton:disabled { background: #622e34; color: #bca2a5; border-color: #87424a; }"
+        )
+        self.set_controls_enabled()
+
+    def advance_transition(self):
+        """Return the known onboard state and boot epoch, or refuse the advance.
+
+        The existing wire command selects state_code + 1. Balius uses the
+        operator's provisional five-state sequence, not the legacy decoder's
+        six-state names. Do not infer states from plot phases or timers.
+        """
+        if not self.c.can_command:
+            raise ValueError(self.c.command_block_reason)
+        sample = self.c.latest
+        if sample is None or sample.source != "LIVE":
+            raise ValueError("Advance State requires a current state from live rocket telemetry")
+        if self.c.rocket_link_state()[0] != "RECEIVING":
+            raise ValueError("Advance State requires fresh, actively received rocket telemetry")
+        if not finite(sample.received) or not 0 <= time.monotonic() - sample.received <= self.c.mission.freshness:
+            raise ValueError("Rocket state is stale; wait for fresh telemetry before advancing")
+        code = sample.details.get("state_code")
+        names = self.base_state_names
+        if type(code) is not int or not 0 <= code < len(names):
+            raise ValueError("Rocket state is unknown; its next state cannot be confirmed")
+        if code == len(names) - 1:
+            raise ValueError(f"{names[code]} is the final rocket state; there is no next state")
+        return code, sample.details.get("boot_index")
+
+    @property
+    def base_state_names(self):
+        return (BALIUS_STATE_NAMES if self.c.vehicle == "balius"
+                else tuple(name.replace("PRE_FLIGHT", "PREFLIGHT") for name in PHASE_ENUM))
+
+    def request_advance_state(self):
+        def confirmed_advance():
+            before = self.advance_transition()
+            code, _ = before
+            names = self.base_state_names
+            answer = QMessageBox.question(
+                self.buttons["advance_state"].window(),
+                "Confirm Advance State",
+                f"Advance the onboard state machine?\n\n"
+                f"From: {names[code]} ({code})\n"
+                f"To: {names[code + 1]} ({code + 1})\n\n"
+                "Send this state-change command to the rocket?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+            # The modal dialog processes new telemetry. Recheck the exact state,
+            # restart epoch, freshness and command gate immediately before send.
+            if self.advance_transition() != before:
+                raise ValueError("Rocket state changed while confirming. Review the current state and try again.")
+            self.c.send_rocket("advance_state", code + 1)
+
+        self.guard(confirmed_advance)
 
     def telemetry_page(self):
         page = QWidget()
@@ -283,6 +359,16 @@ class RocketPanel(QWidget):
         for control in self.controls:
             control.setEnabled(self.c.can_command)
             control.setToolTip(self.c.command_block_reason)
+        if self.base_controls:
+            try:
+                code, _ = self.advance_transition()
+            except ValueError as exc:
+                self.buttons["advance_state"].setEnabled(False)
+                self.buttons["advance_state"].setToolTip(str(exc))
+            else:
+                self.buttons["advance_state"].setToolTip(
+                    f"Confirm {self.base_state_names[code]} → {self.base_state_names[code + 1]} before sending"
+                )
         self.status.setText(
             "Uplink board connected" if self.c.can_command and self.c.board_layout == "base"
             else "Ground station connected" if self.c.can_command
@@ -304,6 +390,8 @@ class RocketPanel(QWidget):
                     set_cell(self.pyros, row, col, "—")
             return
         v = legacy_values(s, self.c.stats["rejected"])
+        if self.base_controls and self.c.vehicle == "balius":
+            v["state"] = balius_state_name(s)
         self.fill(
             self.telemetry,
             [

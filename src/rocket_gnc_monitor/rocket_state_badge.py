@@ -14,6 +14,7 @@ STATE_COLORS = {
     "PREFLIGHT": ("#1d5fd1", "#ffffff"),
     "FLIGHT": ("#c83232", "#ffffff"),
     "POST_APOGEE": ("#ed941e", "#201306"),
+    "APOGEE": ("#ed941e", "#201306"),
     "MAIN": ("#ed941e", "#201306"),
     "END": ("#ed941e", "#201306"),
 }
@@ -87,8 +88,8 @@ class RocketStateBadge(QWidget):
         self.background_color = None
         self.update_state(None)
 
-    def update_state(self, sample, mode="LIVE", fresh=True):
-        self.state_name = telemetry_state_name(sample)
+    def update_state(self, sample, mode="LIVE", fresh=True, *, state_name=None):
+        self.state_name = telemetry_state_name(sample) if state_name is None else state_name
         background, foreground = STATE_COLORS.get(self.state_name, UNKNOWN_COLORS)
         if background != self.background_color:
             self.background_color = background

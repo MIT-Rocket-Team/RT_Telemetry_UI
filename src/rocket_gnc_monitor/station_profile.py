@@ -71,7 +71,7 @@ class StationProfile:
     @property
     def station_label(self):
         if self.station == "base":
-            return "Base station" if self.display_mode == "launch_v2" else "Launch station"
+            return "Base station"
         return f"Away station {self.station[-1]}"
 
     @property

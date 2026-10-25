@@ -44,7 +44,7 @@ class StartupWizard(QWizard):
         self.add_choices(
             "station", "01 / STATION", "Where is this computer?",
             "Choose the launch-site display layout or one of the four away stations.",
-            [("base", "Launch station", "Two displays · One telemetry board · four LTU-XR links"),
+            [("base", "Base station", "One display · no tabs · one telemetry board · four LTU-XR links"),
              ("launch_v2", "Base station · Launch v2", "One display · same launch-site hardware · no local pointer")]
             + [(f"away{i}", f"Away station {i}", "Local Wi-Fi · downlink board and antenna pointer") for i in range(1, 5)],
             "launch_v2" if profile.display_mode == "launch_v2" else profile.station,
@@ -141,8 +141,9 @@ class StartupWizard(QWizard):
                 text += " Away-station feeds: connection pending."
         else:
             if profile.station == "base":
-                displays = "One display" if profile.display_mode == "launch_v2" else "Two displays"
-                text += f"\n{displays} · Ethernet / PoE to four LTU-XR links."
+                text += "\nOne display · Ethernet / PoE to four LTU-XR links."
+                if profile.display_mode == "standard":
+                    text += "\nLive instruments together without tabs."
             else:
                 text += "\nOne display · Wi-Fi, downlink board and antenna control."
             if profile.station == "base":

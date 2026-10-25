@@ -20,7 +20,7 @@ def test_topology_follows_station_role_and_vehicle(station, role, vehicle):
     assert profile.channels == (("digital", "analog", "analog2") if vehicle == "iris" else ("digital", "analog"))
     expected_local = profile.channels if station == "base" else ("digital", "analog2" if vehicle == "iris" and station == "away4" else "analog")
     assert profile.local_channels == (("digital",) if station == "base" and role == "video" else expected_local)
-    assert profile.station_label == ("Launch station" if station == "base" else f"Away station {station[-1]}")
+    assert profile.station_label == ("Base station" if station == "base" else f"Away station {station[-1]}")
     assert profile.vehicle_label == vehicle.title()
     assert set(profile.channel_labels) == set(profile.channels)
     assert profile.channel_labels["analog"] == ("Sustainer Analog" if vehicle == "iris" else "Analog")
@@ -133,7 +133,7 @@ def test_cli_rejects_unknown_station_and_launch_site(flag, value):
 def test_launch_identity_accepts_new_name_and_preserves_existing_saved_profiles(tmp_path):
     profile = StationProfile("launch", "telemetry", "iris", "urrg")
     assert profile.station == "base"
-    assert profile.station_label == "Launch station"
+    assert profile.station_label == "Base station"
     assert profile == StationProfile("base", "telemetry", "iris", "urrg")
     save_startup_choices(profile, tmp_path, True)
     assert load_startup_choices(tmp_path) == (profile, True)
