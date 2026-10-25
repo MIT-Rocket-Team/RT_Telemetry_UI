@@ -76,23 +76,6 @@ class EmbeddedFlightView(Flight3DDialog):
         super().keyPressEvent(event)
 
 
-class AspectRatioSlot(QWidget):
-    """Fit a reserved panel inside its column without stretching its proportions."""
-
-    def __init__(self, panel, width=3, height=4):
-        super().__init__()
-        self.panel = panel
-        self.ratio = width / height
-        panel.setParent(self)
-        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        width = min(self.width(), round(self.height() * self.ratio))
-        height = round(width / self.ratio)
-        self.panel.setGeometry((self.width() - width) // 2, 0, width, height)
-
-
 class StationDisplay(QMainWindow):
     """A closable companion display sharing the primary window's controller."""
 
@@ -475,19 +458,21 @@ class StationWindow(InstrumentWindow):
             diagnostics.addWidget(reading)
         diagnostics.addLayout(panes, 1)
 
-        # Reserve this space for the next status-link design. The shared network
-        # widget remains owned and available in other workspaces.
+        # Remote station metrics have their own display adapter. The legacy
+        # manual peer widget remains available in the other workspaces.
+        from .away_connections_panel import AwayConnectionsPanel
+
         self.network_panel.setParent(self.instrument_storage)
         self.network_panel.hide()
-        self.cards["network"].layout().itemAt(0).widget().setText("Manual status link")
-        self.cards["network"].layout().addStretch()
+        self.cards["network"].layout().itemAt(0).widget().setText("Away Station Connections")
+        self.away_connections = AwayConnectionsPanel()
+        self.attach(self.cards["network"].layout(), self.away_connections, 1)
         self.main_left_column = QWidget()
         left = QVBoxLayout(self.main_left_column)
         left.setContentsMargins(0, 0, 0, 0)
         left.setSpacing(7)
         left.addWidget(self.cards["attitude"], 1)
-        self.manual_status_slot = AspectRatioSlot(self.cards["network"])
-        left.addWidget(self.manual_status_slot, 1)
+        left.addWidget(self.cards["network"], 1)
 
         index = outer.indexOf(self.flight_board)
         outer.removeWidget(self.flight_board)
@@ -515,7 +500,7 @@ class StationWindow(InstrumentWindow):
     def place_main_base_cards(self):
         self.companion.hide()
         self.flight_grid.addWidget(self.main_left_column, 0, 0, 4, 1)
-        for widget in (self.main_left_column, self.cards["attitude"], self.manual_status_slot, self.cards["network"]):
+        for widget in (self.main_left_column, self.cards["attitude"], self.cards["network"]):
             widget.show()
         for args in (
             ("telemetry", 0, 1, 2, 1), ("gps", 2, 1),
@@ -1234,6 +1219,7 @@ class StationWindow(InstrumentWindow):
             self.mission_label.hide()
             self.configure_main_base_actions()
             self.canard_panel.refresh()
+            self.away_connections.refresh()
         self.update_local_video_context()
         if self.profile_locked and self.profile.role == "video":
             for key, action in self.legacy_actions.items():

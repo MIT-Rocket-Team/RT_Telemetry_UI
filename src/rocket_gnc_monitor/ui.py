@@ -57,6 +57,7 @@ from .location_ui import LaunchLocation, PointerLocation
 from .settings_ui import SettingsDialog
 from .virtual_pointer import VIRTUAL_POINTER_DEVICE
 from .table_cells import set_cell
+from .plot_controls import PlotViewControls
 
 
 def label(text, name=None):
@@ -104,6 +105,7 @@ def plot(ylabel, xlabel="Flight time", unit="s"):
         item.getAxis(axis).setTextPen(COLORS["muted"])
         item.getAxis(axis).setPen(COLORS["line"])
         item.getAxis(axis).setTickFont(QFont(FONT_FAMILY, 10))
+    item.view_controls = PlotViewControls(item, ylabel)
     return item
 
 
