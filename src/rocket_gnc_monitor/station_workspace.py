@@ -13,6 +13,7 @@ from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
+    QComboBox,
     QWidget,
     QFrame,
     QLabel,
@@ -787,7 +788,8 @@ class StationWindow(InstrumentWindow):
             controls = QWidget()
             local = QVBoxLayout(controls)
             local.setContentsMargins(0, 0, 0, 0)
-            v = self.video_widgets["digital"]
+            v = self.video_widgets.get("digital") or {"status": QLabel("Mission remote video"), "camera": QComboBox(),
+                    "start": QPushButton(), "stop": QPushButton(), "file": QPushButton()}
             local.addWidget(v["status"])
             local.addLayout(row(
                 v["camera"], button("Find", lambda: self.controller.submit("cameras", camera_devices)),
@@ -1196,6 +1198,8 @@ class StationWindow(InstrumentWindow):
         if self.video_wall is None:
             return
         c = self.controller
+        if "digital" not in c.video_streams:
+            return
         state = c.video_streams["digital"]
         worker = state.worker
         error = state.error or (worker.error if worker else "")

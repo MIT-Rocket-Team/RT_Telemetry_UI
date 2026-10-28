@@ -19,16 +19,16 @@ from PySide6.QtWidgets import QApplication
 
 from .controller import Controller
 from .domain import Sample
+from .mission_video import MissionProfile, MissionVideoPublisher
 from .mission_worker import run
 from .rocket_protocol import rocket_packet
-from .station_profile import StationProfile
 from .station_workspace import StationWindow
 from .tracking_policy import tracking_target
 
 
 class MissionController(Controller):
     def __init__(self, *args, manifest, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, video_registry={s["id"]: s["id"] for s in manifest.get("videoStreams", [])}, **kwargs)
         self.mode = "SIMULATION"
         self.manifest = manifest
         self.station_config = manifest["station"]
@@ -141,6 +141,7 @@ class MissionController(Controller):
 class BoundaryBridge(QObject):
     boundary = Signal(object)
     finished = Signal(str)
+    pause_state = Signal(bool)
 
     def __init__(self, window, manifest):
         super().__init__()
@@ -148,6 +149,13 @@ class BoundaryBridge(QObject):
         self.failure = ""
         self.boundary.connect(self.apply)
         self.finished.connect(self.finish)
+        title = window.windowTitle()
+        def pause_display(paused):
+            window.setWindowTitle(title + (" · PAUSED" if paused else ""))
+            if window.video_wall:
+                window.video_wall.mission_paused = paused
+        self.pause_state.connect(pause_display)
+        self.publisher = MissionVideoPublisher(window, manifest.get("videoStreams", []), window.controller.data_dir) if manifest.get("role") == "video" and window.station_network else None
         self.mapping = (window.controller.data_dir / "mission-clock.jsonl").open("w", encoding="utf-8")
 
     def before(self, batches):
@@ -187,6 +195,11 @@ class BoundaryBridge(QObject):
             self.mapping.write(json.dumps({"missionTimeUs": str(time_us), "hostMonotonic": host, "utc": utc}) + "\n")
             self.mapping.flush()
             for batch, station in zip(batches, result["stations"], strict=True):
+                if self.publisher:
+                    self.publisher.update(time_us, batch.get("videoState", []))
+                    for key, source in self.publisher.sources.items():
+                        if source.state is not None:
+                            self.window.show_frame(key, source.pixels)
                 if batch.get("pointerPose"):
                     pose = batch["pointerPose"]
                     c.pointer_sent = (pose["encoderAzimuthDeg"], pose["encoderElevationDeg"])
@@ -222,6 +235,8 @@ class BoundaryBridge(QObject):
     @Slot(str)
     def finish(self, failure):
         self.failure = failure or self.failure
+        if self.publisher:
+            self.publisher.close()
         self.mapping.close()
         self.window.close()
         QApplication.instance().exit(1 if self.failure else 0)
@@ -236,7 +251,7 @@ def main(path):
         raise ValueError("Mission IPC must use loopback")
     app = QApplication.instance() or QApplication([])
     site = manifest["station"]["id"]
-    profile = StationProfile(station="base" if site == "launch" else "away" + site[-1],
+    profile = MissionProfile(mission_streams=tuple(manifest.get("videoStreams", [])),station="base" if site == "launch" else "away" + site[-1],
                              role="video" if manifest.get("role") == "video" else "telemetry",
                              vehicle=manifest.get("vehicleMode", "balius"), launch_site="urrg")
     network = manifest.get("network")
@@ -256,6 +271,11 @@ def main(path):
         return {"endpoint": network.runtime.local_endpoint, "identity": network.runtime.info()} if network else {}
 
     def control(kind, body):
+        if kind in {"pause", "resume"}:
+            bridge.pause_state.emit(kind == "pause")
+            if bridge.publisher:
+                bridge.publisher.pause(kind == "pause")
+            return {}
         if kind != "network-peers":
             raise ValueError("Unsupported application control")
         for endpoint in body["endpoints"]:

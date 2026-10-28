@@ -48,7 +48,7 @@ class Controller(QObject):
     video_reset = Signal(str)
     task_done = Signal(str, object)
 
-    def __init__(self, data_dir, video_channels=None, video_labels=None, board_layout="legacy", vehicle="balius", initial_mission=None):
+    def __init__(self, data_dir, video_channels=None, video_labels=None, board_layout="legacy", vehicle="balius", initial_mission=None, video_registry=None):
         super().__init__()
         if board_layout not in {"legacy", "base", "launch", "away"}:
             raise ValueError("Unknown board layout; choose legacy, launch or away")
@@ -67,14 +67,15 @@ class Controller(QObject):
         self._serial_labels = MappingProxyType(serial_labels)
         self._selected_away_station = None
         channels = tuple(DEFAULT_VIDEO_CHANNELS if video_channels is None else video_channels)
-        if not channels or any(channel not in VIDEO_STREAMS for channel in channels):
+        registry = VIDEO_STREAMS if video_registry is None else video_registry
+        if (not channels and video_registry is None) or any(channel not in registry for channel in channels):
             raise ValueError("Video channels must be selected from digital, analog and analog2")
         if len(set(channels)) != len(channels):
             raise ValueError("Video channels must be unique")
-        if "digital" not in channels:
+        if video_registry is None and "digital" not in channels:
             raise ValueError("Video channels must include digital")
         labels = {
-            channel: "Analog 1" if channel == "analog" and "analog2" in channels else VIDEO_STREAMS[channel]
+            channel: "Analog 1" if channel == "analog" and "analog2" in channels else registry[channel]
             for channel in channels
         }
         if video_labels is not None:
@@ -297,11 +298,11 @@ class Controller(QObject):
     @property
     def video(self):
         """Legacy access to the first (Digital) stream."""
-        return self.video_streams["digital"].worker
+        return self.video_streams["digital"].worker if "digital" in self.video_streams else None
 
     @property
     def video_config(self):
-        return self.video_streams["digital"].config
+        return self.video_streams["digital"].config if "digital" in self.video_streams else None
 
     @property
     def ground_connected(self):

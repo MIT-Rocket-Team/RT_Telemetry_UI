@@ -25,6 +25,8 @@ class MediaError(Exception):
 
 
 def channel_ids(profile):
+    if hasattr(profile, "channel_identifiers"):
+        return profile.channel_identifiers
     if profile.vehicle == "balius":
         return {"digital": "balius.digital", "analog": "balius.analog"}
     return {"digital": "sustainer.digital", "analog": "sustainer.analog", "analog2": "booster.analog"}
@@ -392,7 +394,7 @@ class MediaService:
                               if len(stamps) > 1 and stamps[-1] > stamps[0] else None)
                 entries.append(dict(stream_id=channel.stream_id, channel_id=channel.channel_id,
                                     station=self.station, vehicle=channel.channel_id.split(".")[0],
-                                    radio_type=channel.channel_id.split(".")[-1], source_mode=channel.source_mode,
+                                    radio_type=getattr(self.profile, "channel_kinds", {}).get(channel.local_key, channel.channel_id.split(".")[-1]), source_mode=channel.source_mode,
                                     capture_state="connected" if connected else "disconnected", rf_lock=None,
                                     source_fps=source_fps, source_resolution=None, decoded_resolution=[WIDTH, HEIGHT],
                                     capture_timing_basis="host_frame_delivery_after_decode",

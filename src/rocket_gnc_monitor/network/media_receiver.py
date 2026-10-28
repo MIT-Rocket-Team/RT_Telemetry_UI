@@ -195,6 +195,7 @@ class VideoWallNetwork(QObject):
         self.runtime, self.wall = runtime, wall
         self.workers, self.descriptions = {}, {}
         self.pending = {}
+        self.on_received = None
         self.mapping = {value: key for key, value in channel_ids(wall.profile).items()}
         wall.external_selection = True
         wall.source_requested.connect(self.request_source)
@@ -229,7 +230,7 @@ class VideoWallNetwork(QObject):
             station = info.get("station", "")
             if (info.get("role") != "video" or station not in {"gs1", "gs2", "gs3", "gs4"}
                     or info.get("mission_id") != self.runtime.mission_id
-                    or info.get("source_mode") != "live"
+                    or info.get("source_mode") != getattr(self.runtime, "source_mode", "live")
                     or str(peer.get("state", "")).lower() not in {"online", "stale"}):
                 continue
             local_station = "away" + station[-1]
@@ -252,7 +253,7 @@ class VideoWallNetwork(QObject):
                     continue
                 channel = self.mapping.get(stream.get("channel_id"))
                 key = (local_station, channel)
-                if key in self.wall.feeds and stream.get("source_mode") == "live":
+                if key in self.wall.feeds and stream.get("source_mode") == getattr(self.runtime, "source_mode", "live"):
                     # Ambiguous publishers never silently replace an existing source.
                     if key in sources:
                         sources[key] = None
@@ -291,6 +292,10 @@ class VideoWallNetwork(QObject):
                     pass
                 if latest:
                     raw, stamp = latest
+                    if self.on_received:
+                        self.on_received(dict(streamId=stream["stream_id"], mediaEpoch=stream["media_epoch"],
+                                              hostMonotonic=stamp, rendition=receiver.rendition,
+                                              receivedFrames=receiver.received_frames))
                     frame = QPixmap.fromImage(QImage(raw, WIDTH, HEIGHT, WIDTH * 3,
                                                     QImage.Format.Format_RGB888).copy())
                     quality = "Main" if receiver is main else "Preview · reduced quality"

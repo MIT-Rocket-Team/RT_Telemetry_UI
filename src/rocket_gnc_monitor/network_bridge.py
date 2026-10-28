@@ -88,7 +88,8 @@ class StationNetworkBridge(QObject):
             settings["network_accept_source_modes"] = ["live", "replay"]
         if self.window.profile.role == "video":
             try:
-                self.media = MediaService(self.window.profile, bind_host=self.config["network_bind_host"])
+                self.media = MediaService(self.window.profile, bind_host=self.config["network_bind_host"],
+                    allowed_source_modes=("simulation",) if self.controller.mode == "SIMULATION" else ("live",))
             except Exception as exc:
                 self.error = f"Network video unavailable: {exc}"
         self.runtime = NetworkRuntime(self.controller.data_dir, self.window.profile,

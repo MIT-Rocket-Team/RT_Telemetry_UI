@@ -830,7 +830,8 @@ class MainWindow(QMainWindow):
             )
             camera.currentIndexChanged.connect(self.update_camera_choices)
         # Keep first-stream widget names available to existing integrations.
-        digital = self.video_widgets["digital"]
+        digital = self.video_widgets.get("digital") or next(iter(self.video_widgets.values()),
+            {"image": QLabel(), "status": QLabel("No video inputs"), "camera": QComboBox()})
         self.video_image, self.video_status, self.camera = (
             digital["image"],
             digital["status"],

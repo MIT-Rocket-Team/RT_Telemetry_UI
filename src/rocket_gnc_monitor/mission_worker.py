@@ -65,6 +65,8 @@ def run(manifest, *, before_advance=None, after_advance=None, configured=None, c
                     elif kind == "action" and control:
                         reply, result = "result", control(body["kind"], body)
                     elif kind in ("pause", "resume"):
+                        if control:
+                            control(kind, body)
                         reply, result = "result", {"paused": kind == "pause"}
                     elif kind == "close":
                         reply, result = "closed", {}
