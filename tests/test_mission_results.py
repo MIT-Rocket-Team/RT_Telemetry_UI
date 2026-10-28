@@ -1,6 +1,10 @@
 import hashlib
 import json
+import sqlite3
 import zipfile
+from contextlib import closing
+
+import pytest
 
 from rocket_gnc_monitor.domain import Sample
 from rocket_gnc_monitor.flight import load_flight
@@ -44,3 +48,24 @@ def test_selected_station_export_opens_in_existing_flight_reader(tmp_path):
         assert 'omissions.json' in saved.namelist()
         manifest = json.loads(saved.read('session/manifest.json'))
         assert manifest['mode'] == 'SIMULATION'
+
+
+@pytest.mark.parametrize('mutation', ["time_us=50", "offset=1", "stream='runs/member-0/other'"])
+def test_hash_valid_but_inconsistent_index_is_rejected(tmp_path, mutation):
+    root = tmp_path / 'stage'
+    folder = root / 'runs/member-0/events'
+    folder.mkdir(parents=True)
+    (root / 'mission.json').write_text('{}')
+    (folder / 'chunk-00000.jsonl').write_text('{"timeUs":"0","kind":"tick"}\n')
+    files = [{'path': p.relative_to(root).as_posix(), 'committedBytes': p.stat().st_size,
+              'sha256': hashlib.sha256(p.read_bytes()).hexdigest()} for p in root.rglob('*') if p.is_file()]
+    (root / 'checkpoint.json').write_text(json.dumps({'files': files}))
+    build_index(root, root / 'index.sqlite')
+    with closing(sqlite3.connect(root / 'index.sqlite')) as db:
+        db.execute('UPDATE records SET ' + mutation)
+        db.commit()
+    archive = tmp_path / 'tampered.rktmission'
+    bundle(root, archive)  # Recompute ZIP inventory: semantic verification must still reject it.
+    stream = 'runs/member-0/other' if mutation.startswith('stream=') else 'runs/member-0/events'
+    with pytest.raises(ValueError, match='Index|index'):
+        query(archive, {'stream': stream})

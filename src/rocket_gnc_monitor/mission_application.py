@@ -32,6 +32,17 @@ class MissionController(Controller):
         self.mode = "SIMULATION"
         self.manifest = manifest
         self.station_config = manifest["station"]
+        self.mission.name = manifest.get('title', 'Mission Simulation')
+        launch = manifest.get('launchSite')
+        if launch:
+            self.mission.latitude = launch['latitudeDeg']
+            self.mission.longitude = launch['longitudeDeg']
+            self.mission.altitude = launch['ellipsoidalHeightM']
+            self.mission.altitude_msl = launch['mslHeightM']
+            self.mission.site_configured = True
+        self.mission.pointer_latitude, self.mission.pointer_longitude, self.mission.pointer_altitude = self.station_config['origin']
+        self.mission.pointer_site_configured = self.station_config.get('pointerEnabled', False)
+        self.mission.freshness = self.station_config.get('freshnessS', 2.0)
         self.mission_time_us = -1_000_000
         self.mission_connected = True
         self.mission_paused = False
@@ -77,6 +88,15 @@ class MissionController(Controller):
 
     def connect(self, *args, **kwargs):
         raise ValueError("Mission stations use software connections configured in OpenRocket")
+
+    def start_video(self, *args, **kwargs):
+        raise ValueError('Mission video sources are configured in OpenRocket')
+
+    def start_virtual_trajectory(self):
+        raise ValueError('The OpenRocket mission owns the simulation clock and vehicle')
+
+    def open_replay(self, path):
+        raise ValueError('Open a separate station window to replay a saved flight')
 
     def disconnect(self, *args, **kwargs):
         self.enqueue("disconnect")

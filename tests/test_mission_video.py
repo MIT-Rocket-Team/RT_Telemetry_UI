@@ -2,6 +2,7 @@ import hashlib
 import time
 import uuid
 
+import pytest
 from PySide6.QtGui import QColor, QImage
 
 from rocket_gnc_monitor.mission_application import MissionController
@@ -15,8 +16,8 @@ def slate(tmp_path, identity='digital-2', kind='digital'):
     image = QImage(960, 540, QImage.Format.Format_RGB888)
     image.fill(QColor(220, 35, 25))
     assert image.save(str(path))
-    return dict(id=identity, kind=kind, ordinal=2, vehicleId='balius', receivers=['gs1'],
-                assetPath=str(path), sha256=hashlib.sha256(path.read_bytes()).hexdigest())
+    return {'id': identity, 'kind': kind, 'ordinal': 2, 'vehicleId': 'balius', 'receivers': ['gs1'],
+                'assetPath': str(path), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
 
 
 def test_zero_and_arbitrary_registry_and_pause_carriers(qtbot, tmp_path):
@@ -25,7 +26,7 @@ def test_zero_and_arbitrary_registry_and_pause_carriers(qtbot, tmp_path):
         qtbot.addWidget(wall)
         assert tuple(wall.primary_views) == tuple(s['id'] for s in streams)
     source = MissionCapture(slate(tmp_path))
-    source.state = dict(timeUs='0', frame='0')
+    source.state = {'timeUs': '0', 'frame': '0'}
     source.time_us = 0
     assert source.publish(time.monotonic())['pauseCarrier'] is False
     assert source.publish(time.monotonic()) is None  # Static pixels do not create logical frames.
@@ -44,14 +45,24 @@ def test_mission_capture_reaches_real_base_wall_over_srt_and_recovers(qtbot, tmp
     try:
         for site, station in [('gs1', 'away1'), ('launch', 'base')]:
             profile = MissionProfile(station=station, role='video', mission_streams=streams)
-            manifest = dict(station=dict(id=site, origin=[42, -77, 250], owner='observer', pointerEnabled=False),
-                            videoStreams=streams, role='video')
+            manifest = {'station': {'id': site, 'origin': [42, -77, 250], 'owner': 'observer', 'pointerEnabled': False},
+                            'videoStreams': streams, 'role': 'video', 'title': 'Configured mission',
+                            'launchSite': {'latitudeDeg': 42.7, 'longitudeDeg': -77.2, 'ellipsoidalHeightM': 217, 'mslHeightM': 250}}
             window = StationWindow(tmp_path / site, profile=profile, auto_place=False,
-                network_config=dict(network_bind_host='127.0.0.1', network_port=0, network_discovery=False,
-                                    network_accept_source_modes=['simulation'], mission_simulation=True,
-                                    mission_id=mission_id, peers=[]),
+                network_config={'network_bind_host': '127.0.0.1', 'network_port': 0, 'network_discovery': False,
+                                    'network_accept_source_modes': ['simulation'], 'mission_simulation': True,
+                                    'mission_id': mission_id, 'peers': []},
                 controller_factory=lambda *a, m=manifest, **kw: MissionController(*a, manifest=m, **kw))
             qtbot.addWidget(window)
+            assert window.controller.mission.name == 'Configured mission'
+            assert window.controller.mission.latitude == 42.7
+            assert window.controller.mission.altitude == 217
+            assert window.controller.mission.altitude_msl == 250
+            for operation in (window.controller.connect, window.controller.start_video, window.controller.start_virtual_trajectory):
+                with pytest.raises(ValueError):
+                    operation()
+            with pytest.raises(ValueError):
+                window.controller.open_replay(tmp_path / 'unrelated.rktflight')
             window.show()
             windows.append(window)
             publishers.append(MissionVideoPublisher(window, streams, tmp_path / site, record=site == 'gs1'))
@@ -65,7 +76,7 @@ def test_mission_capture_reaches_real_base_wall_over_srt_and_recovers(qtbot, tmp
             until = time.monotonic() + duration
             while time.monotonic() < until:
                 frame += 1
-                publishers[0].update(frame * 33333, [dict(streamId='digital-2', timeUs=str(frame * 33333), frame=str(frame))])
+                publishers[0].update(frame * 33333, [{'streamId': 'digital-2', 'timeUs': str(frame * 33333), 'frame': str(frame)}])
                 qtbot.wait(34)
 
         produce(5)

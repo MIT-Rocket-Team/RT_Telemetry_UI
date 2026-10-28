@@ -26,6 +26,7 @@ class MissionLobby(QDialog):
         self.setMinimumWidth(560)
         self.active = None
         self.pending = False
+        self.failure = ""
         self.boot_id = str(uuid.uuid4())
         self.credential = secrets.token_hex(32)
         self.guard = threading.Lock()
@@ -59,7 +60,7 @@ class MissionLobby(QDialog):
                 if not self.authorized() or self.path != '/api/v1/info':
                     return self.respond(403, {'error': 'Private Mission connection required'})
                 self.respond(200, {'protocol': 'rt-mission-attach.v1', 'bootId': lobby.boot_id,
-                                  'source_mode': 'simulation', 'ready': not lobby.pending and lobby.active is None,
+                                  'source_mode': 'simulation', 'connectionError': lobby.failure, 'ready': not lobby.pending and lobby.active is None,
                                   **capabilities()})
 
             def do_POST(self):
@@ -76,6 +77,7 @@ class MissionLobby(QDialog):
                         if lobby.pending or lobby.active is not None:
                             return self.respond(409, {'error': 'This connection is already assigned'})
                         lobby.pending = True
+                        lobby.failure = ""
                     lobby.requested.emit(manifest)
                     self.respond(202, {'accepted': True, 'bootId': lobby.boot_id})
                 except (ValueError, KeyError, TypeError):
@@ -105,7 +107,8 @@ class MissionLobby(QDialog):
             self.active = launch(manifest, on_finished=self.finished_session)
             self.status.setText('Mission Simulation connected. This application owns a separate simulation workspace.')
         except Exception as exc:  # noqa: BLE001 -- report startup errors in the waiting application
-            self.status.setText('Connection failed: ' + str(exc))
+            self.failure = str(exc)
+            self.status.setText('Connection failed: ' + self.failure)
         finally:
             self.pending = False
 

@@ -1,35 +1,35 @@
 import base64
 import json
 import os
-from pathlib import Path
 import socket
 import subprocess
 import sys
-import uuid
 import time
 import urllib.request
+import uuid
+from pathlib import Path
 
 import pytest
+from test_mission_station import delivery
 
 from rocket_gnc_monitor.mission_contracts.wire import encode_frame, read_frame
-from test_mission_station import delivery
 
 
 @pytest.mark.parametrize('attach', [False, True])
 def test_real_workspace_uses_software_receiver_and_closes_native_session(tmp_path, attach):
     identity = {key: str(uuid.uuid4()) for key in (
         'sessionId', 'missionId', 'runId', 'memberId', 'participantId', 'connectionId')}
-    station = dict(id='gs1', origin=[42.70278, -77.17606, 250], pointerEnabled=True,
-                   owner='interactive-ui', policy='legacy-ui.v1')
+    station = {'id': 'gs1', 'origin': [42.70278, -77.17606, 250], 'pointerEnabled': True,
+                   'owner': 'interactive-ui', 'policy': 'legacy-ui.v1'}
     with socket.socket() as server:
         server.bind(('127.0.0.1', 0))
         server.listen(1)
         server.settimeout(20)
         manifest = dict(identity, protocol='rt-mission.v1', host='127.0.0.1', port=server.getsockname()[1], credential='test-secret',
                         station=station, role='telem', dataDirectory=str(tmp_path / 'data'),
-                        network=dict(network_bind_host='127.0.0.1', network_port=0, network_discovery=False,
-                                     peers=[], mission_id=identity['missionId'], mission_simulation=True,
-                                     network_accept_source_modes=['simulation']))
+                        network={'network_bind_host': '127.0.0.1', 'network_port': 0, 'network_discovery': False,
+                                     'peers': [], 'mission_id': identity['missionId'], 'mission_simulation': True,
+                                     'network_accept_source_modes': ['simulation']})
         path = tmp_path / 'private.json'
         path.write_text(json.dumps(manifest))
         log = (tmp_path / 'process.log').open('w+')
@@ -71,15 +71,15 @@ def test_real_workspace_uses_software_receiver_and_closes_native_session(tmp_pat
                 assert ready['identity']['source_mode'] == 'simulation'
                 assert ready['endpoint'].startswith('http://127.0.0.1:')
                 request('action', {'kind': 'network-peers', 'endpoints': []})
-                result = request('advance', {'stations': [dict(id='gs1', deliveries=[delivery()],
-                    actions=[{'kind': 'connect'}, {'kind': 'start-tracking'}])]})
+                result = request('advance', {'stations': [{'id': 'gs1', 'deliveries': [delivery()],
+                    'actions': [{'kind': 'connect'}, {'kind': 'start-tracking'}]}]})
                 assert result['stations'][0]['tracking']
                 assert len(base64.b64decode(result['stations'][0]['writes'][0]['data'])) == 11
-                request('advance', {'stations': [dict(id='gs1', deliveries=[], actions=[])]})
+                request('advance', {'stations': [{'id': 'gs1', 'deliveries': [], 'actions': []}]})
                 request('pause', {})
-                request('action', dict(kind='ownership', siteId='gs1', owner='observer', epoch='1'))
+                request('action', {'kind': 'ownership', 'siteId': 'gs1', 'owner': 'observer', 'epoch': '1'})
                 request('resume', {})
-                result = request('advance', {'stations': [dict(id='gs1', deliveries=[], actions=[{'kind': 'zero'}])]})
+                result = request('advance', {'stations': [{'id': 'gs1', 'deliveries': [], 'actions': [{'kind': 'zero'}]}]})
                 assert not result['stations'][0]['writes'] and not result['stations'][0]['tracking']
                 request('close', {})
             if attach:
@@ -92,8 +92,12 @@ def test_real_workspace_uses_software_receiver_and_closes_native_session(tmp_pat
             assert session['mode'] == 'SIMULATION' and session['complete']
             mappings = (tmp_path / 'data' / 'mission-clock.jsonl').read_text().splitlines()
             assert [json.loads(line)['missionTimeUs'] for line in mappings] == ['0', '0', '0']
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- include child diagnostics on any failed assertion
             log.flush()
+            if attach and ticket.exists():
+                config = json.loads(ticket.read_text())
+                with urllib.request.urlopen(urllib.request.Request(config['endpoint'] + '/api/v1/info', headers={'Authorization': 'Bearer ' + config['credential']})) as response:
+                    print(json.load(response))
             pytest.fail(str(exc) + "\n" + Path(log.name).read_text())
         finally:
             if process.poll() is None:
