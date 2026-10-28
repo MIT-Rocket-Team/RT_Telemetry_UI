@@ -54,7 +54,8 @@ def run(manifest):
                             raise ValueError("Advance batch exceeds bounded queue capacity")
                         time_us = int(message["missionTimeUs"])
                         result = {"acknowledgedSequence": message["sequence"], "stations": [
-                            stations[b["id"]].advance(time_us, b.get("deliveries", []), b.get("actions", []))
+                            stations[b["id"]].advance(time_us, b.get("deliveries", []), b.get("actions", []),
+                                                     evaluate=b.get("evaluate", True))
                             for b in batches]}
                         reply = "advanced"
                     elif kind in ("pause", "resume"):

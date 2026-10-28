@@ -113,7 +113,7 @@ class MissionStation:
             results.append(sample.to_dict())
         return results
 
-    def advance(self, time_us, deliveries=(), actions=()):
+    def advance(self, time_us, deliveries=(), actions=(), *, evaluate=True):
         if time_us < self.last_time_us:
             raise ValueError("Station clock cannot move backwards")
         if len(deliveries) + len(actions) > 256:
@@ -153,7 +153,7 @@ class MissionStation:
                 outcomes.append({"id": action.get("id", kind), "outcome": "applied"})
             except (ValueError, KeyError) as exc:
                 outcomes.append({"id": action.get("id", kind), "outcome": "rejected", "reason": str(exc)})
-        target = self.policy.advance(time_us)
+        target = self.policy.advance(time_us) if evaluate else None
         if target is not None and self.owner != "observer":
             writes.append(self.write(pointer_packet(*target), time_us))
         return {"id": self.id, "samples": samples, "writes": writes, "actions": outcomes,
