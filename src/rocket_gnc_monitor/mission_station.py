@@ -133,6 +133,11 @@ class MissionStation:
                     self.policy.connected = self.policy.polling = False
                     self.policy.hold("Disconnected")
                     self.decoder.buffer.clear()
+                    for key, value in (("last_sequence", None), ("last_tick", None), ("wrap_offset", 0), ("boot", 0)):
+                        if hasattr(self.decoder, key):
+                            setattr(self.decoder, key, value)
+                    self.policy.latest = None
+                    self.policy.height_reference = None
                     self.newest_tx_us = -(2**63)
                     self.epoch += 1
                 elif kind == "start-tracking":

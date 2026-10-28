@@ -97,3 +97,15 @@ def test_worker_import_does_not_load_qt_or_devices():
         "assert not any(n.startswith(('PySide6', 'serial', 'numpy')) for n in sys.modules)")],
         capture_output=True, text=True, check=False)
     assert check.returncode == 0, check.stderr
+
+
+def test_connection_epoch_clears_previous_vehicle_and_partial_frame():
+    s = station()
+    s.advance(0, [delivery()], [{'kind': 'connect'}, {'kind': 'start-tracking'}])
+    s.advance(100_000, [delivery(frame()[:10], tx=100_000)])
+    r = s.advance(100_000, actions=[{'kind': 'disconnect'}, {'kind': 'connect'}, {'kind': 'start-tracking'}])
+    assert not s.decoder.buffer and s.policy.latest is None
+    assert r['connectionEpoch'] == 1 and r['actions'][-1]['outcome'] == 'rejected'
+    r = s.advance(200_000, [delivery(frame(0, 0), tx=200_000)])
+    assert r['samples'][0]['details']['boot_index'] == 0
+    assert not r['tracking']
