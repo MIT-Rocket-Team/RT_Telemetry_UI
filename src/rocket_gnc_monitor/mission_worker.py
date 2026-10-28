@@ -1,15 +1,23 @@
 """Bundled headless station worker. Usage: python -m rocket_gnc_monitor.mission_worker manifest.json."""
+import hashlib
 import hmac
 import json
 import socket
 import sys
+from importlib.resources import files
 from pathlib import Path
 
 from .mission_contracts.wire import encode_frame, read_frame
 from .mission_station import MissionStation
 
 CAPABILITIES = ["legacy-zephyrus.v1", "declarative-codec.v1", "legacy-ui.v1", "geodetic.v1",
-                "mission-clock.v1", "reorder-safe.v1", "pointer-bytes.v1"]
+                "mission-clock.v1", "reorder-safe.v1", "pointer-bytes.v1", "ownership-transfer.v1"]
+
+
+def capabilities():
+    contracts = files('rocket_gnc_monitor.mission_contracts').joinpath('data', 'v1', 'manifest.json').read_bytes()
+    return {'capabilities': CAPABILITIES, 'workerVersion': 1,
+            'contractManifestSha256': hashlib.sha256(contracts).hexdigest()}
 
 
 def run(manifest, *, before_advance=None, after_advance=None, configured=None, control=None):
@@ -22,6 +30,7 @@ def run(manifest, *, before_advance=None, after_advance=None, configured=None, c
         with connection.makefile("rwb", buffering=0) as channel:
             stations, sequence, last_input = {}, 0, -1
             authenticated = False
+            paused = False
             while True:
                 message = read_frame(channel)
                 if message is None:
@@ -41,7 +50,7 @@ def run(manifest, *, before_advance=None, after_advance=None, configured=None, c
                         if not hmac.compare_digest(body.get("credential", ""), manifest["credential"]):
                             raise ValueError("Mission credential mismatch")
                         authenticated = True
-                        reply, result = "capabilities", {"capabilities": CAPABILITIES, "workerVersion": 1}
+                        reply, result = "capabilities", capabilities()
                     elif kind == "configure":
                         if len(body["stations"]) > 5:
                             raise ValueError("At most five stations per member")
@@ -62,14 +71,24 @@ def run(manifest, *, before_advance=None, after_advance=None, configured=None, c
                         if after_advance:
                             after_advance(time_us, batches, result, stations)
                         reply = "advanced"
+                    elif kind == "action" and body.get("kind") == "ownership":
+                        if not paused:
+                            raise ValueError("Ownership changes require a paused participant")
+                        station = stations[body["siteId"]]
+                        station.change_owner(body["owner"], int(body["epoch"]))
+                        if control:
+                            control("ownership", body)
+                        reply, result = "result", {"epoch": body["epoch"], "owner": station.owner,
+                                                    "tracking": False, "connectionEpoch": station.epoch}
                     elif kind == "action" and control:
                         reply, result = "result", control(body["kind"], body)
                     elif kind in ("pause", "resume"):
+                        paused = kind == "pause"
                         if control:
                             control(kind, body)
                         reply, result = "result", {"paused": kind == "pause"}
                     elif kind == "close":
-                        reply, result = "closed", {}
+                        reply, result = "closed", control('close', {}) if control else {}
                     else:
                         raise ValueError("Unsupported worker message")
                 except (ValueError, KeyError, TypeError) as exc:

@@ -165,6 +165,17 @@ class StationWindow(InstrumentWindow):
             self.station_network.changed.connect(self.refresh_network_status)
         self.refresh_network_status()
 
+        if self.controller.mode != 'SIMULATION':
+            mission_menu = self.menuBar().addMenu('Mission Simulation')
+            mission_menu.addAction('Prepare OpenRocket connection…', self.prepare_mission_connection)
+
+    def prepare_mission_connection(self):
+        from .mission_attach import MissionLobby
+        if not getattr(self, 'mission_lobby', None) or not self.mission_lobby.isVisible():
+            self.mission_lobby = MissionLobby(self)
+        self.mission_lobby.show()
+        self.mission_lobby.raise_()
+
     def open_station_network(self):
         if self.station_network is None:
             from .network_bridge import StationNetworkBridge, network_configuration

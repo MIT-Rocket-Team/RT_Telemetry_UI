@@ -6,6 +6,8 @@ import socket
 import subprocess
 import sys
 import uuid
+import time
+import urllib.request
 
 import pytest
 
@@ -13,7 +15,8 @@ from rocket_gnc_monitor.mission_contracts.wire import encode_frame, read_frame
 from test_mission_station import delivery
 
 
-def test_real_workspace_uses_software_receiver_and_closes_native_session(tmp_path):
+@pytest.mark.parametrize('attach', [False, True])
+def test_real_workspace_uses_software_receiver_and_closes_native_session(tmp_path, attach):
     identity = {key: str(uuid.uuid4()) for key in (
         'sessionId', 'missionId', 'runId', 'memberId', 'participantId', 'connectionId')}
     station = dict(id='gs1', origin=[42.70278, -77.17606, 250], pointerEnabled=True,
@@ -22,7 +25,7 @@ def test_real_workspace_uses_software_receiver_and_closes_native_session(tmp_pat
         server.bind(('127.0.0.1', 0))
         server.listen(1)
         server.settimeout(20)
-        manifest = dict(identity, host='127.0.0.1', port=server.getsockname()[1], credential='test-secret',
+        manifest = dict(identity, protocol='rt-mission.v1', host='127.0.0.1', port=server.getsockname()[1], credential='test-secret',
                         station=station, role='telem', dataDirectory=str(tmp_path / 'data'),
                         network=dict(network_bind_host='127.0.0.1', network_port=0, network_discovery=False,
                                      peers=[], mission_id=identity['missionId'], mission_simulation=True,
@@ -30,9 +33,24 @@ def test_real_workspace_uses_software_receiver_and_closes_native_session(tmp_pat
         path = tmp_path / 'private.json'
         path.write_text(json.dumps(manifest))
         log = (tmp_path / 'process.log').open('w+')
-        process = subprocess.Popen([sys.executable, '-m', 'rocket_gnc_monitor', '--mission-manifest', str(path)],
+        ticket = tmp_path / 'attachment.json'
+        process = subprocess.Popen([sys.executable, '-m', 'rocket_gnc_monitor',
+                                    '--mission-listen' if attach else '--mission-manifest', str(ticket if attach else path)],
                                    env={**os.environ, 'QT_QPA_PLATFORM': 'offscreen'}, stdout=log, stderr=log)
         try:
+            if attach:
+                deadline = time.monotonic() + 15
+                while not ticket.exists() and time.monotonic() < deadline:
+                    time.sleep(.05)
+                config = json.loads(ticket.read_text())
+                headers = {'Authorization': 'Bearer ' + config['credential']}
+                with urllib.request.urlopen(urllib.request.Request(config['endpoint'] + '/api/v1/info', headers=headers)) as response:
+                    info = json.load(response)
+                    assert info['ready'] and info['source_mode'] == 'simulation'
+                request_attach = urllib.request.Request(config['endpoint'] + '/mission-api/v1/attach',
+                    data=json.dumps(manifest).encode(), headers={**headers, 'Content-Type': 'application/json'})
+                with urllib.request.urlopen(request_attach) as response:
+                    assert response.status == 202
             connection, _ = server.accept()
             connection.settimeout(15)
             with connection, connection.makefile('rwb', buffering=0) as channel:
@@ -58,14 +76,22 @@ def test_real_workspace_uses_software_receiver_and_closes_native_session(tmp_pat
                 assert result['stations'][0]['tracking']
                 assert len(base64.b64decode(result['stations'][0]['writes'][0]['data'])) == 11
                 request('advance', {'stations': [dict(id='gs1', deliveries=[], actions=[])]})
+                request('pause', {})
+                request('action', dict(kind='ownership', siteId='gs1', owner='observer', epoch='1'))
+                request('resume', {})
+                result = request('advance', {'stations': [dict(id='gs1', deliveries=[], actions=[{'kind': 'zero'}])]})
+                assert not result['stations'][0]['writes'] and not result['stations'][0]['tracking']
                 request('close', {})
-            assert process.wait(timeout=15) == 0
+            if attach:
+                assert process.poll() is None  # Closing a participant does not kill the existing application.
+            else:
+                assert process.wait(timeout=15) == 0
             sessions = list((tmp_path / 'data' / 'sessions').glob('*/manifest.json'))
             assert len(sessions) == 1
             session = json.loads(sessions[0].read_text())
             assert session['mode'] == 'SIMULATION' and session['complete']
             mappings = (tmp_path / 'data' / 'mission-clock.jsonl').read_text().splitlines()
-            assert [json.loads(line)['missionTimeUs'] for line in mappings] == ['0', '0']
+            assert [json.loads(line)['missionTimeUs'] for line in mappings] == ['0', '0', '0']
         except Exception as exc:
             log.flush()
             pytest.fail(str(exc) + "\n" + Path(log.name).read_text())

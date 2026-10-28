@@ -115,6 +115,8 @@ def argument_parser():
         help="Test the private engine using a model and synthetic launch coordinates",
     )
     parser.add_argument("--mission-manifest", type=Path, help="Private OpenRocket Mission connection manifest")
+    parser.add_argument("--mission-listen", type=Path, help="Wait for OpenRocket and write a private connection file")
+    parser.add_argument("--mission-capabilities", action='store_true', help="Report supported Mission contracts without opening endpoints")
     return parser
 
 
@@ -164,6 +166,13 @@ def verification_session(directory, mission, channels):
 
 def main():
     args = argument_parser().parse_args()
+    if args.mission_capabilities:
+        from .mission_worker import capabilities
+        print(json.dumps(capabilities()))
+        return 0
+    if args.mission_listen:
+        from .mission_attach import main as mission_listen
+        return mission_listen(args.mission_listen)
     if args.mission_manifest:
         from .mission_application import main as mission_main
         return mission_main(args.mission_manifest)

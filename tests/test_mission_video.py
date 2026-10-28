@@ -54,7 +54,7 @@ def test_mission_capture_reaches_real_base_wall_over_srt_and_recovers(qtbot, tmp
             qtbot.addWidget(window)
             window.show()
             windows.append(window)
-            publishers.append(MissionVideoPublisher(window, streams, tmp_path / site))
+            publishers.append(MissionVideoPublisher(window, streams, tmp_path / site, record=site == 'gs1'))
         away, base = windows
         qtbot.waitUntil(lambda: bool(away.station_network.runtime.local_endpoint), timeout=5000)
         base.station_network.runtime.add_endpoint(away.station_network.runtime.local_endpoint)
@@ -87,3 +87,6 @@ def test_mission_capture_reaches_real_base_wall_over_srt_and_recovers(qtbot, tmp
             publisher.close()
         for window in windows:
             window.close()
+    segments = list((tmp_path / 'gs1' / 'sessions').glob('*/video_digital-2/segment_*.mkv'))
+    assert segments and all(p.stat().st_size > 1000 for p in segments)
+    assert segments[0].with_name('segments.csv').stat().st_size > 0

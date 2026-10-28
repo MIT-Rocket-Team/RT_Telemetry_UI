@@ -109,3 +109,21 @@ def test_connection_epoch_clears_previous_vehicle_and_partial_frame():
     r = s.advance(200_000, [delivery(frame(0, 0), tx=200_000)])
     assert r['samples'][0]['details']['boot_index'] == 0
     assert not r['tracking']
+
+
+def test_ownership_transfer_revokes_tracking_and_requires_fresh_explicit_restart():
+    s = station(owner='interactive-ui')
+    s.advance(0, [delivery()], [{'kind': 'connect'}, {'kind': 'start-tracking'}])
+    s.change_owner('observer', 1)
+    r = s.advance(200_000, [delivery(frame(1, 1200), tx=200_000)], [{'kind': 'start-tracking'}])
+    assert not r['tracking'] and not r['writes']
+    assert r['actions'][0]['outcome'] == 'rejected'
+    s.change_owner('headless-policy', 2)
+    r = s.advance(400_000, [delivery(frame(2, 1400), tx=400_000)])
+    assert not r['tracking'] and not r['writes'] and r['ownershipEpoch'] == 2
+    r = s.advance(600_000, actions=[{'kind': 'start-tracking'}])
+    assert r['tracking'] and len(r['writes']) == 1
+    with pytest.raises(ValueError, match='epoch'):
+        s.change_owner('interactive-ui', 1)
+    r = s.advance(800_000, actions=[{'kind': 'zero', 'expiresUs': '700000'}])
+    assert r['actions'][0]['outcome'] == 'rejected'

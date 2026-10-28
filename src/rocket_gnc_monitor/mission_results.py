@@ -15,6 +15,7 @@ import struct
 import sys
 import tempfile
 import zipfile
+from contextlib import closing
 from pathlib import Path, PurePosixPath
 
 MAX_FILES = 100_000
@@ -59,7 +60,7 @@ def build_index(root, destination):
     temporary = destination.with_suffix('.working.sqlite')
     if temporary.exists() or destination.exists():
         raise ValueError('Index destination already exists')
-    with sqlite3.connect(temporary) as db:
+    with closing(sqlite3.connect(temporary)) as db:
         db.executescript('''PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA trusted_schema=OFF;
             CREATE TABLE files(path TEXT PRIMARY KEY, length INTEGER, sha256 TEXT);
             CREATE TABLE records(stream TEXT, time_us INTEGER, path TEXT, offset INTEGER, length INTEGER);
@@ -108,7 +109,7 @@ def build_index(root, destination):
         db.execute('INSERT INTO streams SELECT stream,MIN(time_us),MAX(time_us),COUNT(*) FROM records GROUP BY stream')
         db.commit()
         # SQLite backup, rather than copying a live main database while WAL pages exist.
-        with sqlite3.connect(destination) as output:
+        with closing(sqlite3.connect(destination)) as output:
             db.backup(output)
             output.execute('PRAGMA journal_mode=DELETE')
     temporary.unlink()
@@ -188,7 +189,7 @@ def query(path, request):
         with tempfile.TemporaryDirectory(prefix='mission-query-') as directory:
             index = Path(directory) / 'index.sqlite'
             index.write_bytes(archive.read('index.sqlite', 512 * 1024**2))
-            with sqlite3.connect(index.as_uri() + '?mode=ro&immutable=1', uri=True) as db:
+            with closing(sqlite3.connect(index.as_uri() + '?mode=ro&immutable=1', uri=True)) as db:
                 db.execute('PRAGMA trusted_schema=OFF')
                 db.set_progress_handler(lambda: 1, 5_000_000)
                 if db.execute('PRAGMA user_version').fetchone()[0] != 1:
@@ -204,21 +205,33 @@ def query(path, request):
                             'sessions': [name.removesuffix('/manifest.json') for name in archive.files
                                          if name.startswith('runs/' + prefix + '/stations/') and '/sessions/' in name and name.endswith('/manifest.json')]}
                 stream = safe_name(request['stream'])
+                if not stream.startswith('runs/' + prefix + '/'):
+                    raise ValueError('Result channel belongs to another member')
                 start, end, limit = int(request.get('startUs', '-1000000')), int(request.get('endUs', '86400000000')), int(request.get('limit', 250))
                 if not -2**63 <= start <= end < 2**63 or not 1 <= limit <= 500:
                     raise ValueError('Invalid result window')
                 records, cache, used = [], {}, 0
                 for time_us, name, offset, length in db.execute('SELECT time_us,path,offset,length FROM records WHERE stream=? AND time_us BETWEEN ? AND ? ORDER BY time_us,path,offset LIMIT ?', (stream, start, end, limit)):
+                    if not re.search(r'/(?:chunk|index)-[0-9]+\.(?:jsonl|csv)$', name):
+                        raise ValueError('Index references a noncanonical record file')
+                    expected_stream = str(PurePosixPath(name).parent) + ('/raw-index' if PurePosixPath(name).name.startswith('index-') else '')
+                    if expected_stream != stream:
+                        raise ValueError('Index channel does not match the referenced file')
                     if name not in cache:
                         cache = {name: archive.read(name)}  # At most one canonical chunk resident.
                     raw = cache[name]
                     if offset < 0 or length < 1 or offset + length > len(raw):
                         raise ValueError('Result index points outside a chunk')
                     line = raw[offset:offset + length]
+                    if (offset and raw[offset - 1:offset] != b'\n') or not line.endswith(b'\n') or b'\n' in line[:-1]:
+                        raise ValueError('Index does not reference one complete record')
                     used += len(line)
                     if used > 512 * 1024:
                         break
                     value = json.loads(line) if name.endswith('.jsonl') else {'timeUs': str(time_us), 'columns': line.decode().rstrip().split(',')}
+                    actual_time = int(value['timeUs']) if name.endswith('.jsonl') else int(value['columns'][0])
+                    if actual_time != time_us:
+                        raise ValueError('Index time does not match the canonical record')
                     records.append(value)
                 return {'stream': stream, 'records': records, 'count': len(records), 'limit': limit}
     finally:
@@ -267,9 +280,9 @@ def export_flight(path, destination, request):
                 session_manifest = read_json(session / 'manifest.json')
                 configuration = session_manifest['mission']
                 # Preserve actual host/UTC clocks and snapshot SQLite through its backup API.
-                with sqlite3.connect((session / 'session.sqlite').as_uri() + '?mode=ro', uri=True) as source:
+                with closing(sqlite3.connect((session / 'session.sqlite').as_uri() + '?mode=ro', uri=True)) as source:
                     source.execute('PRAGMA trusted_schema=OFF')
-                    with sqlite3.connect(session / 'backup.sqlite') as output:
+                    with closing(sqlite3.connect(session / 'backup.sqlite')) as output:
                         source.backup(output)
                         output.execute('PRAGMA journal_mode=DELETE')
                 os.replace(session / 'backup.sqlite', session / 'session.sqlite')
@@ -281,7 +294,7 @@ def export_flight(path, destination, request):
                 configuration.update(latitude=launch['latitudeDeg'], longitude=launch['longitudeDeg'],
                                      altitude=launch.get('ellipsoidalHeightM', 0),
                                      altitude_msl=launch.get('heightM', 0), site_configured=True)
-                with sqlite3.connect(session / 'session.sqlite') as db, (session / 'raw.bin').open('wb') as raw:
+                with closing(sqlite3.connect(session / 'session.sqlite')) as db, (session / 'raw.bin').open('wb') as raw:
                     db.executescript('''CREATE TABLE samples(id INTEGER PRIMARY KEY,elapsed REAL,t REAL,data TEXT);
                         CREATE INDEX sample_time ON samples(elapsed);
                         CREATE TABLE events(id INTEGER PRIMARY KEY,elapsed REAL,data TEXT);
@@ -322,7 +335,7 @@ def export_flight(path, destination, request):
             session_manifest['mission'] = configuration
             (payload / 'mission.json').write_text(json.dumps(dict(configuration, schema_version=1)) + '\n', encoding='utf-8')
             (session / 'manifest.json').write_text(json.dumps(session_manifest) + '\n', encoding='utf-8')
-            with sqlite3.connect(session / 'session.sqlite') as db:
+            with closing(sqlite3.connect(session / 'session.sqlite')) as db:
                 count, duration = db.execute('SELECT COUNT(*),COALESCE(MAX(elapsed),0) FROM samples').fetchone()
             omissions = {'source': 'openrocket.mission-result', 'member': member, 'station': station,
                              'nativeSession': native or None, 'omitted': ['Other members and stations', 'Truth branches and physical pointer pose',

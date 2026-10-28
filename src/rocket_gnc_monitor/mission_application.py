@@ -34,6 +34,7 @@ class MissionController(Controller):
         self.station_config = manifest["station"]
         self.mission_time_us = -1_000_000
         self.mission_connected = True
+        self.mission_paused = False
         self.operator_actions = queue.Queue(maxsize=256)
         self.polling = True
         self.pointer_status = "SIMULATION · awaiting mission boundary"
@@ -85,10 +86,13 @@ class MissionController(Controller):
         self.polling = bool(enabled)
 
     def enqueue(self, kind, **values):
+        if self.mission_paused:
+            raise ValueError("Resume the mission before issuing a fresh command")
         if self.station_config.get("owner") != "interactive-ui":
             raise ValueError("Observers cannot issue mission commands")
         action = dict(id="ui-" + str(uuid.uuid4()), kind=kind,
-                      siteId=self.station_config["id"], **values)
+                      siteId=self.station_config["id"], createdUs=str(self.mission_time_us),
+                      expiresUs=str(self.mission_time_us + 500_000), hostArrivalNanos=str(time.monotonic_ns()), **values)
         try:
             self.operator_actions.put_nowait(action)
         except queue.Full:
@@ -142,11 +146,15 @@ class BoundaryBridge(QObject):
     boundary = Signal(object)
     finished = Signal(str)
     pause_state = Signal(bool)
+    ownership = Signal(object)
+    close_requested = Signal(object)
 
     def __init__(self, window, manifest):
         super().__init__()
         self.window, self.manifest = window, manifest
         self.failure = ""
+        self.closed = False
+        self.on_finished = None
         self.boundary.connect(self.apply)
         self.finished.connect(self.finish)
         title = window.windowTitle()
@@ -155,8 +163,27 @@ class BoundaryBridge(QObject):
             if window.video_wall:
                 window.video_wall.mission_paused = paused
         self.pause_state.connect(pause_display)
-        self.publisher = MissionVideoPublisher(window, manifest.get("videoStreams", []), window.controller.data_dir) if manifest.get("role") == "video" and window.station_network else None
+        self.ownership.connect(self.change_owner)
+        self.close_requested.connect(self.close_session)
+        self.publisher = MissionVideoPublisher(window, manifest.get("videoStreams", []), window.controller.data_dir,
+                                              record=manifest.get("recordEncodedVideo", False)) if manifest.get("role") == "video" and window.station_network else None
         self.mapping = (window.controller.data_dir / "mission-clock.jsonl").open("w", encoding="utf-8")
+
+    @Slot(object)
+    def change_owner(self, value):
+        body, done = value
+        try:
+            c = self.window.controller
+            c.station_config['owner'] = body['owner']
+            c.tracking = False
+            c.latest = None
+            c.pointer_status = 'SIMULATION · ownership changed; restart tracking after resume'
+            while not c.operator_actions.empty():
+                c.operator_actions.get_nowait()
+            c.log('Mission ownership changed', body)
+            c.changed.emit()
+        finally:
+            done.set()
 
     def before(self, batches):
         controller = self.window.controller
@@ -235,21 +262,33 @@ class BoundaryBridge(QObject):
     @Slot(str)
     def finish(self, failure):
         self.failure = failure or self.failure
+        self.close_session()
+        if self.on_finished:
+            self.on_finished(self.failure)
+        else:
+            QApplication.instance().exit(1 if self.failure else 0)
+
+    @Slot(object)
+    def close_session(self, done=None):
+        if self.closed:
+            if done:
+                done.set()
+            return
+        self.closed = True
         if self.publisher:
-            self.publisher.close()
+            try:
+                self.publisher.close()
+            except ValueError as exc:
+                self.failure = str(exc)
         self.mapping.close()
         self.window.close()
-        QApplication.instance().exit(1 if self.failure else 0)
+        if done:
+            done.set()
 
 
-def main(path):
-    path = Path(path)
-    if path.stat().st_size > 1_048_576:
-        raise ValueError("Mission manifest exceeds 1 MiB")
-    manifest = json.loads(path.read_text(encoding="utf-8"))
+def launch(manifest, *, on_finished=None):
     if manifest["host"] != "127.0.0.1":
         raise ValueError("Mission IPC must use loopback")
-    app = QApplication.instance() or QApplication([])
     site = manifest["station"]["id"]
     profile = MissionProfile(mission_streams=tuple(manifest.get("videoStreams", [])),station="base" if site == "launch" else "away" + site[-1],
                              role="video" if manifest.get("role") == "video" else "telemetry",
@@ -260,6 +299,7 @@ def main(path):
                            controller_factory=lambda *a, **kw: MissionController(*a, manifest=manifest, **kw))
     window.setWindowTitle("MISSION SIMULATION · " + profile.window_title)
     bridge = BoundaryBridge(window, manifest)
+    bridge.on_finished = on_finished
 
     def configured(stations):
         network = window.station_network
@@ -271,10 +311,26 @@ def main(path):
         return {"endpoint": network.runtime.local_endpoint, "identity": network.runtime.info()} if network else {}
 
     def control(kind, body):
+        if kind == 'close':
+            done = threading.Event()
+            bridge.close_requested.emit(done)
+            if not done.wait(8):
+                raise ValueError('Station did not close its recording')
+            return {'sessionClosed': True, 'failure': bridge.failure}
         if kind in {"pause", "resume"}:
+            window.controller.mission_paused = kind == "pause"
+            if kind == 'pause':
+                while not window.controller.operator_actions.empty():
+                    window.controller.operator_actions.get_nowait()
             bridge.pause_state.emit(kind == "pause")
             if bridge.publisher:
                 bridge.publisher.pause(kind == "pause")
+            return {}
+        if kind == 'ownership':
+            done = threading.Event()
+            bridge.ownership.emit((body, done))
+            if not done.wait(8):
+                raise ValueError('Station did not acknowledge ownership transfer')
             return {}
         if kind != "network-peers":
             raise ValueError("Unsupported application control")
@@ -294,5 +350,16 @@ def main(path):
     thread = threading.Thread(target=serve, name="mission-connection", daemon=True)
     thread.start()
     window.show()
+    return bridge
+
+
+def main(path):
+    path = Path(path)
+    if path.stat().st_size > 1_048_576:
+        raise ValueError("Mission manifest exceeds 1 MiB")
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    app = QApplication.instance() or QApplication([])
+    app.setQuitOnLastWindowClosed(False)
+    bridge = launch(manifest)
     code = app.exec()
-    return code
+    return 1 if bridge.failure else code

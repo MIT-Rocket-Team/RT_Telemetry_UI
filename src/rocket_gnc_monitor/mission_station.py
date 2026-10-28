@@ -67,6 +67,19 @@ class MissionStation:
         self.newest_tx_us = -(2**63)
         self.last_time_us = -1_000_000
         self.epoch = 0
+        self.ownership_epoch = 0
+
+    def change_owner(self, owner, epoch):
+        if owner not in {'headless-policy', 'interactive-ui', 'observer'} or epoch <= self.ownership_epoch:
+            raise ValueError('Invalid owner or non-increasing ownership epoch')
+        self.owner = owner
+        self.ownership_epoch = epoch
+        self.policy.hold('Ownership changed; explicitly restart tracking')
+        self.policy.latest = None
+        self.decoder.buffer.clear()
+        self.policy.height_reference = None
+        self.newest_tx_us = -(2**63)
+        self.epoch += 1
 
     def receive(self, delivery, time_us):
         raw = base64.b64decode(delivery["data"], validate=True)
@@ -126,6 +139,8 @@ class MissionStation:
         for action in actions:
             kind = action["kind"]
             try:
+                if time_us > int(action.get('expiresUs', time_us)):
+                    raise ValueError('Operator command expired before admission')
                 if kind == "connect":
                     self.policy.connected = self.pointer_enabled
                     self.policy.polling = True
@@ -155,16 +170,17 @@ class MissionStation:
                     writes.append(self.write(packet, time_us))
                 else:
                     raise ValueError("Unsupported station action")
-                outcomes.append({"id": action.get("id", kind), "outcome": "applied"})
+                outcomes.append({**action, "id": action.get("id", kind), "outcome": "applied"})
             except (ValueError, KeyError) as exc:
-                outcomes.append({"id": action.get("id", kind), "outcome": "rejected", "reason": str(exc)})
+                outcomes.append({**action, "id": action.get("id", kind), "outcome": "rejected", "reason": str(exc)})
         target = self.policy.advance(time_us) if evaluate else None
         if target is not None and self.owner != "observer":
             writes.append(self.write(pointer_packet(*target), time_us))
         return {"id": self.id, "samples": samples, "writes": writes, "actions": outcomes,
                 "tracking": self.policy.tracking, "reason": self.policy.reason,
                 "rejected": self.decoder.rejected - before_rejected,
-                "acceptedTotal": self.decoder.accepted, "connectionEpoch": self.epoch}
+                "acceptedTotal": self.decoder.accepted, "connectionEpoch": self.epoch,
+                "ownershipEpoch": self.ownership_epoch}
 
     def write(self, packet, time_us):
         return {"siteId": self.id, "role": "pointer", "data": base64.b64encode(packet).decode("ascii"),
