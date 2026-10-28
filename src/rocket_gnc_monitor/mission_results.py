@@ -115,7 +115,7 @@ def build_index(root, destination):
     temporary.unlink()
     for suffix in ('-wal', '-shm'):
         temporary.with_name(temporary.name + suffix).unlink(missing_ok=True)
-    with destination.open('rb') as handle:
+    with destination.open('r+b') as handle:
         os.fsync(handle.fileno())
     return {'indexedFiles': len(files), 'index': str(destination)}
 
@@ -354,7 +354,7 @@ def export_flight(path, destination, request):
                 for file in sorted(payload.rglob('*')):
                     if file.is_file():
                         output.write(file, file.relative_to(payload).as_posix())
-            with temporary.open('rb') as handle:
+            with temporary.open('r+b') as handle:
                 os.fsync(handle.fileno())
             os.replace(temporary, destination)
             return {'saved': destination.name, 'samples': count, 'duration': duration, 'omissions': omissions}

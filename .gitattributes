@@ -1,2 +1,4 @@
+# Motor manifests verify the original input bytes, including line endings.
+resources/motors/*.eng -text
 src/rocket_gnc_monitor/mission_contracts/data/** -text
 *.py text eol=lf
