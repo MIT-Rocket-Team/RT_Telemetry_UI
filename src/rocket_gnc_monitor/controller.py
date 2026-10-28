@@ -12,9 +12,10 @@ import time
 from types import MappingProxyType
 import uuid
 from PySide6.QtCore import QObject, QTimer, Signal
-from .domain import Mission, pointing, target_position, to_enu, finite
+from .domain import Mission, target_position, to_enu, finite
 from .devices import SerialWorker, serial_device_key
 from .protocol import pointer_packet
+from .tracking_policy import tracking_target
 from .recording import SessionReader, SessionRecorder
 from .trajectory import Trajectory, SimulationJob
 from .media import DEFAULT_VIDEO_CHANNELS, VIDEO_STREAMS, VideoWorker
@@ -712,20 +713,11 @@ class Controller(QObject):
         self.log("Tracking started")
 
     def tracking_target(self):
-        if not self.latest or time.monotonic() - self.latest.received > self.mission.freshness:
-            raise ValueError("Rocket position is stale")
-        if self.latest.source != "LIVE":
-            raise ValueError("Tracking needs a live source")
-        if self.frozen_ground is None:
-            raise ValueError("Set the ground station GPS with Send to AntPtr first")
-        if not self.latest.gps_fix or not all(
-            finite(v) for v in (self.latest.latitude, self.latest.longitude, self.latest.altitude)
-        ):
-            raise ValueError("Rocket GPS position is not available")
-        # Preserve pointer.py: receiver lat/lon frozen at 5 decimals; pointer altitude 0;
-        # rocket barometric altitude is the target height used by the original UI.
-        origin = (self.frozen_ground["gnd_lat"], self.frozen_ground["gnd_lon"], 0.0)
-        return pointing((self.latest.latitude, self.latest.longitude, self.latest.altitude), origin)
+        origin = None if self.frozen_ground is None else (
+            self.frozen_ground["gnd_lat"], self.frozen_ground["gnd_lon"], 0.0
+        )
+        return tracking_target(self.latest, now=time.monotonic(), freshness=self.mission.freshness,
+                               origin=origin)
 
     def start_recording(self, parent):
         # A dedicated video computer can record its USB receivers without a telemetry PCB.
