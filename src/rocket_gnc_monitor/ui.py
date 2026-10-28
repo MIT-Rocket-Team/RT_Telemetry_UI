@@ -276,7 +276,7 @@ class MissionDialog(QDialog):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, data_dir, video_channels=None, video_labels=None, board_layout="legacy", vehicle="balius", initial_mission=None):
+    def __init__(self, data_dir, video_channels=None, video_labels=None, board_layout="legacy", vehicle="balius", initial_mission=None, controller_factory=Controller):
         super().__init__()
         self._window_shutdown = False
         configure_fonts(QApplication.instance())
@@ -288,7 +288,7 @@ class MainWindow(QMainWindow):
         self.resize(1480, 980)
         self.setMinimumSize(1120, 800)
         self.setStyleSheet(STYLE)
-        self.controller = c = Controller(data_dir, video_channels=video_channels, video_labels=video_labels,
+        self.controller = c = controller_factory(data_dir, video_channels=video_channels, video_labels=video_labels,
                                          board_layout=board_layout, vehicle=vehicle, initial_mission=initial_mission)
         self.settings_dialog = None
         self.flight_3d_dialog = None
@@ -324,7 +324,8 @@ class MainWindow(QMainWindow):
         self.mission_label = label(c.mission.name, "section")
         header.addWidget(self.mission_label)
         self.mode = QComboBox()
-        self.mode.addItems(["LIVE", "REPLAY"])
+        self.mode.addItems(["SIMULATION"] if c.mode == "SIMULATION" else ["LIVE", "REPLAY"])
+        self.mode.setEnabled(c.mode != "SIMULATION")
         self.mode.setAccessibleName("Data source mode")
         self.mode.currentTextChanged.connect(lambda value: self.guard(lambda: c.switch_mode(value)))
         header.addWidget(self.mode)

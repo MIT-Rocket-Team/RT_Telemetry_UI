@@ -72,7 +72,8 @@ def observation_from_sample(
         warnings.append(f"Original bytes unavailable: {raw_unavailable_reason}")
     else:
         raw = bytes(raw)
-        if len(raw) != 144 or raw[:2] != b"\xab\xab" or sum(raw[2:129]) % 256 != raw[129]:
+        if not (sample.source == "SIMULATION" and sample.details.get("codec")) and (
+                len(raw) != 144 or raw[:2] != b"\xab\xab" or sum(raw[2:129]) % 256 != raw[129]):
             raise ValueError("Expected an accepted complete telemetry serial frame")
         raw_b64 = base64.b64encode(raw).decode("ascii")
         raw_sha256 = hashlib.sha256(raw).hexdigest()
@@ -116,7 +117,7 @@ def observation_from_sample(
             "target_epoch": None,
         },
         "packet": {
-            "protocol": "rocket-telemetry",
+            "protocol": sample.details.get("codec", "rocket-telemetry"),
             "protocol_version": "1",
             "decoder_version": "rocket-telemetry/1",
             "type": "telemetry",

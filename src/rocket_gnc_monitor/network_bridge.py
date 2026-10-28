@@ -34,7 +34,7 @@ def validate_configuration(config):
     mission = result.get("mission_id")
     result["mission_id"] = str(uuid.UUID(mission.strip())) if mission else None
     port = result.get("network_port", 8766)
-    if type(port) is not int or not 1 <= port <= 65535:
+    if type(port) is not int or not (0 if result.get("mission_simulation") else 1) <= port <= 65535:
         raise ValueError("Network port must be between 1 and 65535")
     host = result.get("network_bind_host", "0.0.0.0").strip()
     if not host or "/" in host or " " in host:
@@ -151,7 +151,7 @@ class StationNetworkBridge(QObject):
         # Serial worker callback: no widget access or UI queue on this path.
         with self._lock:
             runtime = self.runtime
-            if runtime is None or runtime.source_mode != "live":
+            if runtime is None or runtime.source_mode not in {"live", "simulation"}:
                 return
             self._counter += 1
             payload = observation_from_sample(

@@ -12,7 +12,7 @@ CAPABILITIES = ["legacy-zephyrus.v1", "declarative-codec.v1", "legacy-ui.v1", "g
                 "mission-clock.v1", "reorder-safe.v1", "pointer-bytes.v1"]
 
 
-def run(manifest):
+def run(manifest, *, before_advance=None, after_advance=None, configured=None, control=None):
     if manifest["host"] != "127.0.0.1":
         raise ValueError("Mission worker requires a loopback host")
     with socket.create_connection((manifest["host"], manifest["port"]), timeout=10) as connection:
@@ -46,9 +46,11 @@ def run(manifest):
                         if len(body["stations"]) > 5:
                             raise ValueError("At most five stations per member")
                         stations = {s["id"]: MissionStation(s) for s in body["stations"]}
-                        reply, result = "ready", {"stations": list(stations)}
+                        reply, result = "ready", {"stations": list(stations), **(configured(stations) if configured else {})}
                     elif kind == "advance":
                         batches = body["stations"]
+                        if before_advance:
+                            before_advance(batches)
                         if len(batches) > 5 or sum(len(b.get("deliveries", [])) + len(b.get("actions", []))
                                                   for b in batches) > 256:
                             raise ValueError("Advance batch exceeds bounded queue capacity")
@@ -57,7 +59,11 @@ def run(manifest):
                             stations[b["id"]].advance(time_us, b.get("deliveries", []), b.get("actions", []),
                                                      evaluate=b.get("evaluate", True))
                             for b in batches]}
+                        if after_advance:
+                            after_advance(time_us, batches, result, stations)
                         reply = "advanced"
+                    elif kind == "action" and control:
+                        reply, result = "result", control(body["kind"], body)
                     elif kind in ("pause", "resume"):
                         reply, result = "result", {"paused": kind == "pause"}
                     elif kind == "close":

@@ -114,6 +114,7 @@ def argument_parser():
         type=Path,
         help="Test the private engine using a model and synthetic launch coordinates",
     )
+    parser.add_argument("--mission-manifest", type=Path, help="Private OpenRocket Mission connection manifest")
     return parser
 
 
@@ -163,6 +164,9 @@ def verification_session(directory, mission, channels):
 
 def main():
     args = argument_parser().parse_args()
+    if args.mission_manifest:
+        from .mission_application import main as mission_main
+        return mission_main(args.mission_manifest)
     if args.simulation_smoke:
         from .domain import Mission, write_json
         from .trajectory import SimulationJob

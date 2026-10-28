@@ -1161,7 +1161,7 @@ class Controller(QObject):
                 self.last_replay_video = now
                 self.replay_video(force=False)
         self.advance_virtual_flight(dt, now)
-        if self.tracking and now - self.last_tracking >= 0.2:
+        if self.mode != "SIMULATION" and self.tracking and now - self.last_tracking >= 0.2:
             self.last_tracking = now
             try:
                 target = self.tracking_target()

@@ -93,7 +93,7 @@ class StationDisplay(QMainWindow):
 
 
 class StationWindow(InstrumentWindow):
-    def __init__(self, data_dir, station=None, auto_place=True, profile=None, network_config=None):
+    def __init__(self, data_dir, station=None, auto_place=True, profile=None, network_config=None, controller_factory=None):
         self.workspace_ready = False
         self.closing = False
         self.auto_place = auto_place
@@ -131,7 +131,8 @@ class StationWindow(InstrumentWindow):
                          board_layout=("launch" if self.launch_station
                                        else "away") if self.profile_locked else "legacy",
                          vehicle=self.profile.vehicle,
-                         initial_mission=mission_for_station(self.profile) if self.profile_locked else None)
+                         initial_mission=mission_for_station(self.profile) if self.profile_locked else None,
+                         **({"controller_factory": controller_factory} if controller_factory else {}))
         self.setWindowTitle(self.profile.window_title)
         self.setMinimumSize(1280, 800)
         self.resize(1920, 1020)

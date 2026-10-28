@@ -208,7 +208,7 @@ class SessionRecorder:
         self.put("event", {"name": name, "data": data or {}})
 
     def raw(self, role, data):
-        self.put("raw", (role, bytes(data), time.time()))
+        self.put("raw", ("pointer_tx" if role == "virtual_pointer_tx" else role, bytes(data), time.time()))
 
     def close(self):
         self.closed = True
