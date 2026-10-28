@@ -37,6 +37,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0
       - name: Install pinned desktop runtime
         run: python -m pip install -r requirements-build.txt -e .
+      - name: Prepare qualification output
+        run: python -c "from pathlib import Path; Path('build').mkdir(exist_ok=True)"
       - name: Exercise real application connections and native window lifetimes
         run: >-
           python -m pytest -q
