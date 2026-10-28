@@ -14,13 +14,14 @@ from pathlib import Path
 from PySide6.QtCore import Signal, Slot
 from PySide6.QtWidgets import QApplication, QDialog, QLabel, QPlainTextEdit, QVBoxLayout
 
-from .mission_worker import capabilities
+from .mission_runtime import capabilities, require_supported_qt
 
 
 class MissionLobby(QDialog):
     requested = Signal(object)
 
     def __init__(self, parent=None, ticket=None):
+        require_supported_qt()
         super().__init__(parent)
         self.setWindowTitle('OpenRocket Mission connection')
         self.setMinimumWidth(560)

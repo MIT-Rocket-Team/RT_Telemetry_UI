@@ -33,6 +33,15 @@ py -3.13 scripts/build.py setup
 
 `setup` creates a local `.venv`, installs exact versions from `requirements-build.txt`, and installs this checkout in editable mode. `uv sync --locked` is an alternative for developers using `uv`; the lockfile is retained. Initial dependency/runtime downloads need internet access. For offline builds, stage matching wheels and the architecture-specific vendor files beforehand.
 
+The qualified desktop runtime is PySide6 Essentials/Shiboken **6.12.0**. Mission
+connections reject older Qt bindings because repeated station workspace destruction
+exposed stale layout-item wrappers and native crashes on 6.11.2/6.11.3. This matches
+the ownership failure addressed by [PYSIDE-3469](https://github.com/pyside/pyside-setup/commit/72a3b4d7802203d53d2989fa61db39322b852864).
+`tests/test_mission_lifecycle.py` exercises 30 Base/Away rebuild cycles in an isolated
+process. The Mission desktop workflow also tests fresh and existing-app software
+connections on Windows, Linux and both Mac architectures. Native SRT/video decoding
+requires the platform's separately staged media runtime.
+
 ## Prepare OpenRocket and Java
 
 The bridge requires the team's complete `OpenRocket-MIT-vX.Y.jar` or compatible development `swing-*-all.jar`, including motor/resources databases and fork-specific control fields. An arbitrary upstream OpenRocket JAR is not interchangeable.

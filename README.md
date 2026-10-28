@@ -37,6 +37,27 @@ The four-station telemetry/video/control transport, LTU metrics, analog receiver
 
 ## Run from source
 
+### OpenRocket Mission Simulation
+
+OpenRocket MIT6.5 can launch this application as a simulated Base or Away station.
+Select this project and its Python interpreter in OpenRocket's **Mission Simulation
+→ Connections**, or select a packaged executable. To attach an already-open app,
+choose **Mission Simulation → Prepare OpenRocket connection** here and select the
+displayed connection file in OpenRocket. Each station role uses its own connection.
+The app opens a separate SIMULATION workspace with software receiver/pointer ports,
+native session recording, and optional labeled video slates sent through the normal
+encoder/SRT/Base wall. Physical devices remain disconnected in that workspace.
+
+Desktop Mission connections require Qt/PySide **6.12 or newer**; this checkout pins
+**6.12.0** in both dependency lockfiles. Update an existing environment with
+`make setup` or `uv sync --locked`. Older bindings can retain freed layout-item
+wrappers when workspaces are rebuilt; the connection check rejects them. The
+OpenRocket bundled headless worker needs no Qt or separate Telemetry UI installation.
+See the [Mission Simulation guide](https://github.com/MDNich/ActiveControl_MIT_RktTeam/blob/main/doc/improvements/19-mission-simulation-user-guide.md)
+for configuration, ownership, reconnect, recordings and saved-flight experiments.
+
+### Developer environment
+
 Use a native 64-bit Python 3.12 or 3.13 environment. From the repository root:
 
 ```sh

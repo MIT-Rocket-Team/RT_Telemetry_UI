@@ -307,6 +307,8 @@ class BoundaryBridge(QObject):
 
 
 def launch(manifest, *, on_finished=None):
+    from .mission_runtime import require_supported_qt
+    require_supported_qt()
     if manifest["host"] != "127.0.0.1":
         raise ValueError("Mission IPC must use loopback")
     site = manifest["station"]["id"]

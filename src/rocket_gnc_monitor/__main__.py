@@ -167,7 +167,7 @@ def verification_session(directory, mission, channels):
 def main():
     args = argument_parser().parse_args()
     if args.mission_capabilities:
-        from .mission_worker import capabilities
+        from .mission_runtime import capabilities
         print(json.dumps(capabilities()))
         return 0
     if args.mission_listen:

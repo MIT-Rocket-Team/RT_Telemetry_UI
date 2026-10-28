@@ -170,6 +170,9 @@ class StationWindow(InstrumentWindow):
             mission_menu.addAction('Prepare OpenRocket connection…', self.prepare_mission_connection)
 
     def prepare_mission_connection(self):
+        self.guard(self._prepare_mission_connection)
+
+    def _prepare_mission_connection(self):
         from .mission_attach import MissionLobby
         if not getattr(self, 'mission_lobby', None) or not self.mission_lobby.isVisible():
             self.mission_lobby = MissionLobby(self)

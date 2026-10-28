@@ -66,7 +66,7 @@ pyqtgraph==0.14.0
     # via rocket-gnc-monitor-v0a
 pyserial==3.5
     # via rocket-gnc-monitor-v0a
-pyside6-essentials==6.11.2
+pyside6-essentials==6.12.0
     # via rocket-gnc-monitor-v0a
 pytest==9.1.1
     # via pytest-qt
@@ -76,7 +76,7 @@ pywin32-ctypes==0.2.3 ; sys_platform == 'win32'
 ruff==0.16.8
 setuptools==84.0.0
     # via pyinstaller
-shiboken6==6.11.2
+shiboken6==6.12.0
     # via pyside6-essentials
 typing-extensions==4.16.0
     # via
