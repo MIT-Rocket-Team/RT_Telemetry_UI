@@ -11,7 +11,7 @@ parser.add_argument('--check', action='store_true')
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
 package = root / 'src' / 'rocket_gnc_monitor'
-files = ['__init__.py', 'domain.py', 'protocol.py', 'tracking_policy.py', 'mission_station.py', 'mission_worker.py']
+files = ['__init__.py', 'domain.py', 'protocol.py', 'tracking_policy.py', 'mission_station.py', 'mission_worker.py', 'mission_results.py']
 files += [str(p.relative_to(package)) for p in (package / 'mission_contracts').rglob('*')
           if p.is_file() and '__pycache__' not in p.parts and p.suffix in ('.py', '.json')]
 import io
