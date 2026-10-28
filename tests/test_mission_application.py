@@ -34,14 +34,17 @@ def test_real_workspace_uses_software_receiver_and_closes_native_session(tmp_pat
         path.write_text(json.dumps(manifest))
         log = (tmp_path / 'process.log').open('w+')
         ticket = tmp_path / 'attachment.json'
-        process = subprocess.Popen([sys.executable, '-m', 'rocket_gnc_monitor',
+        process = subprocess.Popen([sys.executable, '-X', 'faulthandler', '-m', 'rocket_gnc_monitor',
                                     '--mission-listen' if attach else '--mission-manifest', str(ticket if attach else path)],
                                    env={**os.environ, 'QT_QPA_PLATFORM': 'offscreen'}, stdout=log, stderr=log)
         try:
             if attach:
-                deadline = time.monotonic() + 15
-                while not ticket.exists() and time.monotonic() < deadline:
+                # Cold Qt/font startup on hosted Macs may exceed 15 seconds.
+                # Match the production application's 30-second connection budget.
+                deadline = time.monotonic() + 30
+                while not ticket.exists() and process.poll() is None and time.monotonic() < deadline:
                     time.sleep(.05)
+                assert ticket.exists(), f'Attachment listener did not become ready (exit={process.poll()})'
                 config = json.loads(ticket.read_text())
                 headers = {'Authorization': 'Bearer ' + config['credential']}
                 with urllib.request.urlopen(urllib.request.Request(config['endpoint'] + '/api/v1/info', headers=headers)) as response:
@@ -98,7 +101,7 @@ def test_real_workspace_uses_software_receiver_and_closes_native_session(tmp_pat
                 config = json.loads(ticket.read_text())
                 with urllib.request.urlopen(urllib.request.Request(config['endpoint'] + '/api/v1/info', headers={'Authorization': 'Bearer ' + config['credential']})) as response:
                     print(json.load(response))
-            pytest.fail(str(exc) + "\n" + Path(log.name).read_text())
+            pytest.fail(f'{exc}\nChild exit: {process.poll()}\n' + Path(log.name).read_text())
         finally:
             if process.poll() is None:
                 process.terminate()

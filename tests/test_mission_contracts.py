@@ -60,8 +60,12 @@ def test_urrg_matches_actual_telemetry_decoder():
     draft = create_urrg()
     for actual, vector in zip(draft["sites"], resource("urrg-sites.json")["sites"], strict=True):
         decoded = decode_mgrs(vector["mgrs"])
-        assert actual["latitudeDeg"] == vector["latitudeDeg"] == decoded.latitude
-        assert actual["longitudeDeg"] == vector["longitudeDeg"] == decoded.longitude
+        assert actual["latitudeDeg"] == vector["latitudeDeg"]
+        assert actual["longitudeDeg"] == vector["longitudeDeg"]
+        # Native MGRS builds differ in their final floating-point bit. Keep
+        # saved defaults exact; compare the independent conversion to 0.1 mm.
+        assert actual["latitudeDeg"] == pytest.approx(decoded.latitude, abs=1e-9, rel=0)
+        assert actual["longitudeDeg"] == pytest.approx(decoded.longitude, abs=1e-9, rel=0)
         assert actual["coordinateInput"]["value"] == vector["mgrs"]
         assert actual["coordinateInput"]["reference"] == "grid-point"
     assert len(draft["pointers"]) == 4
@@ -81,6 +85,8 @@ def test_urrg_matches_actual_telemetry_decoder():
         b'{"x":' + b"[" * 65 + b"0" + b"]" * 65 + b"}",
         b" " * (MAX_BYTES + 1),
     ],
+    ids=['array', 'trailing', 'duplicate', 'escaped-duplicate', 'nan',
+         'overflow', 'utf8', 'surrogate', 'depth', 'size'],
 )
 def test_strict_json(data):
     with pytest.raises(ValueError):
