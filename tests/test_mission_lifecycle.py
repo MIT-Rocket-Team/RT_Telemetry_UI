@@ -16,22 +16,25 @@ def test_older_desktop_runtime_is_rejected_before_connection(monkeypatch):
         mission_runtime.capabilities()
 
 
-def test_station_workspaces_can_be_destroyed_and_rebuilt():
+def test_station_workspaces_can_be_destroyed_and_rebuilt(tmp_path):
     # Isolate native crashes so pytest reports a useful child-process failure.
-    result = subprocess.run(
-        [sys.executable, str(Path(__file__).resolve()), '--probe'],
-        env={**os.environ, 'QT_QPA_PLATFORM': 'offscreen'}, capture_output=True,
-        # Sixty complete instrument windows are substantially slower on hosted
-        # Intel Macs. Keep every cycle while bounding the entire child process.
-        text=True, timeout=300, check=False,
-    )
-    assert result.returncode == 0, (result.stdout + result.stderr)[-8000:]
-    assert '30 station rebuild cycles passed' in result.stdout
+    output = tmp_path / 'probe.log'
+    with output.open('w', encoding='utf-8') as log:
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).resolve()), '--probe', str(tmp_path)],
+            env={**os.environ, 'QT_QPA_PLATFORM': 'offscreen'}, stdout=log, stderr=subprocess.STDOUT,
+            # Sixty instrument windows take longer on hosted Intel Macs. Keep
+            # every cycle, and preserve the partial log even on a timeout.
+            timeout=300, check=False,
+        )
+    report = output.read_text(encoding='utf-8')
+    assert result.returncode == 0, report[-8000:]
+    assert '30 station rebuild cycles passed' in report
 
 
-def probe():
+def probe(root):
     import gc
-    import tempfile
+    import json
 
     from PySide6.QtCore import QCoreApplication, QEvent, QEventLoop, QObject, QTimer
     from PySide6.QtWidgets import QApplication, QMenuBar
@@ -44,36 +47,42 @@ def probe():
     app.setQuitOnLastWindowClosed(False)
     for iteration in range(30):
         print(f'Rebuilding stations: {iteration + 1}/30', flush=True)
-        with tempfile.TemporaryDirectory() as directory:
-            for station, role in [('base', 'video'), ('away1', 'telemetry')]:
-                manifest = {'station': {'id': 'gs1', 'origin': [42, -77, 250],
-                                       'owner': 'observer', 'pointerEnabled': False}, 'role': role}
-                window = StationWindow(
-                    Path(directory) / station,
-                    profile=MissionProfile(station=station, role=role, mission_streams=()),
-                    auto_place=False,
-                    controller_factory=lambda *a, m=manifest, **kw: MissionController(*a, manifest=m, **kw),
-                )
-                try:
-                    assert isinstance(window.companion.menuBar(), QMenuBar)
-                    window.show()
-                    for _ in range(50):
-                        loop = QEventLoop()
-                        QTimer.singleShot(1, loop.quit)
-                        loop.exec()
-                finally:
-                    window.close()
-                    window.deleteLater()
-                    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
-                del window
-                gc.collect()
-                # Reuse native allocations after the layouts have been destroyed.
-                for _ in range(500):
-                    objects = (QObject(), QTimer(), QEventLoop())
-                    assert all(isinstance(obj, QObject) for obj in objects)
-                app.processEvents()
+        # Preserve recordings in pytest's scratch directory for diagnostics.
+        # Deleting fresh SQLite files inside the child can race Windows scanners.
+        directory = root / str(iteration)
+        for station, role in [('base', 'video'), ('away1', 'telemetry')]:
+            manifest = {'station': {'id': 'gs1', 'origin': [42, -77, 250],
+                                   'owner': 'observer', 'pointerEnabled': False}, 'role': role}
+            window = StationWindow(
+                Path(directory) / station,
+                profile=MissionProfile(station=station, role=role, mission_streams=()),
+                auto_place=False,
+                controller_factory=lambda *a, m=manifest, **kw: MissionController(*a, manifest=m, **kw),
+            )
+            recorder = window.controller.recorder
+            try:
+                assert isinstance(window.companion.menuBar(), QMenuBar)
+                window.show()
+                for _ in range(50):
+                    loop = QEventLoop()
+                    QTimer.singleShot(1, loop.quit)
+                    loop.exec()
+            finally:
+                window.close()
+                assert not recorder.thread.is_alive(), 'Recorder still running after station close'
+                assert not recorder.error, recorder.error
+                assert json.loads((recorder.path / 'manifest.json').read_text())['complete']
+                window.deleteLater()
+                QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+            del window
+            gc.collect()
+            # Reuse native allocations after the layouts have been destroyed.
+            for _ in range(500):
+                objects = (QObject(), QTimer(), QEventLoop())
+                assert all(isinstance(obj, QObject) for obj in objects)
+            app.processEvents()
     print('30 station rebuild cycles passed', flush=True)
 
 
 if __name__ == '__main__':
-    probe()
+    probe(Path(sys.argv[2]))

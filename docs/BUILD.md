@@ -42,6 +42,12 @@ process. The Mission desktop workflow also tests fresh and existing-app software
 connections on Windows, Linux and both Mac architectures. Native SRT/video decoding
 requires the platform's separately staged media runtime.
 
+The rebuild probe checks that each recorder thread has stopped, reported no error
+and finalized a complete manifest before proceeding. It keeps recordings in pytest's
+scratch directory instead of deleting newly created databases during the child run;
+Windows can temporarily deny that deletion. CI retains the child logs alongside its
+test report for diagnosis.
+
 The private Mission attachment listener binds directly to `127.0.0.1` without a
 hostname lookup. Its startup works with DNS unavailable; a regression test disables
 hostname resolution explicitly. Native coordinate checks keep stored URRG defaults

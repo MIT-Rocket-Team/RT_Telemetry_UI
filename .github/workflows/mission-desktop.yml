@@ -43,10 +43,14 @@ jobs:
           tests/test_mission_application.py tests/test_mission_codec.py
           tests/test_mission_contracts.py tests/test_mission_results.py
           tests/test_mission_station.py tests/test_mission_lifecycle.py
+          --basetemp=build/mission-desktop-fixtures
           --junitxml=build/mission-desktop.xml
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: mission-desktop-${{ matrix.os }}
-          path: build/mission-desktop.xml
+          path: |
+            build/mission-desktop.xml
+            build/mission-desktop-fixtures/**/probe.log
+            build/mission-desktop-fixtures/**/process.log
           retention-days: 14
