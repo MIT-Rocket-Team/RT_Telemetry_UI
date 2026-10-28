@@ -15,6 +15,25 @@ from test_mission_station import delivery
 from rocket_gnc_monitor.mission_contracts.wire import encode_frame, read_frame
 
 
+def test_attachment_listener_needs_no_hostname_lookup(qtbot, tmp_path, monkeypatch):
+    from rocket_gnc_monitor.mission_attach import MissionLobby
+
+    def unavailable_dns(*args, **kwargs):
+        raise AssertionError('A private loopback listener must not resolve hostnames')
+
+    monkeypatch.setattr(socket, 'getfqdn', unavailable_dns)
+    ticket = tmp_path / 'attachment.json'
+    lobby = MissionLobby(ticket=ticket)
+    qtbot.addWidget(lobby)
+    try:
+        assert ticket.is_file()
+        assert lobby.server.server_address[0] == '127.0.0.1'
+        assert lobby.server.server_name == 'localhost'
+    finally:
+        lobby.close()
+    assert not ticket.exists()
+
+
 @pytest.mark.parametrize('attach', [False, True])
 def test_real_workspace_uses_software_receiver_and_closes_native_session(tmp_path, attach):
     identity = {key: str(uuid.uuid4()) for key in (

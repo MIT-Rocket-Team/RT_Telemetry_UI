@@ -42,6 +42,11 @@ process. The Mission desktop workflow also tests fresh and existing-app software
 connections on Windows, Linux and both Mac architectures. Native SRT/video decoding
 requires the platform's separately staged media runtime.
 
+The private Mission attachment listener binds directly to `127.0.0.1` without a
+hostname lookup. Its startup works with DNS unavailable; a regression test disables
+hostname resolution explicitly. Native coordinate checks keep stored URRG defaults
+exact while allowing 0.1 mm conversion tolerance between platform MGRS libraries.
+
 ## Prepare OpenRocket and Java
 
 The bridge requires the team's complete `OpenRocket-MIT-vX.Y.jar` or compatible development `swing-*-all.jar`, including motor/resources databases and fork-specific control fields. An arbitrary upstream OpenRocket JAR is not interchangeable.

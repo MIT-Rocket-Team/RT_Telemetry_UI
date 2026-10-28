@@ -21,7 +21,9 @@ def test_station_workspaces_can_be_destroyed_and_rebuilt():
     result = subprocess.run(
         [sys.executable, str(Path(__file__).resolve()), '--probe'],
         env={**os.environ, 'QT_QPA_PLATFORM': 'offscreen'}, capture_output=True,
-        text=True, timeout=120, check=False,
+        # Sixty complete instrument windows are substantially slower on hosted
+        # Intel Macs. Keep every cycle while bounding the entire child process.
+        text=True, timeout=300, check=False,
     )
     assert result.returncode == 0, (result.stdout + result.stderr)[-8000:]
     assert '30 station rebuild cycles passed' in result.stdout

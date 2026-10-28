@@ -10,11 +10,21 @@ import threading
 import uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from socketserver import TCPServer
 
 from PySide6.QtCore import Signal, Slot
 from PySide6.QtWidgets import QApplication, QDialog, QLabel, QPlainTextEdit, QVBoxLayout
 
 from .mission_runtime import capabilities, require_supported_qt
+
+
+class _LoopbackServer(HTTPServer):
+    def server_bind(self):
+        # HTTPServer performs a reverse hostname lookup even for 127.0.0.1.
+        # This endpoint has a fixed numeric address and must also start offline.
+        TCPServer.server_bind(self)
+        self.server_name = 'localhost'
+        self.server_port = self.server_address[1]
 
 
 class MissionLobby(QDialog):
@@ -84,7 +94,7 @@ class MissionLobby(QDialog):
                 except (ValueError, KeyError, TypeError):
                     self.respond(400, {'error': 'Invalid Mission manifest'})
 
-        self.server = HTTPServer(('127.0.0.1', 0), Handler)
+        self.server = _LoopbackServer(('127.0.0.1', 0), Handler)
         self.server.timeout = 1
         self.thread = threading.Thread(target=self.server.serve_forever, name='mission-attachment', daemon=True)
         self.thread.start()
