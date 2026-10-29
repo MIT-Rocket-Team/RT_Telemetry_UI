@@ -268,7 +268,10 @@ class Session:
         self.thread = threading.Thread(target=self.run, name="srt-viewer", daemon=True)
 
     def enqueue(self, data):
-        if self.stopped.is_set() or self.connection is None:
+        # Encoding can begin between HTTP allocation and the SRT handshake.
+        # Retain the initial PAT/PMT and H.264 parameter sets in the same bounded
+        # queue; discarding them leaves a newly connected decoder without PPS.
+        if self.stopped.is_set():
             return
         try:
             self.queue.put_nowait((time.monotonic(), data))
