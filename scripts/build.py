@@ -243,6 +243,8 @@ def bridge(engine="", release=""):
 def package(target, engine="", release=""):
     if target and target != platform.system():
         raise SystemExit(f"Build {target} on a native {target} machine; PyInstaller is not a cross-compiler.")
+    from prepare_network_media import prepare_linux_decoder
+    prepare_linux_decoder()
     # ctypes-loaded SRT is a required part of the standalone video package.
     # Verify it before packaging so a developer's system library cannot mask a
     # missing runtime in the delivered app.

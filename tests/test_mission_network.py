@@ -144,6 +144,11 @@ def test_stream_metadata_is_bounded_and_checked():
         validate_simulation_streams([{}] * 65)
     with pytest.raises(ValueError):
         validate_simulation_streams([{'id': '../file', 'kind': 'digital', 'vehicleId': 'balius', 'receivers': ['gs1']}])
+    streams = validate_simulation_streams([
+        dict(id=str(i), kind=kind, vehicleId='balius', receivers=['gs1'])
+        for i, kind in enumerate(('digital', 'analog', 'digital', 'analog'))])
+    assert [(s['kind'], s['ordinal']) for s in streams] == [
+        ('digital', 1), ('analog', 1), ('digital', 2), ('analog', 2)]
 
 
 def test_scoped_slot_conflicts_do_not_mix_live_and_simulated_missions(tmp_path):

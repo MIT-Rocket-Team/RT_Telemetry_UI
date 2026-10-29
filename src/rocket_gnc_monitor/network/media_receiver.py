@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections import deque
 import json
+import platform
 import queue
 import random
 import subprocess
@@ -21,7 +22,18 @@ from PySide6.QtGui import QImage, QPixmap
 
 from ..media import WIDTH, HEIGHT, ffmpeg, popen_options
 from .media import _replace_pending, _stop_process, channel_ids
-from .media_srt import SRTSocket, SRTError
+from .media_srt import SRTSocket, SRTError, runtime_directory
+
+
+def decoder_executable():
+    # imageio's Linux 7.0.2 static build crashes on MPEG-TS input. Keep encoding
+    # unchanged and use the separately qualified, bundled decoder for reception.
+    if platform.system() == "Linux":
+        decoder = runtime_directory() / "ffmpeg"
+        if not decoder.is_file():
+            raise OSError("Packaged MPEG-TS decoder missing; run scripts/build_mission_srt.py")
+        return str(decoder)
+    return ffmpeg()
 
 
 def _http(endpoint, method, path, body=None, token=None):
@@ -125,7 +137,7 @@ class MediaReceiver:
                 transport = session["transport"]
                 self.connection = connection = SRTSocket()
                 connection.connect(transport["host"], transport["port"], transport["srt_streamid"])
-                arguments = [ffmpeg(), "-hide_banner", "-loglevel", "error", "-threads", "1",
+                arguments = [decoder_executable(), "-hide_banner", "-loglevel", "error", "-threads", "1",
                              "-fflags", "+discardcorrupt", "-probesize", "32768", "-analyzeduration", "1000000",
                              "-f", "mpegts", "-i", "pipe:0", "-map", "0:v:0", "-an",
                              "-vf", f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,"

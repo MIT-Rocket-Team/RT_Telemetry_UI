@@ -513,7 +513,8 @@ def validate_simulation_streams(streams):
     if not isinstance(streams, list) or len(streams) > 64:
         raise ValueError("Simulation advertises an invalid video stream list")
     result, identifiers = [], set()
-    for index, stream in enumerate(streams):
+    ordinals = {"digital": 0, "analog": 0}
+    for stream in streams:
         if not isinstance(stream, dict):
             raise ValueError("Invalid simulation video stream")
         identifier = stream.get("id", "")
@@ -526,6 +527,7 @@ def validate_simulation_streams(streams):
                 or any(r not in ("gs1", "gs2", "gs3", "gs4") for r in receivers)):
             raise ValueError("Invalid simulation video stream routing")
         identifiers.add(identifier)
+        ordinals[stream["kind"]] += 1
         result.append(dict(id=identifier, vehicleId=vehicle, kind=stream["kind"],
-                           ordinal=index + 1, receivers=list(dict.fromkeys(receivers))))
+                           ordinal=ordinals[stream["kind"]], receivers=list(dict.fromkeys(receivers))))
     return result
