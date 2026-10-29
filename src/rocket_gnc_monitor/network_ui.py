@@ -114,7 +114,11 @@ class StationNetworkDialog(QDialog):
         mission = (peer or {}).get("info", {}).get("mission_id")
         if mission:
             self.mission.setText(mission)
-            self.apply()
+            try:
+                self.bridge.join_peer(peer)
+            except (ValueError, OSError, RuntimeError) as exc:
+                QMessageBox.warning(self, "Station network", str(exc))
+            self.refresh()
 
     def show_details(self):
         peer = self.selected_peer()
@@ -141,7 +145,9 @@ class StationNetworkDialog(QDialog):
             title = "Base" if station == "launch" else station.upper()
             role = identity.get("role", "?")
             ages = [p["sample_age_ms_lower_bound"] for p in peer.get("latest", []) if p.get("sample_age_ms_lower_bound") is not None]
-            values = [f"{title} / {role}", peer["state"], (identity.get("mission_id") or "unassigned")[:8],
+            mode = identity.get("source_mode", "live").upper()
+            phase = (peer.get("status") or {}).get("application", {}).get("state", "")
+            values = [f"{title} / {role} · {mode}", peer["state"] + (f" · {phase}" if mode == "SIMULATION" else ""), (identity.get("mission_id") or "unassigned")[:8],
                       f"{peer['rtt_ms']:.1f}" if peer.get("rtt_ms") is not None else "—",
                       f"{min(ages):.0f}" if ages else "—", peer.get("error") or peer["endpoint"]]
             for column, value in enumerate(values):
@@ -149,7 +155,7 @@ class StationNetworkDialog(QDialog):
                 item.setToolTip(peer.get("error") or str(identity))
                 self.table.setItem(row, column, item)
             if role == "telem" and peer.get("synchronized") and not peer.get("conflict"):
-                options.append((f"{title} · network · READ ONLY", identity["node_id"]))
+                options.append((f"{title} · {mode} · READ ONLY", identity["node_id"]))
         if selected >= 0 and selected < len(self._rows):
             self.table.selectRow(selected)
         self.table.blockSignals(False)

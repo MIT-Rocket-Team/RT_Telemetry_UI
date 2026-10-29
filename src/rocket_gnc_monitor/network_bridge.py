@@ -53,6 +53,8 @@ class StationNetworkBridge(QObject):
         self.window, self.controller = window, window.controller
         self.config = validate_configuration(config)
         self.runtime = self.media = self.viewer = None
+        self._standard_video_wall = None
+        self._simulation_video_wall = None
         self.error = ""
         self.peers = []
         self._counter = 0
@@ -84,7 +86,11 @@ class StationNetworkBridge(QObject):
         self.error = ""
         self._mode = self.controller.mode.lower()
         settings = {**self.config, "network_source_mode": self._mode}
-        if self.config.get("accept_replay"):
+        if self.config.get("receive_source_mode") == "simulation":
+            if self.window.profile.station != "base":
+                raise ValueError("Only Base mode can join an OpenRocket simulation")
+            settings["network_accept_source_modes"] = ["simulation"]
+        elif self.config.get("accept_replay"):
             settings["network_accept_source_modes"] = ["live", "replay"]
         if self.window.profile.role == "video":
             try:
@@ -117,6 +123,7 @@ class StationNetworkBridge(QObject):
             existing.on_observation = accepted
         if self.window.profile.role == "video" and self.window.profile.station == "base":
             from .network.media_receiver import VideoWallNetwork
+            self._configure_video_wall()
             self.viewer = VideoWallNetwork(self.runtime, self.window.video_wall)
 
     def stop(self):
@@ -133,6 +140,55 @@ class StationNetworkBridge(QObject):
     def close(self):
         self.timer.stop()
         self.stop()
+
+    def join_peer(self, peer):
+        """Joining a simulation is explicit and does not change local hardware mode."""
+        info = peer.get("info") or {}
+        mode = info.get("source_mode", "live")
+        if info.get("vehicle_mode") != self.window.profile.vehicle:
+            raise ValueError("Select the same vehicle layout as the discovered station first")
+        if mode == "simulation" and self.window.profile.station != "base":
+            raise ValueError("Open Telemetry UI in Base mode to receive this simulation")
+        if mode not in ("live", "simulation", "replay") or not info.get("mission_id"):
+            raise ValueError("The selected station has no joinable mission")
+        streams = validate_simulation_streams(info.get("simulation", {}).get("streams", [])) if mode == "simulation" else []
+        config = {**self.config, "mission_id": info["mission_id"],
+                  "receive_source_mode": mode, "accept_replay": mode == "replay",
+                  "simulation_streams": streams,
+                  "peers": list(dict.fromkeys([*self.config["peers"], peer["endpoint"]]))}
+        self.apply(config)
+        if self.window.profile.role == "telemetry" and info.get("role") == "telem":
+            self.select_source(info["node_id"])
+
+    def _configure_video_wall(self):
+        from .video_wall import VideoWall
+        from .mission_video import MissionProfile
+        current = self.window.video_wall
+        simulation = self.config.get("receive_source_mode") == "simulation"
+        if simulation:
+            streams = validate_simulation_streams(self.config.get("simulation_streams", []))
+            if not streams:
+                return
+            profile = MissionProfile(station="base", role="video", vehicle=self.window.profile.vehicle,
+                                     mission_streams=tuple(streams))
+            replacement = VideoWall(profile)
+            if self._standard_video_wall is None:
+                self._standard_video_wall = current
+            previous_simulation = self._simulation_video_wall
+            self._simulation_video_wall = replacement
+        elif self._standard_video_wall is not None:
+            replacement = self._standard_video_wall
+            previous_simulation = self._simulation_video_wall
+            self._simulation_video_wall = self._standard_video_wall = None
+        else:
+            return
+        parent = current.parentWidget()
+        parent.layout().replaceWidget(current, replacement)
+        current.hide()
+        self.window.video_wall = replacement
+        replacement.show()
+        if previous_simulation is not None:
+            previous_simulation.deleteLater()
 
     def apply(self, config):
         config = validate_configuration(config)
@@ -414,7 +470,7 @@ class StationNetworkBridge(QObject):
         if same_boot and int(previous.rsplit(":", 1)[1]) >= int(identity.rsplit(":", 1)[1]):
             return
         source = f"{info.get('station', '?').upper()} · {payload.get('vehicle', {}).get('id', 'unknown')} · read only"
-        sample = observation_to_sample(payload, received_monotonic=now, source_age_ms=age, source_label=source)
+        sample = observation_to_sample(payload, received_monotonic=now, source_age_ms=age, source_label=("SIMULATION · " if info.get("source_mode") == "simulation" else "") + source)
         history = self._history.setdefault(node, deque(maxlen=6000))
         if previous and not same_boot:
             history.clear()
@@ -447,5 +503,29 @@ class StationNetworkBridge(QObject):
         mission = self.config["mission_id"]
         online = sum(p["state"] == "ONLINE" and not p.get("conflict") for p in self.peers)
         return self.error or self.runtime.error or self.runtime.archive_status.get("error") or (
-            f"Network: {self.runtime.state} · {online} peers · " + (f"mission {mission[:8]}" if mission else "choose a mission")
+            f"Network: {self.runtime.state} · {online} peers · " + (f"{self.config.get('receive_source_mode', 'live').upper()} mission {mission[:8]}" if mission else "choose a mission")
         )
+
+
+def validate_simulation_streams(streams):
+    """Bound untrusted discovery metadata before constructing native video widgets."""
+    import re
+    if not isinstance(streams, list) or len(streams) > 64:
+        raise ValueError("Simulation advertises an invalid video stream list")
+    result, identifiers = [], set()
+    for index, stream in enumerate(streams):
+        if not isinstance(stream, dict):
+            raise ValueError("Invalid simulation video stream")
+        identifier = stream.get("id", "")
+        vehicle = stream.get("vehicleId", "")
+        receivers = stream.get("receivers")
+        if (not isinstance(identifier, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", identifier)
+                or identifier in identifiers or stream.get("kind") not in ("digital", "analog")
+                or not isinstance(vehicle, str) or len(vehicle) > 64
+                or not isinstance(receivers, list) or len(receivers) > 4
+                or any(r not in ("gs1", "gs2", "gs3", "gs4") for r in receivers)):
+            raise ValueError("Invalid simulation video stream routing")
+        identifiers.add(identifier)
+        result.append(dict(id=identifier, vehicleId=vehicle, kind=stream["kind"],
+                           ordinal=index + 1, receivers=list(dict.fromkeys(receivers))))
+    return result

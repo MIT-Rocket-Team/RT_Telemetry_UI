@@ -743,11 +743,12 @@ class NetworkRuntime:
         active = [peer for peer in self._peers.values() if peer.get("info") and peer["state"] in {"ONLINE", "STALE", "CONNECTING", "SYNCHRONIZING", "CONFLICT"} and now-peer.get("_last_seen", 0) < 10]
         for peer in active:
             info = peer["info"]
-            slot_conflict = (info["station"], info["role"]) == (self.station, self.role) and (info["node_id"], info["boot_id"]) != (self.node_id, self.boot_id)
+            same_scope = (info["mission_id"], info["source_mode"], info["vehicle_mode"]) == (self.mission_id, self.source_mode, self.vehicle_mode)
+            slot_conflict = same_scope and (info["station"], info["role"]) == (self.station, self.role) and (info["node_id"], info["boot_id"]) != (self.node_id, self.boot_id)
             identity_conflict = info["node_id"] == self.node_id and info["boot_id"] != self.boot_id
             others = [p for p in active if p is not peer]
             conflict = slot_conflict or identity_conflict or any(
-                (p["info"]["station"], p["info"]["role"]) == (info["station"], info["role"]) and p["info"]["node_id"] != info["node_id"]
+                all(p["info"][field] == info[field] for field in ("mission_id", "source_mode", "vehicle_mode", "station", "role")) and p["info"]["node_id"] != info["node_id"]
                 or p["info"]["node_id"] == info["node_id"] and any(p["info"][field] != info[field] for field in ("boot_id", "station", "role", "mission_id", "vehicle_mode", "source_mode")) for p in others)
             peer["conflict"] = bool(conflict)
             if conflict:

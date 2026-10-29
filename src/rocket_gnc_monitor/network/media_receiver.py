@@ -230,7 +230,7 @@ class VideoWallNetwork(QObject):
             station = info.get("station", "")
             if (info.get("role") != "video" or station not in {"gs1", "gs2", "gs3", "gs4"}
                     or info.get("mission_id") != self.runtime.mission_id
-                    or info.get("source_mode") != getattr(self.runtime, "source_mode", "live")
+                    or info.get("source_mode") not in getattr(self.runtime, "accept_source_modes", ["live"])
                     or str(peer.get("state", "")).lower() not in {"online", "stale"}):
                 continue
             local_station = "away" + station[-1]
@@ -253,7 +253,7 @@ class VideoWallNetwork(QObject):
                     continue
                 channel = self.mapping.get(stream.get("channel_id"))
                 key = (local_station, channel)
-                if key in self.wall.feeds and stream.get("source_mode") == getattr(self.runtime, "source_mode", "live"):
+                if key in self.wall.feeds and stream.get("source_mode") == info.get("source_mode"):
                     # Ambiguous publishers never silently replace an existing source.
                     if key in sources:
                         sources[key] = None

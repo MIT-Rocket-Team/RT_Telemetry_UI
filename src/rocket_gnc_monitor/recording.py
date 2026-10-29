@@ -16,7 +16,6 @@ import uuid
 import zlib
 from . import __version__
 from .domain import Sample, write_json
-from .rocket_protocol import CSV_FIELDS, legacy_values
 from .protocol import TelemetryDecoder
 
 RAW_HEADER = struct.Struct("<4sddBI")
@@ -217,6 +216,8 @@ class SessionRecorder:
             self.error = "Recorder did not finish; session remains incomplete"
 
     def _run(self):
+        # Network-only observation archives do not need legacy CSV/numpy support.
+        from .rocket_protocol import CSV_FIELDS, legacy_values
         connection = None
         try:
             connection = sqlite3.connect(self.path / "session.sqlite")
