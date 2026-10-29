@@ -81,7 +81,7 @@ def test_mission_capture_reaches_real_base_wall_over_srt_and_recovers(qtbot, tmp
 
         produce(5)
         viewers = base.station_network.viewer.workers
-        assert viewers and any(v.received_frames > 5 for v in viewers.values()), {k: v.error for k, v in viewers.items()}
+        assert viewers and any(v.received_frames > 5 for v in viewers.values()), {k: (v.error, list(v.logs), v.received_frames) for k, v in viewers.items()}
         tile = base.video_wall.primary_views['digital-2']
         assert tile.pixmap() and not tile.pixmap().isNull()
         pixel = tile.pixmap().toImage().pixelColor(10, 10)

@@ -117,7 +117,7 @@ def test_normal_base_video_receives_custom_slate_via_leased_srt(qtbot, tmp_path)
                 [{'id': 'gs1', 'samples': [], 'tracking': False}])
             qtbot.wait(34)
         workers = window.station_network.viewer.workers
-        assert workers and any(w.received_frames > 5 for w in workers.values()), {k: w.error for k, w in workers.items()}
+        assert workers and any(w.received_frames > 5 for w in workers.values()), {k: (w.error, list(w.logs), w.received_frames) for k, w in workers.items()}
         pixels = window.video_wall.primary_views['digital-2'].pixmap().toImage()
         assert not pixels.isNull() and pixels.pixelColor(10, 10).red() > 180
         boot = publisher.services['gs1', 'video'][0].boot_id
