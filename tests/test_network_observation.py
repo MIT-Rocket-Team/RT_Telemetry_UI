@@ -83,6 +83,28 @@ def test_balius_provisional_state_names_preserve_original_numeric_code(code, nam
     assert payload["values"]["native"]["phase"] == "Flight"
 
 
+@pytest.mark.parametrize('code,name', [(0, 'GROUND_TESTING'), (1, 'PRE_FLIGHT'), (2, 'FLIGHT'),
+                                      (3, 'APOGEE'), (4, 'MAIN'), (5, 'END'), (255, None)])
+def test_simulation_state_keeps_zephyrus_meaning_and_raw_bytes_through_network(code, name):
+    raw = bytearray(frame())
+    raw[65] = code
+    raw[129] = sum(raw[2:129]) & 255
+    raw = bytes(raw)
+    sample = TelemetryDecoder().feed(raw, received=15)[0]
+    sample.source = 'SIMULATION'
+    sample.details.update(state_schema='zephyrus-v1', state_basis='flight-events')
+    payload = observation(sample, raw=raw)
+    validate_observation(payload)
+    assert payload['values']['state'] == dict(code=code, name=name, schema='zephyrus-v1', basis='flight-events')
+    assert base64.b64decode(payload['packet']['raw_b64']) == raw
+    assert not any('provisional' in warning for warning in payload['quality']['warnings'])
+    received = observation_to_sample(payload, received_monotonic=30, source_age_ms=0, source_label='GS1')
+    assert received.details['state_code'] == code
+    assert received.details['state_schema'] == 'zephyrus-v1'
+    assert received.details['state_basis'] == 'flight-events'
+    assert received.phase == (name or 'Unknown')
+
+
 def test_three_receptions_never_collapse_even_when_rocket_bytes_repeat():
     payloads = [observation(station=f"gs{n}", node_id=str(uuid.uuid4())) for n in (1, 2, 3)]
     assert len({p["observation_id"] for p in payloads}) == 3

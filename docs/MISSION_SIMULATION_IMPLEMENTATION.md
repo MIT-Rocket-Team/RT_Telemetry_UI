@@ -35,6 +35,14 @@ slate pixels. Accepted samples retain original post-link bytes and mission time,
 network receipt ages use the host clock. No simulated sample enters local hardware
 control. Commands remain in OpenRocket.
 
+Mission telemetry carries the Zephyrus state enum in received packet bytes and in
+canonical network observations, identified by `zephyrus-v1`. The standard generator
+uses accepted flight events for PRE_FLIGHT, FLIGHT, APOGEE, altitude-triggered MAIN
+and landed END; a coupled FC supplies its own state. The receiver does not infer
+states from trajectory fields. Custom-codec `state.code` is retained, and a missing
+optional state cannot become a zero-valued GROUND_TESTING reading. Base displays
+these explicit states without applying provisional live Balius labels.
+
 Only the selected ensemble member is shared. Pause preserves service and media
 identities, continues heartbeats/leases and uses video carrier frames without creating
 canonical samples or encoded recording frames. Optional bounded video recording is

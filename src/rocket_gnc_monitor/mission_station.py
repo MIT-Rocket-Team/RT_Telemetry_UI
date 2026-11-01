@@ -6,10 +6,11 @@ carries packet identity, acquisition times and declared height references, never
 import base64
 import copy
 
-from .domain import Sample
+from .domain import Sample, finite
 from .mission_contracts.codec import TelemetryCodec
 from .protocol import TelemetryDecoder, pointer_packet
 from .tracking_policy import TrackingPolicy
+from .zephyrus_states import ZEPHYRUS_STATE_SCHEMA, zephyrus_state_name
 
 
 class CodecDecoder:
@@ -41,6 +42,10 @@ class CodecDecoder:
                 continue
             del self.buffer[:codec.frame_bytes]
             values = {field["source"]: decoded[field["name"]] for field in codec.definition["fields"]}
+            details = {"codec": codec.definition["id"], "availability": list(values)}
+            state = values.get("state.code")
+            if finite(state) and state == int(state):
+                details["state_code"] = int(state)
             output.append(Sample(
                 t=(values.get("uptime_ms") or 0) / 1000,
                 sequence=int(values.get("packet_sequence") or 0), source="SIMULATION",
@@ -48,7 +53,7 @@ class CodecDecoder:
                 velocity=values.get("velocity.up_ms"), latitude=values.get("gps.latitude_deg"),
                 longitude=values.get("gps.longitude_deg"), gps_altitude=values.get("gps.height_m"),
                 gps_fix=int(values.get("gps.fix") or 0),
-                details={"codec": codec.definition["id"], "availability": list(values)},
+                details=details,
             ))
             self.accepted += 1
         return output
@@ -119,6 +124,15 @@ class MissionStation:
                 for field in fields:
                     if field["name"] in missing and field["source"] in attributes:
                         setattr(sample, attributes[field["source"]], 0 if field["source"] == "gps.fix" else None)
+                    if field["name"] in missing and field["source"] == "state.code":
+                        sample.details.pop("state_code", None)
+                        sample.details["availability"] = [v for v in sample.details["availability"] if v != "state.code"]
+            if "state" in sample.details["unavailable"]:
+                sample.details.pop("state_code", None)
+            sample.details["state_schema"] = ZEPHYRUS_STATE_SCHEMA
+            basis = delivery.get("stateBasis", "received-telemetry")
+            sample.details["state_basis"] = basis if basis in ("flight-events", "flight-computer") else "received-telemetry"
+            sample.phase = zephyrus_state_name(sample.details.get("state_code")) or "UNKNOWN"
             if not old:
                 self.policy.latest = sample
                 self.policy.height_reference = delivery.get("heightReference")

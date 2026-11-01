@@ -5,6 +5,8 @@ import pytest
 
 from rocket_gnc_monitor.domain import Sample
 from rocket_gnc_monitor.mission_station import MissionStation
+from rocket_gnc_monitor.mission_contracts.codec import TelemetryCodec
+from rocket_gnc_monitor.mission_contracts.contracts import resource
 from rocket_gnc_monitor.tracking_policy import tracking_target
 
 
@@ -28,6 +30,43 @@ def delivery(data=None, tx=0, identity='packet-0'):
     return {'data': base64.b64encode(frame() if data is None else data).decode(),
                 'txTimeUs': str(tx), 'packetId': identity,
                 'heightReference': {'convention': 'relative-msl', 'baselineMslM': 250, 'geoidSeparationM': -33}}
+
+
+@pytest.mark.parametrize('code,name', [(0, 'GROUND_TESTING'), (1, 'PRE_FLIGHT'), (2, 'FLIGHT'),
+                                      (3, 'APOGEE'), (4, 'MAIN'), (5, 'END'), (255, 'UNKNOWN')])
+@pytest.mark.parametrize('custom', [False, True])
+def test_received_zephyrus_state_survives_standard_and_custom_packets(code, name, custom):
+    if custom:
+        definition = resource('codec-vectors.json')['codec']
+        codec = TelemetryCodec(definition)
+        values = {field['source']: 0 for field in definition['fields']}
+        payload, missing = codec.encode({**values, 'state.code': code})
+        raw = codec.frame(payload, bytes(14) if codec.trailer == 'legacy-v1' else b'')
+        s = station(codec=definition)
+    else:
+        raw = bytearray(frame())
+        raw[65] = code
+        raw[129] = sum(raw[2:129]) & 255
+        s = station()
+    incoming = {**delivery(raw), 'stateBasis': 'flight-computer' if custom else 'flight-events'}
+    sample = s.advance(0, [incoming])['samples'][0]
+    assert sample['details']['state_code'] == code
+    assert sample['details']['state_schema'] == 'zephyrus-v1'
+    assert sample['details']['state_basis'] == incoming['stateBasis']
+    assert sample['phase'] == name
+
+
+def test_missing_optional_state_does_not_become_ground_testing():
+    definition = resource('codec-vectors.json')['codec']
+    codec = TelemetryCodec(definition)
+    values = {field['source']: 0 for field in definition['fields'] if field['source'] != 'state.code'}
+    payload, missing = codec.encode(values)
+    assert missing
+    raw = codec.frame(payload, bytes(14) if codec.trailer == 'legacy-v1' else b'')
+    sample = station(codec=definition).advance(0, [{**delivery(raw), 'missingFields': list(missing)}])['samples'][0]
+    assert 'state_code' not in sample['details']
+    assert 'state.code' not in sample['details']['availability']
+    assert sample['phase'] == 'UNKNOWN'
 
 
 def test_shared_legacy_geometry_is_identical_for_live_and_mission():

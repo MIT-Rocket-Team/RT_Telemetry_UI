@@ -18,6 +18,7 @@ import uuid
 
 from ..balius_states import BALIUS_STATE_NAMES
 from ..domain import Sample, finite
+from ..zephyrus_states import ZEPHYRUS_STATE_SCHEMA, zephyrus_state_name
 
 
 def _counter(value, field):
@@ -81,11 +82,17 @@ def observation_from_sample(
     code = sample.details.get("state_code")
     code = code if type(code) is int else None
     state_name = sample.phase or None
-    if vehicle_mode == "balius":
+    zephyrus = sample.details.get("state_schema") == ZEPHYRUS_STATE_SCHEMA
+    if zephyrus:
+        state_name = zephyrus_state_name(code)
+    elif vehicle_mode == "balius":
         state_name = BALIUS_STATE_NAMES[code] if code is not None and 0 <= code < len(BALIUS_STATE_NAMES) else None
         warnings.append("Balius state names use provisional wire codes 0–4.")
-    else:
+    if vehicle_mode != "balius":
         warnings.append("Iris vehicle attribution is unknown until packet identity or a qualified switch acknowledgement is available.")
+    state = {"code": code, "name": state_name}
+    if zephyrus:
+        state.update(schema=ZEPHYRUS_STATE_SCHEMA, basis=sample.details.get("state_basis", "received-telemetry"))
 
     position_valid = (
         type(sample.gps_fix) is int and sample.gps_fix >= 2
@@ -134,7 +141,7 @@ def observation_from_sample(
             "clock_uncertainty_ms": None,
         },
         "values": {
-            "state": {"code": code, "name": state_name},
+            "state": state,
             "position": {
                 "lat_deg": sample.latitude if position_valid else None,
                 "lon_deg": sample.longitude if position_valid else None,
@@ -207,6 +214,10 @@ def observation_to_sample(payload, *, received_monotonic, source_age_ms, source_
     code = state.get("code")
     if type(code) is int:
         details["state_code"] = code
+    if state.get("schema") == ZEPHYRUS_STATE_SCHEMA:
+        details["state_schema"] = ZEPHYRUS_STATE_SCHEMA
+        if state.get("basis") in ("flight-events", "flight-computer", "received-telemetry"):
+            details["state_basis"] = state["basis"]
     details.update(
         display_source=str(source_label),
         remote_observation_id=payload["observation_id"],

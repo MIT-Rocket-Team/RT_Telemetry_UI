@@ -1,15 +1,19 @@
 """Ordinary Base-mode clients receiving OpenRocket-owned Away services."""
 import base64
 import hashlib
+import json
 import socket
 import time
 import uuid
+import urllib.request
 
 import pytest
 from PySide6.QtGui import QColor, QImage
 
 from rocket_gnc_monitor.domain import Sample
 from rocket_gnc_monitor.mission_network import MissionNetwork
+from rocket_gnc_monitor.mission_station import MissionStation
+from rocket_gnc_monitor.mission_contracts.contracts import resource
 from rocket_gnc_monitor.network import NetworkRuntime
 from rocket_gnc_monitor.network_bridge import validate_simulation_streams
 from rocket_gnc_monitor.network_ui import StationNetworkDialog
@@ -87,6 +91,45 @@ def test_normal_base_joins_simulation_receives_exact_bytes_and_pauses(qtbot, tmp
         assert service.boot_id == received['observation_id'].split(':')[1]
         assert any(p['state'] == 'ONLINE' for p in window.station_network.peers)
         publisher.phase('running')
+    finally:
+        if window:
+            window.close()
+        publisher.close()
+
+
+def test_all_four_publishers_stream_received_zephyrus_states_to_normal_base(qtbot, tmp_path):
+    publisher = MissionNetwork(tmp_path / 'states-publisher')
+    window = None
+    sites = [f'gs{i}' for i in range(1, 5)]
+    try:
+        config = mission()
+        config['sites'] = [dict(id=site, enabled=True) for site in sites]
+        publisher.configure(config, discovery=False)
+        window = base(qtbot, tmp_path / 'states-base', 'telemetry')
+        join(qtbot, window, publisher.services['gs1', 'telemetry'][0])
+        stations = {site: MissionStation(dict(id=site, origin=[42, -77, 0])) for site in sites}
+        publisher.begin([])
+        for code, name in enumerate(('GROUND_TESTING', 'PRE_FLIGHT', 'FLIGHT', 'APOGEE', 'MAIN', 'END')):
+            raw = bytearray.fromhex(resource('legacy-vectors.json')['frameHex'])
+            raw[65] = code
+            raw[129] = sum(raw[2:129]) & 255
+            data = base64.b64encode(raw).decode()
+            stamp = code * 1_000_000
+            delivery = dict(packetId=f'state-{code}', txTimeUs=str(stamp), data=data, stateBasis='flight-events')
+            batches = [dict(id=site, deliveries=[delivery], videoState=[]) for site in sites]
+            results = [stations[site].advance(stamp, [delivery]) for site in sites]
+            publisher.advance(str(stamp), batches, results)
+            qtbot.waitUntil(lambda: window.controller.display_latest is not None
+                and window.controller.display_latest.details.get('state_code') == code, timeout=5000)
+            window.last_ui = window.last_table = 0
+            window.refresh()
+            assert window.rocket_state_badge.state_name == name
+            for site in sites:
+                endpoint = publisher.services[site, 'telemetry'][0].local_endpoint
+                with urllib.request.urlopen(endpoint + '/api/v1/telemetry/latest', timeout=3) as response:
+                    received = json.load(response)['observations'][0]
+                assert received['values']['state'] == dict(code=code, name=name, schema='zephyrus-v1', basis='flight-events')
+                assert base64.b64decode(received['packet']['raw_b64']) == raw
     finally:
         if window:
             window.close()

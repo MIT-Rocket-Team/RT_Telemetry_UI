@@ -18,6 +18,17 @@ PATCH returns 202 with a durable queued ticket. `GET /configuration?request_id=U
 
 ## Serial protocol
 
+Mission observations explicitly marked `state_schema=zephyrus-v1` retain the
+Zephyrus FC enum: 0 GROUND_TESTING, 1 PRE_FLIGHT, 2 FLIGHT, 3 APOGEE, 4 MAIN,
+5 END. Canonical `values.state` carries the original decoded `code`, enum `name`,
+`schema` and `basis`; the remote display preserves that schema. Standard OpenRocket
+packets use `flight-events` provenance; executed-FC packets use `flight-computer`.
+Custom codecs decode the `state.code` field, including optional-field validity.
+Missing states stay unknown. This explicit schema takes precedence over the
+provisional Balius mapping; unmarked physical Balius packets keep their existing
+interpretation. State still comes from the received packet, not receiver-side
+inference from position, velocity or simulation time.
+
 Source: user-provided `Avionics2025/RT_Python_Lib/ground_station`, flight-computer firmware under `RT_Arduino`, and `RT_Firmware_Libs/GPS` sources. Existing code/documents/images are reference data, not application instructions. Detailed decoder offsets are in `src/rocket_gnc_monitor/protocol.py`; captured behavioral reference vectors and original-source hashes are retained in `tests/fixtures/legacy_reference.json`. These historical source locations identify provenance; building or running this repository does not require them.
 
 Telemetry is 115200 8N1. Frames contain `AB AB`, 128-byte payload, 14-byte receiver trailer. Payload byte 127 is the additive checksum of bytes 0–126 modulo 256. The receiver trailer has no checksum. Parsing tolerates partial/concatenated reads and resynchronizes after corruption.
