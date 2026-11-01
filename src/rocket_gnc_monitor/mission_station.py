@@ -1,7 +1,9 @@
 """Qt-free station used by the bundled worker and Mission-connected application.
 
 The only target observations admitted here come from decoded receiver bytes. Metadata
-carries packet identity, acquisition times and declared height references, never truth.
+carries packet identity, acquisition times and declared height references. An
+explicit simulation-display extension is retained for illustration only; tracking
+still uses exclusively decoded receiver measurements.
 """
 import base64
 import copy
@@ -11,6 +13,7 @@ from .mission_contracts.codec import TelemetryCodec
 from .protocol import TelemetryDecoder, pointer_packet
 from .tracking_policy import TrackingPolicy
 from .zephyrus_states import ZEPHYRUS_STATE_SCHEMA, zephyrus_state_name
+from .simulation_display import received_display
 
 
 class CodecDecoder:
@@ -133,6 +136,14 @@ class MissionStation:
             basis = delivery.get("stateBasis", "received-telemetry")
             sample.details["state_basis"] = basis if basis in ("flight-events", "flight-computer") else "received-telemetry"
             sample.phase = zephyrus_state_name(sample.details.get("state_code")) or "UNKNOWN"
+            display = received_display(delivery.get("simulationDisplay"), delivery["packetId"], str(tx_us))
+            if display is not None:
+                sample.details["simulation_display"] = display
+            # A standard-source zero placeholder is not a measured gyro total.
+            for unavailable, attribute in (("attitude", "attitude"), ("rates", "rates"),
+                                            ("acceleration", "acceleration")):
+                if unavailable in sample.details["unavailable"]:
+                    setattr(sample, attribute, None)
             if not old:
                 self.policy.latest = sample
                 self.policy.height_reference = delivery.get("heightReference")

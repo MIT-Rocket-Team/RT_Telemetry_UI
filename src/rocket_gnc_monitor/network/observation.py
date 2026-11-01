@@ -19,6 +19,7 @@ import uuid
 from ..balius_states import BALIUS_STATE_NAMES
 from ..domain import Sample, finite
 from ..zephyrus_states import ZEPHYRUS_STATE_SCHEMA, zephyrus_state_name
+from ..simulation_display import received_display
 
 
 def _counter(value, field):
@@ -152,6 +153,8 @@ def observation_from_sample(
             "baro_altitude": {"value_m": sample.altitude if finite(sample.altitude) else None, "datum": baro_datum},
             "velocity_enu_m_s": None,
             "orientation": None,
+            "simulation_display": received_display(sample.details.get("simulation_display"),
+                sample.details.get("packetId"), sample.details.get("txTimeUs")) if sample.source == "SIMULATION" else None,
             "flight_status": {
                 "motor_ignited": None,
                 "motor_burning": None,
@@ -226,6 +229,11 @@ def observation_to_sample(payload, *, received_monotonic, source_age_ms, source_
         network_native=json.loads(json.dumps(native, allow_nan=False)),
         network_vehicle=dict(payload.get("vehicle", {})),
     )
+    if native.get("source") == "SIMULATION":
+        display = received_display(values.get("simulation_display"),
+            native_details.get("packetId"), native_details.get("txTimeUs"))
+        if display is not None:
+            details["simulation_display"] = display
     orientation = values.get("orientation")
     # The baseline does not publish orientation. Future explicit frames must
     # name the nose axis; do not guess an axis from an arbitrary quaternion.

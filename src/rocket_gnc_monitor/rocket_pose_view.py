@@ -56,6 +56,8 @@ class RocketPoseView(QWidget):
     @property
     def orientation_text(self):
         if self.pose is not None and self.pose.attitude_known:
+            if self.pose.simulated_display:
+                return "SIMULATION ATTITUDE · received packet"
             return "SIMULATION ATTITUDE" if self.pose.source == "SIMULATION" else "TELEMETRY ATTITUDE"
         if self.pose is not None and "Path-aligned" in self.pose.status:
             return "PATH-ALIGNED ILLUSTRATION"
@@ -131,6 +133,8 @@ class RocketPoseView(QWidget):
         return label + (" · STALE" if self.pose.stale else "")
 
     def _angle_source(self):
+        if self.pose is not None and self.pose.simulated_display:
+            return "OpenRocket simulation illustration"
         if self.pose is not None and self.pose.source == "SIMULATION":
             return "R/P/Y derived" if self.pose.attitude_known else "R/P/Y unavailable"
         if self.pose is not None and self.pose.angle_kind == "gyro_integrals":

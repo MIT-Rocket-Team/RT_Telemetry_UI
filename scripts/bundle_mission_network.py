@@ -15,7 +15,7 @@ args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
 package = root / 'src/rocket_gnc_monitor'
 files = ['__init__.py', 'domain.py', 'protocol.py', 'balius_states.py', 'recording.py',
-         'station_profile.py', 'rocket_protocol.py', 'media.py', 'mission_network.py', 'mission_recording.py', 'zephyrus_states.py']
+         'station_profile.py', 'rocket_protocol.py', 'media.py', 'mission_network.py', 'mission_recording.py', 'zephyrus_states.py', 'simulation_display.py']
 files += [str(p.relative_to(package)) for p in (package / 'network').glob('*.py') if p.name != 'media_receiver.py']
 buffer = io.BytesIO()
 with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as archive:

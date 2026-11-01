@@ -76,6 +76,7 @@ class RocketPose:
     inflation: float = 0.0
     time: float | None = None
     receiver_label: str = ""
+    simulated_display: bool = False
 
 
 def _angles(values):
@@ -184,9 +185,25 @@ def telemetry_pose(sample, mode="LIVE", fresh=True):
     flight_status = flight_status if isinstance(flight_status, Mapping) else {}
     motor, parachute, ignited = (_flag(flight_status, key) for key in
                                 ("motor_burning", "parachute_deployed", "motor_ignited"))
+    # This extension follows an accepted packet from the selected station. It
+    # is explicitly a simulation illustration, separate from measured attitude.
+    simulated_display = False
+    if not known and (getattr(sample, "source", "") == "SIMULATION"
+                      or details.get("network_source_mode") == "simulation"):
+        from .simulation_display import received_display
+        display = details.get("simulation_display")
+        display = received_display(display, display.get("packet_id"), display.get("tx_time_us")) if isinstance(display, dict) else None
+        if display is not None:
+            rotation, known = _orientation_rotation(display)
+            angles, angle_kind = _rpy_from_rotation(rotation), "orientation"
+            motor, parachute, ignited = (_flag(display, key) for key in
+                ("motor_burning", "parachute_deployed", "motor_ignited"))
+            simulated_display = True
     stale = source in {"LIVE", "NETWORK"} and not fresh
     state = "STALE · last telemetry" if stale else "Telemetry"
-    if known:
+    if simulated_display:
+        attitude = "OpenRocket simulation illustration · associated with received packet"
+    elif known:
         attitude = "Orientation quaternion · body-to-ENU · +Z nose"
     elif angle_kind == "gyro_integrals":
         attitude = "Orientation unavailable · gyro integrals are not attitude"
@@ -213,6 +230,7 @@ def telemetry_pose(sample, mode="LIVE", fresh=True):
         source=source, status=status, stale=bool(stale), attitude_known=known,
         inflation=1.0 if parachute is True else 0.0, time=_number(getattr(sample, "t", None)),
         receiver_label=receiver_label,
+        simulated_display=simulated_display,
     )
 
 
