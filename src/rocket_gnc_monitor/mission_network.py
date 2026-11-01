@@ -180,7 +180,8 @@ class MissionNetwork:
                         library()  # Report missing media support before advertising capabilities.
                         media = MediaService(profile, port_start=55000 + int(site['id'][-1]) * 32,
                             port_end=55031 + int(site['id'][-1]) * 32,
-                            bind_host=config.get('bindHost', '0.0.0.0'), allowed_source_modes=('simulation',))
+                            bind_host=config.get('bindHost', '0.0.0.0'), allowed_source_modes=('simulation',),
+                            viewers_per_stream=4)
                     runtime = SimulationRuntime(self.directory / ('-'.join(key)), profile,
                         mission['identity']['missionId'], {'network_source_mode': 'simulation',
                         'network_accept_source_modes': [], 'network_port': 0,

@@ -1,13 +1,16 @@
 import asyncio
+import io
+import json
 import threading
 import time
+import urllib.error
 import uuid
 
 import pytest
 
 from rocket_gnc_monitor.media import WIDTH, HEIGHT
 from rocket_gnc_monitor.network.media import MediaError, MediaService
-from rocket_gnc_monitor.network.media_receiver import MediaReceiver
+from rocket_gnc_monitor.network.media_receiver import MediaReceiver, _http_failure_message
 from rocket_gnc_monitor.network.media_srt import SRTSocket, library
 from rocket_gnc_monitor.network.runtime import NetworkRuntime
 from rocket_gnc_monitor.station_profile import StationProfile
@@ -153,3 +156,56 @@ def test_real_h264_mpegts_srt_http_loopback(tmp_path):
         stopped.set()
         service.close()
         runtime.stop()
+
+
+def test_simulation_capacity_is_per_stream_and_released_sessions_free_slots():
+    require_native()
+    service = MediaService(StationProfile(station="away1", role="video"),
+                           port_start=55940, port_end=55955, viewers_per_stream=2,
+                           allowed_source_modes=("simulation",))
+    context = dict(mission_id=str(uuid.uuid4()), boot_id=str(uuid.uuid4()),
+                   host="127.0.0.1", source_mode="simulation")
+    sessions = []
+    try:
+        for key in ("digital", "analog"):
+            source = Capture()
+            source.source_mode = "simulation"
+            service.set_source(key, source)
+            source.emit(bytes(WIDTH * HEIGHT * 3))
+        streams = service.streams()
+        def allocate(stream, rendition="preview"):
+            request = dict(request_id=str(uuid.uuid4()), client_node_id=str(uuid.uuid4()),
+                           client_boot_id=str(uuid.uuid4()), mission_id=context["mission_id"],
+                           expected_server_boot_id=context["boot_id"], stream_id=stream["stream_id"],
+                           rendition=rendition, expected_media_epoch=stream["media_epoch"])
+            return asyncio.run(service.create_session(request, context))
+        # Two computers can each receive both streams; four previews used to fail.
+        for _ in range(2):
+            sessions.extend(allocate(stream) for stream in streams)
+        assert len({session["transport"]["port"] for session in sessions}) == 4
+        assert all(len(channel.encoders) == 1 for channel in service.channels.values())
+        with pytest.raises(MediaError) as caught:
+            allocate(streams[0])
+        assert caught.value.code == "media_capacity"
+        # Main/preview promotion still works while both preview slots are used.
+        allocate(streams[0], "main")
+        session = sessions[0]
+        asyncio.run(service.delete_session(session["session_id"],
+                    dict(context, session_token=session["session_token"])))
+        allocate(streams[0])
+    finally:
+        service.close()
+
+
+@pytest.mark.parametrize("body,status,expected", [
+    ({"error": {"code": "media_capacity", "message": "do not show secret-token"}}, 429,
+     "Video viewer limit reached at this station"),
+    ({"error": {"code": "capture_unavailable"}}, 503, "Waiting for source video frames"),
+    ({"error": {"code": "unknown", "message": "secret-token"}}, 503,
+     "Station rejected the video connection (HTTP 503)"),
+    ([], 429, "Video viewer limit reached at this station"),
+])
+def test_video_http_errors_explain_failure_without_exposing_server_details(body, status, expected):
+    error = urllib.error.HTTPError("http://station/private-token", status, "hidden details", {},
+                                   io.BytesIO(json.dumps(body).encode()))
+    assert _http_failure_message(error) == expected

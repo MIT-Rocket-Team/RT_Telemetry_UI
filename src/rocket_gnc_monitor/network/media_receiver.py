@@ -52,6 +52,31 @@ def _http(endpoint, method, path, body=None, token=None):
         return json.loads(raw) if raw else None
 
 
+def _http_failure_message(error):
+    """Translate public error codes without displaying URLs, tokens or server text."""
+    messages = {
+        "media_capacity": "Video viewer limit reached at this station",
+        "capture_unavailable": "Waiting for source video frames",
+        "boot_changed": "Video publisher restarted; reconnecting",
+        "media_epoch_changed": "Video source changed; reconnecting",
+        "mission_mismatch": "Video publisher belongs to another mission",
+        "source_mode_rejected": "This publisher does not accept the selected video mode",
+        "media_transport_unavailable": "Station could not open a video connection",
+        "endpoint_unavailable": "Station has no reachable video address",
+    }
+    try:
+        raw = error.read(65537)
+        body = json.loads(raw) if len(raw) <= 65536 else {}
+        code = body.get("error", {}).get("code")
+        message = messages.get(code)
+    except (OSError, ValueError, TypeError, AttributeError):
+        message = None
+    finally:
+        error.close()
+    return message or ("Video viewer limit reached at this station" if error.code == 429
+                       else f"Station rejected the video connection (HTTP {error.code})")
+
+
 class MediaReceiver:
     def __init__(self, endpoint, identity, peer, stream, rendition):
         self.endpoint, self.identity, self.peer = endpoint, dict(identity), dict(peer)
@@ -168,7 +193,8 @@ class MediaReceiver:
             except Exception as exc:
                 if not self.stopped.is_set():
                     # Stream IDs/tokens are never included in diagnostics.
-                    self.error = f"{type(exc).__name__}: video source unavailable"
+                    self.error = (_http_failure_message(exc) if isinstance(exc, urllib.error.HTTPError)
+                                  else f"{type(exc).__name__}: video source unavailable")
             finally:
                 failed.set()
                 if self.connection:

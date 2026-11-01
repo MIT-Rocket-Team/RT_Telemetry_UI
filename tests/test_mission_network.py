@@ -151,6 +151,43 @@ def test_stream_metadata_is_bounded_and_checked():
         ('digital', 1), ('analog', 1), ('digital', 2), ('analog', 2)]
 
 
+def test_two_base_video_viewers_receive_both_mission_streams(qtbot, tmp_path):
+    image = QImage(960, 540, QImage.Format.Format_RGB888)
+    image.fill(QColor(35, 210, 25))
+    path = tmp_path / 'slate.png'
+    assert image.save(str(path))
+    streams = [dict(id=kind, kind=kind, vehicleId='balius', receivers=['gs1'],
+                    assetPath=str(path), sha256=hashlib.sha256(path.read_bytes()).hexdigest())
+               for kind in ('digital', 'analog')]
+    publisher = MissionNetwork(tmp_path / 'publisher')
+    windows = []
+    try:
+        publisher.configure(mission(streams), discovery=False)
+        publisher.begin(streams)
+        # A paused carrier is the same source for both ordinary Base windows.
+        publisher.advance('0', [{'id': 'gs1', 'deliveries': [], 'videoState': [
+            {'streamId': s['id'], 'frame': '0', 'timeUs': '0'} for s in streams]}],
+            [{'id': 'gs1', 'samples': [], 'tracking': False}])
+        publisher.phase('paused')
+        for index in range(2):
+            window = base(qtbot, tmp_path / f'base-{index}', 'video')
+            windows.append(window)
+            join(qtbot, window, publisher.services['gs1', 'video'][0])
+        def all_main_feeds_decoded():
+            return all((worker := w.station_network.viewer.workers.get(('away1', kind, 'main')))
+                       and worker.received_frames >= 3 and not worker.error
+                       for w in windows for kind in ('digital', 'analog'))
+        qtbot.waitUntil(all_main_feeds_decoded, timeout=20000)
+        for window in windows:
+            for tile in window.video_wall.primary_views.values():
+                assert not tile.pixmap().isNull()
+                assert tile.pixmap().toImage().pixelColor(10, 10).green() > 180
+    finally:
+        for window in windows:
+            window.close()
+        publisher.close()
+
+
 def test_scoped_slot_conflicts_do_not_mix_live_and_simulated_missions(tmp_path):
     runtime = NetworkRuntime(tmp_path, StationProfile(), str(uuid.uuid4()), {'network_discovery': False})
     template = dict(station='gs1', role='telem', vehicle_mode='balius', source_mode='live',

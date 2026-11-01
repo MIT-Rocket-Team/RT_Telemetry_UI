@@ -317,11 +317,14 @@ class MediaService:
     """
 
     def __init__(self, profile, *, port_start=55000, port_end=55031, bind_host="0.0.0.0", notify=None,
-                 allowed_source_modes=("live",)):
+                 allowed_source_modes=("live",), viewers_per_stream=None):
         self.profile, self.bind_host, self.notify = profile, bind_host, notify
         self.allowed_source_modes = set(allowed_source_modes)
         if not self.allowed_source_modes <= {"live", "replay", "simulation"}:
             raise ValueError("Invalid media source mode")
+        if viewers_per_stream is not None and (type(viewers_per_stream) is not int or not 1 <= viewers_per_stream <= 4):
+            raise ValueError("Media viewers per stream must be between one and four")
+        self.viewers_per_stream = viewers_per_stream
         station = "launch" if profile.station == "base" else "gs" + profile.station[-1]
         mapping = channel_ids(profile)
         self.channels = {key: Channel(key, mapping[key], f"{station}.{mapping[key]}")
@@ -480,8 +483,15 @@ class MediaService:
                     or time.monotonic() - channel.last_frame > 5):
                 raise MediaError(503, "capture_unavailable", "Camera has no recent source frame", True)
             active = [s for s in self.sessions.values() if not s.stopped.is_set()]
-            if len(active) >= 4 or sum(s.rendition == request["rendition"] for s in active) >= 2:
-                raise MediaError(429, "media_capacity", "Two main and two preview sessions are supported", True)
+            if self.viewers_per_stream is None:
+                if len(active) >= 4 or sum(s.rendition == request["rendition"] for s in active) >= 2:
+                    raise MediaError(429, "media_capacity", "Two main and two preview sessions are supported", True)
+            else:
+                # Simulated stations share one encoder for each stream/rendition.
+                # Count viewers of that stream, not unrelated analog/digital feeds.
+                viewers = sum(s.channel is channel and s.rendition == request["rendition"] for s in active)
+                if viewers >= self.viewers_per_stream or len(active) >= len(self.ports):
+                    raise MediaError(429, "media_capacity", "Video viewer limit reached for this stream or station", True)
             session_id, token = str(uuid.uuid4()), secrets.token_hex(16)
             listener = None
             error = "No available media port"

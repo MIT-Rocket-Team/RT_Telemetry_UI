@@ -39,7 +39,12 @@ Only the selected ensemble member is shared. Pause preserves service and media
 identities, continues heartbeats/leases and uses video carrier frames without creating
 canonical samples or encoded recording frames. Optional bounded video recording is
 shared by the desktop and headless publisher; OpenRocket adds completed segments to
-its result archive. A station still supports two main and two preview media leases.
+its result archive. Simulated stations support four viewers per stream and rendition,
+with at most 32 media leases per station. Digital and analog previews have independent
+limits, so two Base video windows can receive both feeds concurrently. Each
+stream/rendition still shares one encoder; viewer queues remain bounded. Physical
+Away stations retain their two-main/two-preview limits. Capacity errors are displayed
+as a viewer limit rather than an unavailable video source.
 
 Station-slot conflicts are scoped by mission, source mode and vehicle. A simulated
 GS1 can coexist with a live GS1 on the same network. Joining is explicit and simulation
