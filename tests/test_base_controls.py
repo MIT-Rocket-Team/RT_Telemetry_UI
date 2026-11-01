@@ -22,7 +22,6 @@ def controls(qtbot, tmp_path):
     controller.workers["telemetry"] = SimpleNamespace(send=lambda data, identifier: packets.append(data))
     controller.states["telemetry"] = "Connected"
     controller.polling = True
-    controller.accept(Sample(0, 1, "LIVE", details={"state_code": 1, "boot_index": 0}))
 
     def guard(callback):
         try:
@@ -32,6 +31,9 @@ def controls(qtbot, tmp_path):
 
     panel = RocketPanel(controller, guard)
     qtbot.addWidget(panel)
+    # Native font/widget startup can exceed the two-second telemetry deadline.
+    # Deliver the fixture's live packet once the panel is ready to receive it.
+    controller.accept(Sample(0, 1, "LIVE", details={"state_code": 1, "boot_index": 0}))
     panel.configure_base_controls()
     yield controller, panel, packets, errors
     controller.workers["telemetry"] = None

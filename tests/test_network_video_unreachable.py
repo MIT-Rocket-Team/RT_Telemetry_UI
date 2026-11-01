@@ -22,11 +22,8 @@ def test_all_eight_real_video_feeds_survive_unreachable_saved_peer(qtbot, tmp_pa
     publisher = MissionNetwork(tmp_path / "publisher")
     window = None
     # Bound but not listening: keep the dead port unavailable to other tests.
-    with socket.socket() as dead, socket.socket() as listener:
+    with socket.socket() as dead:
         dead.bind(("127.0.0.1", 0))
-        listener.bind(("127.0.0.1", 0))
-        local_port = listener.getsockname()[1]
-        listener.close()
         try:
             publisher.configure(dict(identity=dict(missionId=str(uuid.uuid4()), title="Video regression"),
                 sites=[dict(id=s, enabled=True) for s in stations], video=dict(streams=streams),
@@ -38,7 +35,9 @@ def test_all_eight_real_video_feeds_survive_unreachable_saved_peer(qtbot, tmp_pa
             publisher.phase("paused")
             services = [publisher.services[s, "video"][0] for s in stations]
             window = StationWindow(tmp_path / "base", profile=StationProfile(role="video"), auto_place=False,
-                network_config=dict(network_bind_host="127.0.0.1", network_port=local_port,
+                # Let the service reserve its own port atomically; the eight
+                # publisher services can reuse a port selected then released here.
+                network_config=dict(network_bind_host="127.0.0.1", network_port=0, mission_simulation=True,
                     network_discovery=False, mission_id=None,
                     peers=[f"http://127.0.0.1:{dead.getsockname()[1]}", *[s.local_endpoint for s in services]]))
             qtbot.addWidget(window)
