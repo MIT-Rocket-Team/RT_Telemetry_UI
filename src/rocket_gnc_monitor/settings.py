@@ -40,6 +40,7 @@ class AppSettings:
     sessions_directory: str = ""
     daylight: bool = False
     simulation_timeout: int = 120
+    display_units: str = "imperial"
 
     @property
     def engine_path(self):
@@ -53,6 +54,8 @@ class AppSettings:
             raise ValueError("Unsupported settings version")
         if type(self.daylight) is not bool:
             raise ValueError("Daylight must be true or false")
+        if self.display_units not in ("imperial", "metric"):
+            raise ValueError("Display units must be imperial or metric")
         if type(self.simulation_timeout) is not int or not 10 <= self.simulation_timeout <= 1800:
             raise ValueError("Simulation time limit must be between 10 and 1800 seconds")
         for name in ("openrocket_jar", "sessions_directory"):

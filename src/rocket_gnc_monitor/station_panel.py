@@ -16,6 +16,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton, QSpinBox, QVBoxLayout, QWidget
 
 from .domain import write_json
+from .display_units import DisplayUnits
 from .station_io import APRSReceiver, StationLink, controller_snapshot
 
 
@@ -250,7 +251,7 @@ class StationNetworkPanel(QWidget):
             self.aprs_status.clear()
         elif fix:
             age = max(0, time.monotonic() - fix.received)
-            altitude = f" · {fix.altitude_m:.0f} m" if fix.altitude_m is not None else ""
+            altitude = " · " + DisplayUnits(self.c.settings.display_units).text(fix.altitude_m, "distance", 0) if fix.altitude_m is not None else ""
             prefix = "APRS" if aprs_connected else "LAST APRS · disconnected"
             self.aprs_status.setText(
                 f"{prefix} · {fix.callsign} · {fix.latitude:.5f}, {fix.longitude:.5f}{altitude} · {age:.0f}s old"
@@ -284,7 +285,7 @@ class StationNetworkPanel(QWidget):
         if peer:
             sample = peer["telemetry"] or {}
             altitude = sample.get("altitude")
-            altitude = f"{altitude:.1f} m" if altitude is not None else "—"
+            altitude = DisplayUnits(self.c.settings.display_units).text(altitude, "distance")
             age = peer["sample_age_s"]
             age = f" · sample {(age + lan['age_s']):.1f}s old" if age is not None else ""
             self.peer_status.setText(

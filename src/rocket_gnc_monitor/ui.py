@@ -55,6 +55,7 @@ from .rocket_protocol import legacy_values
 from .fonts import FONT_FAMILY, configure_fonts
 from .location_ui import LaunchLocation, PointerLocation
 from .settings_ui import SettingsDialog
+from .display_units import DisplayUnits
 from .virtual_pointer import VIRTUAL_POINTER_DEVICE
 from .table_cells import set_cell
 from .plot_controls import PlotViewControls
@@ -620,6 +621,10 @@ class MainWindow(QMainWindow):
     def apply_settings(self, settings):
         self.controller.save_settings(settings)
         self.set_daylight(settings.daylight, persist=False)
+        self.last_ui = self.last_table = 0
+        self.last_sample_key = None
+        self.refresh()
+        self.refresh_plots(force=True)
         self.statusBar().showMessage("Settings saved", 5000)
 
     def set_daylight(self, enabled, *, persist=True):
@@ -772,6 +777,7 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
         metrics = QHBoxLayout()
+        self.metric_unit_labels = {}
         for key, title, unit in [
             ("altitude", "ALTITUDE", "m"),
             ("velocity", "VELOCITY", "m/s"),
@@ -784,7 +790,10 @@ class MainWindow(QMainWindow):
             column.addWidget(label(title, "muted"))
             value = label("—", "metric")
             column.addWidget(value)
-            column.addWidget(label(unit, "muted"))
+            unit_label = label(unit, "muted")
+            column.addWidget(unit_label)
+            if key in ("altitude", "velocity"):
+                self.metric_unit_labels[key] = (unit_label, "")
             metrics.addWidget(panel, 1)
             self.metrics[key] = value
         layout.addLayout(metrics)
@@ -1421,7 +1430,7 @@ class MainWindow(QMainWindow):
             return
         m = c.mission
         self.virtual_location.setText(
-            f"Antenna: {m.pointer_latitude:.7f}°, {m.pointer_longitude:.7f}°\n{m.pointer_altitude:.1f} m ellipsoid"
+            f"Antenna: {m.pointer_latitude:.7f}°, {m.pointer_longitude:.7f}°\n{DisplayUnits(c.settings.display_units).text(m.pointer_altitude, 'distance')} ellipsoid"
             if m.pointer_site_configured
             else "Set the antenna location in Mission configuration"
         )
@@ -1454,7 +1463,7 @@ class MainWindow(QMainWindow):
         self.virtual_slider.blockSignals(False)
         self.virtual_clock.setText(
             f"{'PLAYING' if flight.playing else 'ENDED' if flight.time >= flight.end else 'PAUSED'} · "
-            f"{flight.time:.2f} / {flight.end:.2f} s\nRange {flight.distance:,.1f} m"
+            f"{flight.time:.2f} / {flight.end:.2f} s\nRange {DisplayUnits(c.settings.display_units).text(flight.distance, 'distance')}"
             + (" · direction undefined at antenna origin" if flight.angles is None else "")
             if flight
             else "Ready to follow the reference trajectory"
@@ -1883,12 +1892,12 @@ class MainWindow(QMainWindow):
         if c.frozen_ground:
             gps = c.frozen_ground
             self.ground_gps.setText(
-                f"FROZEN · {'FIX' if gps['gnd_fix'] else 'NO FIX'}\n{gps['gnd_lat']:.5f}°, {gps['gnd_lon']:.5f}°\nAltitude {gps['gnd_alt']} m"
+                f"FROZEN · {'FIX' if gps['gnd_fix'] else 'NO FIX'}\n{gps['gnd_lat']:.5f}°, {gps['gnd_lon']:.5f}°\nAltitude {DisplayUnits(c.settings.display_units).text(gps['gnd_alt'], 'distance')}"
             )
         elif c.latest:
             gps = legacy_values(c.latest)
             self.ground_gps.setText(
-                f"{'FIX' if gps['gnd_fix'] else 'NO FIX'}\n{gps['gnd_lat']}°, {gps['gnd_lon']}°\nAltitude {gps['gnd_alt']} m"
+                f"{'FIX' if gps['gnd_fix'] else 'NO FIX'}\n{gps['gnd_lat']}°, {gps['gnd_lon']}°\nAltitude {DisplayUnits(c.settings.display_units).text(gps['gnd_alt'], 'distance')}"
             )
         else:
             self.ground_gps.setText("Awaiting telemetry")
@@ -1926,6 +1935,16 @@ class MainWindow(QMainWindow):
         self.last_ui = now
         c = self.controller
         s = c.display_latest
+        units = DisplayUnits(c.settings.display_units)
+        for key, (widget, prefix) in self.metric_unit_labels.items():
+            widget.setText(prefix + units.unit("distance" if key == "altitude" else "velocity"))
+        if getattr(self, "live_plot_headers", None):
+            for header, title in zip(self.live_plot_headers,
+                    ("ALTITUDE / " + units.unit("distance"), "ANGULAR RATE / " + units.unit("rate"), "INTEGRATED ANGLES / °")):
+                if header.title != title:
+                    header.title = title
+                    header.setToolTip(title)
+                    header.update()
         remote = c.remote_display_key is not None
         if hasattr(self, "flight_actions"):
             self.flight_actions["open"].setEnabled(not c.flight_busy and c.recorder is None)
@@ -1951,8 +1970,8 @@ class MainWindow(QMainWindow):
         self.refresh_connections(now)
         age = max(0, now - s.received) if s else None
         values = dict(
-            altitude=s.altitude if s else None,
-            velocity=s.velocity if s else None,
+            altitude=units.convert(s.altitude, "distance") if s else None,
+            velocity=units.convert(s.velocity, "velocity") if s else None,
             flight=s.t - c.display_flight_zero if s and c.display_time_aligned else None,
             battery=s.battery if s else None,
             rssi=s.rssi if s else None,
@@ -2065,7 +2084,7 @@ class MainWindow(QMainWindow):
             f"{m.name} · "
             + (f"{m.launch_site_name} · " if m.launch_site_name else "")
             + (
-                f"Launch {m.latitude:.6f}°, {m.longitude:.6f}° / {m.altitude:.1f} m ellipsoid"
+                f"Launch {m.latitude:.6f}°, {m.longitude:.6f}° / {units.text(m.altitude, 'distance')} ellipsoid"
                 if m.site_configured
                 else "Launch origin not configured"
             )
@@ -2114,10 +2133,12 @@ class MainWindow(QMainWindow):
         if not hasattr(self, "trajectory_plot"):
             return
         c = self.controller
+        units = DisplayUnits(c.settings.display_units)
         sample = c.display_latest
         remote = c.remote_display_key is not None
         flight_zero = c.display_flight_zero
         key = (
+            c.settings.display_units,
             c.mode,
             c.remote_display_key,
             sample.sequence if sample else None,
@@ -2135,9 +2156,11 @@ class MainWindow(QMainWindow):
         times = [s.t - flight_zero for s in history]
         for graph in (self.altitude_plot, self.rate_plot, self.angle_plot):
             graph.setLabel("bottom", "Source device uptime" if remote else "Flight time", units="s", color=COLORS["muted"])
-        self.altitude_curve.setData(times, [s.altitude if finite(s.altitude) else np.nan for s in history])
+        self.altitude_plot.setLabel("left", "Altitude", units=units.unit("distance"), color=COLORS["muted"])
+        self.rate_plot.setLabel("left", "Body angular rate", units=units.unit("rate"), color=COLORS["muted"])
+        self.altitude_curve.setData(times, [units.convert(s.altitude, "distance") if finite(s.altitude) else np.nan for s in history])
         for i in range(3):
-            self.rate_curves[i].setData(times, [s.rates[i] if s.rates else np.nan for s in history])
+            self.rate_curves[i].setData(times, [units.convert(s.rates[i], "rate") if s.rates and finite(s.rates[i]) else np.nan for s in history])
             self.angle_curves[i].setData(times, [s.attitude[i] if s.attitude else np.nan for s in history])
         view = self.view.currentIndex()
 
@@ -2145,6 +2168,7 @@ class MainWindow(QMainWindow):
             points = np.asarray(points, dtype=float)
             if points.size == 0:
                 return [], []
+            points = points * units.factor("distance")
             if view == 0:
                 return points[:, 0], points[:, 1]
             if view == 1:
@@ -2154,10 +2178,10 @@ class MainWindow(QMainWindow):
             ) * 0.34
 
         self.trajectory_plot.setLabel(
-            "left", ["North (m)", "Up (m)", "Projected up (m)"][view], color=COLORS["muted"]
+            "left", units.label(["North (m)", "Up (m)", "Projected up (m)"][view]), color=COLORS["muted"]
         )
         self.trajectory_plot.setLabel(
-            "bottom", ["East (m)", "East (m)", "Projected horizontal (m)"][view], color=COLORS["muted"]
+            "bottom", units.label(["East (m)", "East (m)", "Projected horizontal (m)"][view]), color=COLORS["muted"]
         )
         x, y = project(list(c.display_track))
         self.actual_curve.setData(x, y)
@@ -2168,7 +2192,7 @@ class MainWindow(QMainWindow):
             reference = c.reference
             x, y = project(reference.points[:, 1:])
             self.reference_curve.setData(x, y)
-            self.altitude_reference.setData(reference.points[:, 0], reference.points[:, 3])
+            self.altitude_reference.setData(reference.points[:, 0], reference.points[:, 3] * units.factor("distance"))
             mark = reference.at(c.latest.t - c.flight_zero) if c.latest and c.time_aligned else None
             virtual = c.virtual_flight if c.virtual_pointer else None
             if virtual and virtual.reference is reference:
@@ -2182,7 +2206,7 @@ class MainWindow(QMainWindow):
                 text += f" · VIRTUAL {virtual.time:.2f} s · gold: target · purple: antenna"
             if c.latest and c.latest.enu and mark and not virtual:
                 residual = np.linalg.norm(np.asarray(c.latest.enu) - np.asarray(mark))
-                text += f" · same-time position residual {residual:.1f} m"
+                text += f" · same-time position residual {units.convert(residual, 'distance'):.1f} {units.unit('distance')}"
             if not c.time_aligned and not virtual:
                 text += " · flight time not aligned"
             self.reference_label.setText(text)

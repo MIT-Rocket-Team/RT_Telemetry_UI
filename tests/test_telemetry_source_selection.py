@@ -2,6 +2,7 @@
 
 from collections import deque
 import copy
+from dataclasses import replace
 import socket
 import time
 import uuid
@@ -30,6 +31,9 @@ def window(qtbot, tmp_path):
         network_config=dict(network_bind_host="127.0.0.1", network_port=free_port(),
                             network_discovery=False, mission_id=None, peers=[]))
     qtbot.addWidget(window)
+    # These source-routing assertions use SI values; unit presentation has its
+    # own imperial-default/switching regression tests.
+    window.controller.settings = replace(window.controller.settings, display_units="metric")
     window.show()
     yield window
     window.close()
@@ -51,17 +55,50 @@ def add_peer(qtbot, bridge, service):
     return next(p for p in bridge.peers if p.get("info", {}).get("node_id") == service.node_id)
 
 
-def publish(service, altitude=120, state=2, quaternion=(1, 0, 0, 0), counter=1):
+def publish(service, altitude=120, state=2, quaternion=(1, 0, 0, 0), counter=1, simulated_display=False):
     sample = Sample(t=counter, sequence=counter, source="SIMULATION", received=time.monotonic(),
                     altitude=altitude, details={"state_code": state})
+    if simulated_display:
+        from rocket_gnc_monitor.simulation_display import SCHEMA
+        sample.details.update(packetId=f"packet-{counter}", txTimeUs=str(counter * 1_000_000))
+        sample.details["simulation_display"] = dict(schema=SCHEMA, packet_id=f"packet-{counter}",
+            tx_time_us=str(counter * 1_000_000), frame="body_to_ENU", body_axis="+Z",
+            quaternion_wxyz=list(quaternion), motor_ignited=True, motor_burning=state == 2,
+            parachute_deployed=state == 3)
     payload = observation_from_sample(sample, raw=None, raw_unavailable_reason="Test fixture",
         station=service.station, node_id=service.node_id, boot_id=service.boot_id,
         connection_id=str(uuid.uuid4()), observation_counter=counter,
         boot_monotonic=service.boot_monotonic, vehicle_mode="balius")
-    payload["values"]["orientation"] = dict(body_axes="right_handed_nose_+Z", quaternion_wxyz=list(quaternion))
-    payload["values"]["flight_status"] = dict(motor_ignited=True, motor_burning=state == 2,
-        parachute_deployed=state == 3, evidence_source="test")
+    if not simulated_display:
+        payload["values"]["orientation"] = dict(body_axes="right_handed_nose_+Z", quaternion_wxyz=list(quaternion))
+        payload["values"]["flight_status"] = dict(motor_ignited=True, motor_burning=state == 2,
+            parachute_deployed=state == 3, evidence_source="test")
     service.publish_observation(payload)
+
+
+def test_packet_associated_illustration_follows_selected_receiver(window, qtbot, tmp_path):
+    mission = str(uuid.uuid4())
+    services = [publisher(tmp_path / f"pose-{i}", mission, station=f"away{i}") for i in (1, 3)]
+    bridge, c = window.station_network, window.controller
+    try:
+        bridge.join_peer(add_peer(qtbot, bridge, services[0]))
+        add_peer(qtbot, bridge, services[1])
+        for service, q, state in zip(services, ((1, 0, 0, 0), (0, 1, 0, 0)), (2, 3)):
+            publish(service, quaternion=q, state=state, simulated_display=True)
+        qtbot.waitUntil(lambda: all(bridge._history.get(s.node_id) for s in services), timeout=5000)
+        for service, expected, motor, chute in ((services[1], np.diag([1, -1, -1]), False, True),
+                                               (services[0], np.eye(3), True, False)):
+            bridge.select_source(service.node_id)
+            window.attitude.refresh()
+            pose = window.attitude.view.pose
+            assert pose.simulated_display and pose.attitude_known
+            np.testing.assert_allclose(pose.rotation, expected)
+            assert pose.motor is motor and pose.parachute is chute
+            assert service.station.upper() in pose.receiver_label
+        assert c.latest is None and not c.can_command
+    finally:
+        for service in services:
+            service.stop()
 
 
 def test_joining_video_selects_delayed_telemetry_without_serial_polling(window, qtbot, tmp_path):

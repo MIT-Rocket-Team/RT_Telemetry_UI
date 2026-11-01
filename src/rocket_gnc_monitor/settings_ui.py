@@ -74,6 +74,12 @@ class SettingsDialog(QDialog):
         self.theme = QComboBox()
         self.theme.addItems(["Dark", "Daylight"])
         form.addRow("Appearance", self.theme)
+        self.units = QComboBox()
+        self.units.addItem("Imperial · OpenRocket defaults", "imperial")
+        self.units.addItem("Metric", "metric")
+        self.units.setAccessibleName("Display units")
+        self.units.setToolTip("Display only. Telemetry, recordings, mission inputs and control calculations keep their original units.")
+        form.addRow("Display units", self.units)
         if open_network is not None or open_station_assignments is not None:
             network = QHBoxLayout()
             self.network_button = QPushButton("Station network…")
@@ -132,6 +138,7 @@ class SettingsDialog(QDialog):
         self.sessions.setText(settings.sessions_directory)
         self.timeout.setValue(settings.simulation_timeout)
         self.theme.setCurrentIndex(int(settings.daylight))
+        self.units.setCurrentIndex(max(0, self.units.findData(settings.display_units)))
         self.error.hide()
         self.describe_engine()
 
@@ -177,6 +184,7 @@ class SettingsDialog(QDialog):
                 sessions_directory=absolute(self.sessions.text()),
                 daylight=bool(self.theme.currentIndex()),
                 simulation_timeout=self.timeout.value(),
+                display_units=self.units.currentData(),
             ).validate(paths=True)
             self.apply_settings(settings)
         except (ValueError, OSError) as exc:

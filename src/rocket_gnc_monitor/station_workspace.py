@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
 from .ui import MainWindow as InstrumentWindow, button, label
 from .widgets import COLORS, ComboBox
 from .flight_view import Flight3DDialog
+from .display_units import DisplayUnits
 from .media import WIDTH, HEIGHT, camera_devices
 from .domain import finite
 from .table_cells import set_cell
@@ -319,7 +320,10 @@ class StationWindow(InstrumentWindow):
             box.setObjectName("card")
             line = QHBoxLayout(box)
             line.setContentsMargins(10, 4, 10, 4)
-            line.addWidget(label(title, "muted"))
+            title_label = label(title, "muted")
+            line.addWidget(title_label)
+            if key in ("altitude", "velocity"):
+                self.metric_unit_labels[key] = (title_label, title.split(" · ")[0] + " · ")
             line.addStretch()
             line.addWidget(self.metrics[key])
             self.metrics[key].show()
@@ -1279,6 +1283,11 @@ class StationWindow(InstrumentWindow):
             return
         c = self.controller
         video = self.station_mode == "video"
+        units = DisplayUnits(c.settings.display_units)
+        for key, title in (("altitude", "VERTICAL PROFILE / " + units.unit("distance")),
+                           ("gnc_rates", "ANGULAR RATES / " + units.unit("rate"))):
+            if key in self.cards:
+                self.cards[key].layout().itemAt(0).widget().setText(title)
         from .balius_states import balius_state_name
 
         self.rocket_state_badge.update_state(
@@ -1403,13 +1412,13 @@ class StationWindow(InstrumentWindow):
         ):
             table.setRowCount(len(names))
             for r, name in enumerate(names):
-                set_cell(table, r, 0, name)
+                set_cell(table, r, 0, DisplayUnits(c.settings.display_units).label(name))
                 if not c.display_latest:
                     set_cell(table, r, 1, "—")
                 table.setRowHeight(r, 19)
             table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
             table.setColumnWidth(0, round(table.viewport().width() * 0.58))
-        set_cell(self.rocket_panel.power, 7, 0, "Temp °C")
+        set_cell(self.rocket_panel.power, 7, 0, "Temp " + DisplayUnits(c.settings.display_units).unit("temperature"))
         for col in (0, 1):
             self.rocket_panel.pyros.horizontalHeader().setSectionResizeMode(
                 col, QHeaderView.ResizeMode.ResizeToContents

@@ -22,6 +22,7 @@ from PySide6.QtGui import QFont
 from .flight_scene import FlightScene, Playback
 from .rocket_geometry import rocket_mesh, canopy_mesh, plume_mesh
 from .domain import to_enu
+from .display_units import DisplayUnits
 
 
 EVENT_NAMES = {
@@ -41,6 +42,7 @@ class FlightView(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.scene = self.frame = None
+        self.units = DisplayUnits()
         self.yaw, self.pitch, self.zoom = -55.0, 24.0, 1.0
         self.pan = np.zeros(2)
         self.follow = False
@@ -242,7 +244,8 @@ class FlightView(QWidget):
         p.setPen(QColor(COLORS["muted"]))
         p.drawText(
             QRectF(18, 43, self.width() - 36, 24),
-            f"{frame.time:.2f} s  ·  Altitude {position[2]:,.1f} m  ·  Speed {np.linalg.norm(frame.velocity):,.1f} m/s",
+            f"{frame.time:.2f} s  ·  Altitude {self.units.convert(position[2], 'distance'):,.1f} {self.units.unit('distance')}"
+            f"  ·  Speed {self.units.convert(np.linalg.norm(frame.velocity), 'velocity'):,.1f} {self.units.unit('velocity')}",
         )
         p.drawText(
             QRectF(18, self.height() - 54, self.width() - 36, 22),
@@ -412,6 +415,7 @@ class Flight3DDialog(QDialog):
             self.tick()
 
     def tick(self):
+        self.view.units = DisplayUnits(self.controller.settings.display_units)
         self.load_reference()
         if self.playback is None:
             for w in (self.play_button, self.rewind, self.slider, self.speed, self.events):

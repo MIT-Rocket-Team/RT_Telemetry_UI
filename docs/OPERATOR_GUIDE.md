@@ -83,6 +83,7 @@ Open **Rocket GNC Monitor → Settings…** or press **⌘,** on Mac. On Windows
 - **Simulation time limit:** 10–1800 seconds; default 120 seconds.
 - **Recording folder:** Where new logging sessions are created. **Use default** restores the app data directory's sessions folder. Existing sessions and active recordings stay in their current locations.
 - **Appearance:** Dark or Daylight. The View menu's Daylight choice also persists.
+- **Display units:** Imperial (default) or Metric. Imperial follows OpenRocket's unit definitions: feet for altitude/distance, ft/s for velocity, °F for temperature, and revolutions/second for angular-rate plots. Angles remain degrees. Values, table labels and plot axes update together. This changes display only: raw telemetry, recordings/exports, mission and control inputs, tracking and calculations keep their original units. The choice is saved on this computer.
 
 **Save** validates and stores preferences; **Cancel** discards edits. **Restore Defaults** resets the form and takes effect when saved. Preferences live in the per-user application data directory as `settings.json` (the exact path appears in the window); `--data-dir` selects a separate preferences file. They are local to this computer and are not included in mission JSON or portable flight files. Mission-specific site, wind, rail, alert and video-offset choices remain in Mission configuration. The app always starts in LIVE with hardware closed.
 

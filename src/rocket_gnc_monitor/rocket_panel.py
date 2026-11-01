@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 
 from .balius_states import BALIUS_STATE_NAMES, balius_state_name
 from .domain import finite
+from .display_units import DisplayUnits
 from .rocket_protocol import PHASE_ENUM, legacy_values
 from .table_cells import clear_cells, set_cell
 from .widgets import COLORS
@@ -391,6 +392,12 @@ class RocketPanel(QWidget):
             return
         rejected = s.details.get("bad_packets", 0) if s.source == "NETWORK" else self.c.stats["rejected"]
         v = legacy_values(s, rejected)
+        units = DisplayUnits(self.c.settings.display_units)
+        for key, quantity in (("barofilteredalt", "distance"), ("baro_max_alt", "distance"),
+                ("accel_integrated_velo", "velocity"), ("temp", "temperature"), ("bms_temp", "temperature"),
+                ("gpsalt", "distance"), ("gps_max_alt", "distance"),
+                ("gps_horiz_prec", "distance"), ("gps_vert_prec", "distance")):
+            v[key] = units.convert(v.get(key), quantity)
         if s.source == "NETWORK":
             for native, rendered in (("armed_bits", "armed_pyros"), ("fired_bits", "fired_pyros")):
                 if native not in s.details:
@@ -400,7 +407,7 @@ class RocketPanel(QWidget):
         self.fill(
             self.telemetry,
             [
-                (label, v.get(key))
+                (units.label(label), v.get(key))
                 for label, key in [
                     ("State", "state"),
                     ("RSSI (dBm)", "rssi"),
@@ -426,7 +433,7 @@ class RocketPanel(QWidget):
         self.fill(
             self.gps,
             [
-                (label, v.get(key))
+                (units.label(label), v.get(key))
                 for label, key in [
                     ("GPS fix", "gps_fix"),
                     ("Latitude", "lat"),
@@ -470,6 +477,7 @@ class RocketPanel(QWidget):
         set_cell(self.power, 0, 2, text(all_enabled))
         set_cell(self.power, 0, 4, text(v["total_current"]))
         set_cell(self.power, 7, 3, text(v["bms_temp"]))
+        set_cell(self.power, 7, 0, "Temp " + units.unit("temperature"))
         for row, field in enumerate(["bms_protections_enabled", "bms_protection_status"]):
             bits = v[field]
             for col in range(8):
