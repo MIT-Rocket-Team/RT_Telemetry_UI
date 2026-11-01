@@ -102,10 +102,16 @@ class RocketStateBadge(QWidget):
             )
         self.state_label.setText(self.state_name)
         source = mode.upper() if isinstance(mode, str) else "UNKNOWN SOURCE"
-        if source not in {"LIVE", "REPLAY"}:
+        if source not in {"LIVE", "REPLAY", "SIMULATION"}:
             source = "UNKNOWN SOURCE"
         recorded_source = getattr(sample, "source", "")
-        if source == "LIVE" and isinstance(recorded_source, str) and recorded_source and recorded_source != "LIVE":
+        if source == "LIVE" and recorded_source == "NETWORK":
+            details = getattr(sample, "details", {})
+            mode = details.get("network_source_mode") if isinstance(details, Mapping) else None
+            source = "SIMULATION · NETWORK" if mode == "simulation" else "REPLAY · NETWORK" if mode == "replay" else "NETWORK"
+        elif source == "LIVE" and recorded_source == "SIMULATION":
+            source = "SIMULATION"
+        elif source == "LIVE" and isinstance(recorded_source, str) and recorded_source and recorded_source != "LIVE":
             source = "REPLAY"
         status = ("No telemetry received" if sample is None else
                   "Telemetry" if fresh else "STALE · last telemetry")

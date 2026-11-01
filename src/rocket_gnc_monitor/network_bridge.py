@@ -15,6 +15,10 @@ from PySide6.QtCore import QObject, QTimer, Signal
 from .network import NetworkRuntime
 from .network.observation import observation_from_sample, observation_to_sample
 from .network.protocol import endpoint
+from .domain import finite
+
+
+BEST_CONNECTION = "best"
 
 
 def network_configuration(data_dir, **overrides):
@@ -60,6 +64,9 @@ class StationNetworkBridge(QObject):
         self._counter = 0
         self._lock = threading.Lock()
         self._history, self._last_observations = {}, {}
+        self.source_selection = self._default_source(self.config)
+        self._last_source_evaluation = None
+        self._set_display_source(self.source_selection)
         self._workers, self._hardware = {}, {}
         self._last_status = 0
         self._mode = None
@@ -160,6 +167,16 @@ class StationNetworkBridge(QObject):
         if self.window.profile.role == "telemetry" and info.get("role") == "telem":
             self.select_source(info["node_id"])
 
+    def _default_source(self, config):
+        return BEST_CONNECTION if (self.window.profile.station == "base"
+            and self.window.profile.role == "telemetry" and config.get("mission_id")
+            and config.get("receive_source_mode") == "simulation") else None
+
+    @staticmethod
+    def _source_scope(config):
+        return (config.get("mission_id"), config.get("receive_source_mode", "live"),
+                bool(config.get("accept_replay")))
+
     def _configure_video_wall(self):
         from .video_wall import VideoWall
         from .mission_video import MissionProfile
@@ -192,15 +209,21 @@ class StationNetworkBridge(QObject):
 
     def apply(self, config):
         config = validate_configuration(config)
+        same_scope = self._source_scope(config) == self._source_scope(self.config)
         # Deliberately never restore a previous mission merely by restarting.
         path = self.controller.data_dir / "station-network.json"
         persisted = {key: config[key] for key in ("network_bind_host", "network_port", "network_discovery", "peers")}
         path.write_text(json.dumps(persisted, indent=2) + "\n")
         self.stop()
         self.config = config
-        self._history.clear()
-        self._last_observations.clear()
-        self.select_source(None)
+        if not same_scope:
+            self._history.clear()
+            self._last_observations.clear()
+            self.source_selection = self._default_source(config)
+            self._set_display_source(self.source_selection)
+        # Source choice and history survive a network restart within this mission.
+        # Neither is persisted across application restarts or mission changes.
+        self._last_source_evaluation = None
         self.start()
         self.poll()
 
@@ -221,6 +244,15 @@ class StationNetworkBridge(QObject):
             runtime.publish_observation(payload)
 
     def select_source(self, node_id):
+        self.source_selection = node_id or None
+        self._last_source_evaluation = None
+        if node_id == BEST_CONNECTION:
+            self._select_best_source(time.monotonic())
+        else:
+            self._set_display_source(node_id)
+        self.changed.emit()
+
+    def _set_display_source(self, node_id):
         c = self.controller
         c.remote_display_key = node_id or None
         c.remote_display_sample = None
@@ -228,7 +260,56 @@ class StationNetworkBridge(QObject):
         if node_id in self._history:
             c.remote_display_history = self._history[node_id]
             c.remote_display_sample = c.remote_display_history[-1] if c.remote_display_history else None
-        self.changed.emit()
+
+    def telemetry_peers(self):
+        """Only sources in the explicitly joined mission/vehicle/source mode."""
+        return [p for p in self.peers if (p.get("info") or {}).get("role") == "telem"
+                and p["info"].get("mission_id") == self.config.get("mission_id")
+                and self.config.get("mission_id") is not None
+                and p["info"].get("vehicle_mode") == self.window.profile.vehicle
+                and p["info"].get("source_mode") == self.config.get("receive_source_mode", "live")
+                and p.get("synchronized") and not p.get("conflict")]
+
+    def _select_best_source(self, now):
+        if self.source_selection != BEST_CONNECTION:
+            return
+        if self._last_source_evaluation is not None and now - self._last_source_evaluation < 1:
+            return
+        self._last_source_evaluation = now
+        candidates = []
+        for peer in self.telemetry_peers():
+            info = peer["info"]
+            if peer.get("state") != "ONLINE" or info.get("station") not in {"gs1", "gs2", "gs3", "gs4"}:
+                continue
+            ages = [p.get("sample_age_ms_lower_bound") for p in peer.get("latest", [])]
+            ages = [age for age in ages if finite(age) and age >= 0]
+            if not ages or min(ages) > self.controller.mission.freshness * 1000:
+                continue
+            # Match the Rocket bar: full quality at <=60 ms, then 60/age.
+            # LTU-XR quality is measured by application RTT, not RF strength.
+            age = max(60, min(ages))
+            ping = peer.get("rtt_ms")
+            ping = ping if finite(ping) and ping >= 0 else float("inf")
+            node = info["node_id"]
+            candidates.append((age, ping, node != self.controller.remote_display_key, info["station"], node))
+        node = min(candidates)[-1] if candidates else BEST_CONNECTION
+        if self.controller.remote_display_key != node:
+            self._set_display_source(node)
+
+    def source_options(self):
+        options = [("Local telemetry board", None)]
+        if self.window.profile.station == "base" and self.window.profile.role == "telemetry":
+            chosen = next((p["info"]["station"].upper() for p in self.telemetry_peers()
+                           if p["info"]["node_id"] == self.controller.remote_display_key), None)
+            suffix = f" · {chosen}" if self.source_selection == BEST_CONNECTION and chosen else ""
+            options.append(("Best connection" + suffix, BEST_CONNECTION))
+        for peer in sorted(self.telemetry_peers(), key=lambda p: (p["info"]["station"], p["info"]["node_id"])):
+            info = peer["info"]
+            title = "Base" if info["station"] == "launch" else info["station"].upper()
+            options.append((f"{title} · {info['source_mode'].upper()} · READ ONLY", info["node_id"]))
+        if self.source_selection and self.source_selection not in [value for _, value in options]:
+            options.append(("Selected remote source · unavailable · READ ONLY", self.source_selection))
+        return options
 
     def _hardware_status(self, role):
         if role not in self.controller.states:
@@ -244,6 +325,7 @@ class StationNetworkBridge(QObject):
 
     def poll(self):
         if self._mode != self.controller.mode.lower():
+            self.select_source(None)
             self.stop()
             self.start()
         runtime, c = self.runtime, self.controller
@@ -283,6 +365,8 @@ class StationNetworkBridge(QObject):
                 age = payload.get("sample_age_ms_lower_bound")
                 if age is not None:
                     self._accept_remote(peer, payload, now, age)
+        if self.source_selection == BEST_CONNECTION:
+            self._select_best_source(now)
         panel = getattr(self.window, "away_connections", None)
         if panel:
             self._update_connections(panel)
@@ -471,6 +555,8 @@ class StationNetworkBridge(QObject):
             return
         source = f"{info.get('station', '?').upper()} · {payload.get('vehicle', {}).get('id', 'unknown')} · read only"
         sample = observation_to_sample(payload, received_monotonic=now, source_age_ms=age, source_label=("SIMULATION · " if info.get("source_mode") == "simulation" else "") + source)
+        sample.details["network_source_mode"] = info.get("source_mode", "live")
+        sample.details["network_station"] = info.get("station", "?")
         history = self._history.setdefault(node, deque(maxlen=6000))
         if previous and not same_boot:
             history.clear()

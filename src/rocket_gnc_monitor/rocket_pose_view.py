@@ -125,7 +125,10 @@ class RocketPoseView(QWidget):
     def _source_text(self):
         if self.pose is None:
             return "NO TELEMETRY · Neutral illustration"
-        return self.pose.source + (" · STALE" if self.pose.stale else "")
+        label = self.pose.source
+        if self.pose.receiver_label:
+            label += " · " + self.pose.receiver_label
+        return label + (" · STALE" if self.pose.stale else "")
 
     def _angle_source(self):
         if self.pose is not None and self.pose.source == "SIMULATION":
@@ -186,6 +189,8 @@ class RocketPoseView(QWidget):
         self._font(painter, 10)
         status = self.pose.status.removeprefix(self.pose.source + " · ") if self.pose is not None else "Attitude unavailable · neutral illustration"
         status = self._source_text() + " · " + self._angle_source() + " · " + status
+        if self.pose is not None and self.pose.receiver_label:
+            status = self._source_text() + " · " + self._angle_source() + " · READ ONLY"
         if self.pose is not None and self.pose.angle_kind == "gyro_integrals":
             status = self._source_text() + " · Body gyro integrals in degrees · not Euler angles"
             if "Invalid orientation metadata" in self.pose.status:

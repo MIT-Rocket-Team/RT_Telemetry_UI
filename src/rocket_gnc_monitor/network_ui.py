@@ -9,6 +9,25 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog,
     QTextEdit, QVBoxLayout)
 
 
+SOURCE_HELP = ("Select the telemetry feed for the rocket view, state, tables and plots. "
+    "Network feeds do not require serial polling. Best connection checks once per second: "
+    "Rocket packet freshness first (full quality at 60 ms or less), then LTU-XR round-trip time. "
+    "Unavailable or stale feeds are not selected; manual choices stay fixed.")
+
+
+def refresh_source_selector(combo, bridge):
+    options = bridge.source_options()
+    previous = combo.blockSignals(True)
+    if options != [(combo.itemText(i), combo.itemData(i)) for i in range(combo.count())]:
+        combo.clear()
+        for title, value in options:
+            combo.addItem(title, value)
+    # The selection can change independently of the list (join or other menu).
+    combo.setCurrentIndex(max(0, combo.findData(bridge.source_selection)))
+    combo.blockSignals(previous)
+    combo.setToolTip(SOURCE_HELP)
+
+
 class StationNetworkDialog(QDialog):
     def __init__(self, bridge, parent=None):
         super().__init__(parent)
@@ -50,6 +69,8 @@ class StationNetworkDialog(QDialog):
         self.apply_button.clicked.connect(self.apply)
         form.addRow(self.apply_button)
         self.source = QComboBox()
+        self.source.setAccessibleName("Telemetry display source")
+        self.source.setToolTip(SOURCE_HELP)
         self.source.currentIndexChanged.connect(self.source_changed)
         form.addRow("Telemetry display source", self.source)
         outer.addLayout(form)
@@ -76,7 +97,6 @@ class StationNetworkDialog(QDialog):
         buttons.rejected.connect(self.reject)
         outer.addWidget(buttons)
         self._rows = []
-        self._source_options = None
         import ifaddr
         self.addresses = [ip.ip for adapter in ifaddr.get_adapters() for ip in adapter.ips
                           if isinstance(ip.ip, str) and not ip.ip.startswith("127.")]
@@ -116,6 +136,7 @@ class StationNetworkDialog(QDialog):
             self.mission.setText(mission)
             try:
                 self.bridge.join_peer(peer)
+                self.endpoints.setText(", ".join(self.bridge.config["peers"]))
             except (ValueError, OSError, RuntimeError) as exc:
                 QMessageBox.warning(self, "Station network", str(exc))
             self.refresh()
@@ -138,7 +159,6 @@ class StationNetworkDialog(QDialog):
         selected = self.table.currentRow()
         self.table.blockSignals(True)
         self.table.setRowCount(len(self._rows))
-        options = [("Local telemetry board", None)]
         for row, peer in enumerate(self._rows):
             identity = peer.get("info") or {}
             station = identity.get("station", "?")
@@ -154,22 +174,10 @@ class StationNetworkDialog(QDialog):
                 item = QTableWidgetItem(value)
                 item.setToolTip(peer.get("error") or str(identity))
                 self.table.setItem(row, column, item)
-            if role == "telem" and peer.get("synchronized") and not peer.get("conflict"):
-                options.append((f"{title} · {mode} · READ ONLY", identity["node_id"]))
         if selected >= 0 and selected < len(self._rows):
             self.table.selectRow(selected)
         self.table.blockSignals(False)
-        chosen = bridge.controller.remote_display_key
-        if chosen and chosen not in [value for _, value in options]:
-            options.append(("Selected remote source · unavailable · READ ONLY", chosen))
-        if options != self._source_options:
-            self.source.blockSignals(True)
-            self.source.clear()
-            for title, value in options:
-                self.source.addItem(title, value)
-            self.source.setCurrentIndex(max(0, self.source.findData(chosen)))
-            self.source.blockSignals(False)
-            self._source_options = options
+        refresh_source_selector(self.source, bridge)
         self.source.setEnabled(bridge.window.profile.role == "telemetry")
         archive = bridge.runtime.archive_status
         self.archive.setText(f"Observation archive: {archive.get('error') or archive.get('path') or 'starting'}"

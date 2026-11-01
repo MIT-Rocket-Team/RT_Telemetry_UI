@@ -120,6 +120,7 @@ class StationWindow(InstrumentWindow):
         self.base_tabs = None
         self.base_grids = {}
         self.base_route = None
+        self.telemetry_source = None
         self.launch_station = self.profile_locked and self.profile.station == "base"
         self.main_base = self.launch_station and self.profile.layout == "base"
         self.canard_panel = None
@@ -196,6 +197,19 @@ class StationWindow(InstrumentWindow):
         count = sum(p["state"] == "ONLINE" and not p.get("conflict") for p in self.station_network.peers)
         self.workspace_network.setText(f"Network · {count}" if runtime.mission_id else "Join network…")
         self.workspace_network.setToolTip(self.station_network.summary())
+        if self.telemetry_source is not None:
+            from .network_ui import refresh_source_selector
+            refresh_source_selector(self.telemetry_source, self.station_network)
+
+    def select_telemetry_source(self):
+        if self.station_network is None:
+            from .network_bridge import StationNetworkBridge, network_configuration
+            self.station_network = StationNetworkBridge(self, network_configuration(self.controller.data_dir))
+            self.station_network.changed.connect(self.refresh_network_status)
+        self.station_network.select_source(self.telemetry_source.currentData())
+        self.last_ui = self.last_table = 0
+        self.refresh()
+        self.attitude.refresh()
 
     def card(self, key, title):
         panel = QFrame()
@@ -448,9 +462,19 @@ class StationWindow(InstrumentWindow):
         self.health.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.health.setWordWrap(True)
         self.launch_links.selector.setMaximumWidth(280)
-        identity.insertWidget(3, label("AWAY ROUTE", "eyebrow"))
+        identity.insertWidget(3, label("ANTENNA ROUTE", "eyebrow"))
         identity.insertWidget(4, self.launch_links.selector)
         self.launch_links.selector.show()
+        from .network_bridge import BEST_CONNECTION
+        from .network_ui import SOURCE_HELP
+        self.telemetry_source = ComboBox()
+        self.telemetry_source.setAccessibleName("Telemetry display source")
+        self.telemetry_source.setToolTip(SOURCE_HELP)
+        self.telemetry_source.setMaximumWidth(280)
+        self.telemetry_source.addItem("Local telemetry board", None)
+        self.telemetry_source.addItem("Best connection", BEST_CONNECTION)
+        self.telemetry_source.currentIndexChanged.connect(self.select_telemetry_source)
+        controls.addLayout(row(label("TELEMETRY SOURCE", "eyebrow"), self.telemetry_source, stretch=True))
         self.usb_strip.layout().addWidget(self.health, 1)
 
         # Replace only this mode's legacy table; other workspaces retain theirs.

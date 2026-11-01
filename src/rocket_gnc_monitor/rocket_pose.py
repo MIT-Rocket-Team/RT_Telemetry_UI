@@ -75,6 +75,7 @@ class RocketPose:
     attitude_known: bool = False
     inflation: float = 0.0
     time: float | None = None
+    receiver_label: str = ""
 
 
 def _angles(values):
@@ -198,10 +199,20 @@ def telemetry_pose(sample, mode="LIVE", fresh=True):
         status = f"NETWORK · {details.get('display_source', 'Remote station')} · READ ONLY · {state} · {attitude}"
     if ignited is True and motor is None:
         status += " · Ignition reported; current burn unknown"
+    receiver_label = ""
+    if source == "NETWORK":
+        receiver_label = str(details.get("network_station", "")).upper()
+        if receiver_label:
+            mode = details.get("network_source_mode")
+            if mode in ("simulation", "replay"):
+                receiver_label = mode.upper() + " · " + receiver_label
+        else:
+            receiver_label = str(details.get("display_source", ""))
     return RocketPose(
         rotation=rotation, angles=angles, angle_kind=angle_kind, motor=motor, parachute=parachute, ignited=ignited,
         source=source, status=status, stale=bool(stale), attitude_known=known,
         inflation=1.0 if parachute is True else 0.0, time=_number(getattr(sample, "t", None)),
+        receiver_label=receiver_label,
     )
 
 
