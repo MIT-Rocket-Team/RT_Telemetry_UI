@@ -221,6 +221,11 @@ def test_two_base_video_viewers_receive_both_mission_streams(qtbot, tmp_path):
                        and worker.received_frames >= 3 and not worker.error
                        for w in windows for kind in ('digital', 'analog'))
         qtbot.waitUntil(all_main_feeds_decoded, timeout=20000)
+        # Worker counts advance before the GUI timer drains their frame queues.
+        # Wait for presentation too, especially on a loaded Windows runner.
+        qtbot.waitUntil(lambda: all(not tile.pixmap().isNull()
+                                   for window in windows
+                                   for tile in window.video_wall.primary_views.values()), timeout=5000)
         for window in windows:
             for tile in window.video_wall.primary_views.values():
                 assert not tile.pixmap().isNull()

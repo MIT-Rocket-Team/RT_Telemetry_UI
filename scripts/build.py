@@ -23,7 +23,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 VENDOR = ROOT / "vendor"
 APP_NAME = "RocketGNCMonitor-v0a"
-VERSION = "0.1.1"
+VERSION = "1.0.0"
 
 
 def process_architecture():
@@ -335,7 +335,7 @@ def package(target, engine="", release=""):
         "ffmpeg_sha256": sha(imageio_ffmpeg.get_ffmpeg_exe()),
         "station_network_protocol": "1.0",
         "network_media_native": {path.name: sha(path) for path in runtime_directory().iterdir()
-            if path.is_file() and path.suffix == (".dll" if platform.system() == "Windows" else ".dylib")},
+            if path.is_file() and (path.suffix in {".dll", ".dylib"} or ".so" in path.suffixes)},
     }
     write(VENDOR / "build-manifest.json", metadata)
     ffinfo = subprocess.run(
@@ -374,6 +374,9 @@ def package(target, engine="", release=""):
             dmg,
         )
         artifact = dmg
+    elif platform.system() == "Linux":
+        # Preserve executable permissions and PyInstaller's library symlinks.
+        artifact = Path(shutil.make_archive(str(dist / base), "gztar", root_dir=dist, base_dir=APP_NAME))
     else:
         artifact = Path(
             shutil.make_archive(str(dist / base), "zip", root_dir=dist, base_dir=APP_NAME)

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rocket-gnc-monitor-v0a"
-version = "0.1.1"
+version = "1.0.0"
 description = "MIT Rocket Team base and away station telemetry, video and antenna monitoring"
 requires-python = ">=3.12,<3.15"
 dependencies = [

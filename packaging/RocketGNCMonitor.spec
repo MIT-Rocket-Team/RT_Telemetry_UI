@@ -13,8 +13,10 @@ for path in (root / "vendor").rglob("*"):
     if not path.is_file():
         continue
     target = str(path.parent.relative_to(root))
-    if path.parent.name == "network-media" and path.suffix in {".dll", ".dylib"}:
-        if (sys.platform == "win32" and path.suffix == ".dll") or (sys.platform == "darwin" and path.suffix == ".dylib"):
+    if path.parent.name == "network-media" and (path.suffix in {".dll", ".dylib"} or ".so" in path.suffixes):
+        if ((sys.platform == "win32" and path.suffix == ".dll")
+                or (sys.platform == "darwin" and path.suffix == ".dylib")
+                or (sys.platform == "linux" and ".so" in path.suffixes)):
             native_media.append((str(path), target))
     else:
         datas.append((str(path), target))
@@ -40,7 +42,7 @@ exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name=app_name,
 collection = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name=app_name)
 if sys.platform == "darwin":
     app = BUNDLE(collection, name=app_name + ".app", icon=str(root / "build" / "icon.icns"), bundle_identifier="edu.mit.rocketteam.gncmonitor.v0a",
-        info_plist={"CFBundleShortVersionString": "0.1.1", "CFBundleVersion": "2",
+        info_plist={"CFBundleShortVersionString": "1.0.0", "CFBundleVersion": "10000",
             "CFBundleDisplayName": "Rocket GNC Monitor v0a",
             "NSHighResolutionCapable": True,
             "NSCameraUsageDescription": "Display and record the connected rocket video receiver.",
