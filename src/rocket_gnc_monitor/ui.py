@@ -2133,6 +2133,12 @@ class MainWindow(QMainWindow):
     def clear_plots(self):
         """Hide existing plot samples without altering telemetry or recordings."""
         c = self.controller
+        if c.history:
+            self.plot_clear_markers[(c.mode, None)] = c.history[-1]
+        bridge = getattr(self, "station_network", None)
+        if bridge is not None:
+            for source, sample in bridge.plot_history_tails().items():
+                self.plot_clear_markers[(c.mode, source)] = sample
         key = (c.mode, c.remote_display_key)
         if c.display_history:
             self.plot_clear_markers[key] = c.display_history[-1]
@@ -2140,7 +2146,7 @@ class MainWindow(QMainWindow):
         self.refresh_plots(force=True)
         for graph in (self.altitude_plot, self.rate_plot, self.angle_plot):
             graph.enableAutoRange()
-        self.statusBar().showMessage("Plots cleared for this source · recordings unchanged", 5000)
+        self.statusBar().showMessage("Plots cleared · recordings unchanged", 5000)
 
     def refresh_plots(self, force=False):
         if not hasattr(self, "trajectory_plot"):

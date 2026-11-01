@@ -512,7 +512,7 @@ class StationWindow(InstrumentWindow):
         heading.addWidget(title)
         heading.addStretch()
         self.clear_plots_button = button("Clear plots", self.clear_plots)
-        self.clear_plots_button.setToolTip("Clear the displayed plot history for this source. New samples continue; recordings and telemetry stay intact.")
+        self.clear_plots_button.setToolTip("Clear plot history across known telemetry sources. New samples continue; recordings and telemetry stay intact.")
         heading.addWidget(self.clear_plots_button)
         plot_card.addLayout(heading)
         plot_card.addLayout(plots, 1)

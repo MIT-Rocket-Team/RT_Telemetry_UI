@@ -101,6 +101,27 @@ def test_packet_associated_illustration_follows_selected_receiver(window, qtbot,
             service.stop()
 
 
+def test_clear_plots_does_not_restore_old_history_when_receiver_changes(window):
+    bridge, c = window.station_network, window.controller
+    first = Sample(t=1, sequence=1, source="NETWORK", altitude=100)
+    second = Sample(t=2, sequence=2, source="NETWORK", altitude=200)
+    bridge._history = {"station-one": deque([first]), "station-two": deque([second])}
+    bridge.select_source("station-one")
+    window.refresh_plots(force=True)
+    window.clear_plots_button.click()
+    for node_id in ("station-two", "station-one"):
+        bridge.select_source(node_id)
+        window.refresh_plots(force=True)
+        assert window.altitude_curve.yData is None or len(window.altitude_curve.yData) == 0
+        assert len(bridge._history[node_id]) == 1
+    fresh = Sample(t=3, sequence=3, source="NETWORK", altitude=300)
+    bridge._history["station-two"].append(fresh)
+    bridge.select_source("station-two")
+    window.refresh_plots(force=True)
+    assert window.altitude_curve.yData.tolist() == [300]
+    assert c.display_latest is fresh
+
+
 def test_joining_video_selects_delayed_telemetry_without_serial_polling(window, qtbot, tmp_path):
     mission = str(uuid.uuid4())
     video = publisher(tmp_path / "video", mission, role="video")

@@ -261,6 +261,10 @@ class StationNetworkBridge(QObject):
             c.remote_display_history = self._history[node_id]
             c.remote_display_sample = c.remote_display_history[-1] if c.remote_display_history else None
 
+    def plot_history_tails(self):
+        """Sample boundaries for clearing charts without erasing receiver data."""
+        return {node_id: history[-1] for node_id, history in self._history.items() if history}
+
     def telemetry_peers(self):
         """Only sources in the explicitly joined mission/vehicle/source mode."""
         return [p for p in self.peers if (p.get("info") or {}).get("role") == "telem"
