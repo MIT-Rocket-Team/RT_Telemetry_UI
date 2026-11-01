@@ -7,11 +7,13 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 from .rocket_protocol import PHASE_ENUM
+from .zephyrus_states import ZEPHYRUS_STATE_SCHEMA, zephyrus_state_name
 
 
 STATE_COLORS = {
     "GROUND_TESTING": ("#2dbe70", "#07160e"),
     "PREFLIGHT": ("#1d5fd1", "#ffffff"),
+    "PRE_FLIGHT": ("#1d5fd1", "#ffffff"),
     "FLIGHT": ("#c83232", "#ffffff"),
     "POST_APOGEE": ("#ed941e", "#201306"),
     "APOGEE": ("#ed941e", "#201306"),
@@ -52,6 +54,8 @@ def telemetry_state_name(sample):
                 return "UNKNOWN"
             if "state" in values:
                 return _normalized_state(values["state"])
+    if details.get("state_schema") == ZEPHYRUS_STATE_SCHEMA:
+        return zephyrus_state_name(details.get("state_code")) or "UNKNOWN"
     if "state_code" in details:
         code = details["state_code"]
         if type(code) is int and 0 <= code < len(PHASE_ENUM):

@@ -7,6 +7,8 @@ Legacy workspaces retain their existing state interpretation.
 
 from collections.abc import Mapping
 
+from .zephyrus_states import ZEPHYRUS_STATE_SCHEMA, zephyrus_state_name
+
 BALIUS_STATE_NAMES = ("GROUND_TESTING", "PREFLIGHT", "FLIGHT", "APOGEE", "LOW_BATTERY")
 
 
@@ -17,6 +19,8 @@ def balius_state_name(sample):
     details = getattr(sample, "details", {})
     if not isinstance(details, Mapping):
         return "UNKNOWN"
+    if details.get("state_schema") == ZEPHYRUS_STATE_SCHEMA:
+        return zephyrus_state_name(details.get("state_code")) or "UNKNOWN"
     if "state_code" in details:
         code = details["state_code"]
         return BALIUS_STATE_NAMES[code] if type(code) is int and 0 <= code < len(BALIUS_STATE_NAMES) else "UNKNOWN"
