@@ -5,8 +5,10 @@ import uuid
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog,
     QDialogButtonBox, QFormLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit,
-    QMessageBox, QPushButton, QSpinBox, QTableWidget, QTableWidgetItem,
+    QMessageBox, QPushButton, QSpinBox, QTableWidget,
     QTextEdit, QVBoxLayout)
+
+from .table_cells import set_cell
 
 
 SOURCE_HELP = ("Select the telemetry feed for the rocket view, state, tables and plots. "
@@ -171,9 +173,8 @@ class StationNetworkDialog(QDialog):
                       f"{peer['rtt_ms']:.1f}" if peer.get("rtt_ms") is not None else "—",
                       f"{min(ages):.0f}" if ages else "—", peer.get("error") or peer["endpoint"]]
             for column, value in enumerate(values):
-                item = QTableWidgetItem(value)
+                item = set_cell(self.table, row, column, value)
                 item.setToolTip(peer.get("error") or str(identity))
-                self.table.setItem(row, column, item)
         if selected >= 0 and selected < len(self._rows):
             self.table.selectRow(selected)
         self.table.blockSignals(False)

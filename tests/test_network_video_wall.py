@@ -2,6 +2,8 @@ import queue
 import time
 import uuid
 
+import pytest
+
 from rocket_gnc_monitor.media import HEIGHT, WIDTH
 from rocket_gnc_monitor.network.media import MediaService
 from rocket_gnc_monitor.network.media_receiver import VideoWallNetwork
@@ -25,7 +27,8 @@ class Receiver:
         self.stopped = True
 
 
-def test_all_eight_previews_and_transactional_main_promotion(qtbot, monkeypatch):
+@pytest.mark.parametrize("unresolved", [False, True])
+def test_all_eight_previews_and_transactional_main_promotion(qtbot, monkeypatch, unresolved):
     monkeypatch.setattr("rocket_gnc_monitor.network.media_receiver.MediaReceiver", Receiver)
     mission = str(uuid.uuid4())
     peers = []
@@ -36,6 +39,12 @@ def test_all_eight_previews_and_transactional_main_promotion(qtbot, monkeypatch)
         peers.append(dict(endpoint=f"http://192.0.2.{index}:8766", state="ONLINE", streams=streams,
                           info=dict(station=f"gs{index}", role="video", mission_id=mission, source_mode="live",
                                     node_id=str(uuid.uuid4()), boot_id=str(uuid.uuid4()))))
+
+    if unresolved:
+        # Real saved peer lists retain old ports and discovery can be in flight.
+        # Either missing identity must be skipped without blocking valid feeds.
+        peers.insert(0, dict(endpoint="http://192.0.2.99:8766", state="DISCONNECTED", info=None))
+        peers.insert(2, dict(endpoint="http://192.0.2.98:8766", state="CONNECTING"))
 
     class Runtime:
         mission_id = mission

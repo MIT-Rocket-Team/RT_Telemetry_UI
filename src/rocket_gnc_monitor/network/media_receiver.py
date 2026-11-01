@@ -264,7 +264,9 @@ class VideoWallNetwork(QObject):
         peers = self.runtime.peers_snapshot()
         sources = {}
         for peer in peers:
-            info = peer.get("info", {})
+            # Unreachable or newly discovered addresses have no identity yet.
+            # They must not prevent healthy stations from updating the wall.
+            info = peer.get("info") or {}
             station = info.get("station", "")
             if (info.get("role") != "video" or station not in {"gs1", "gs2", "gs3", "gs4"}
                     or info.get("mission_id") != self.runtime.mission_id

@@ -63,6 +63,12 @@ def test_real_network_ui_health_display_and_join(qtbot, tmp_path):
         dialog.show()
         assert dialog.table.rowCount() == 1
         assert dialog.source.currentData() == peer.node_id
+        # Continuous health updates must retain table-owned items, including
+        # those referenced by macOS accessibility while the dialog is open.
+        items = [dialog.table.item(0, column) for column in range(dialog.table.columnCount())]
+        for _ in range(3):
+            dialog.refresh()
+        assert all(dialog.table.item(0, column) is item for column, item in enumerate(items))
         assert "read-only" in window.controller.command_block_reason
         # A deliberate leave resets view and boot, while retaining installation identity.
         old_boot = window.station_network.runtime.boot_id
