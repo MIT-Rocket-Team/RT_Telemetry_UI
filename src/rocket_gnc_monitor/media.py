@@ -106,7 +106,10 @@ class LocalVideoRecorder:
             args = [ffmpeg(), "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo",
                     "-pixel_format", "rgb24", "-video_size", f"{WIDTH}x{HEIGHT}", "-framerate", "30",
                     "-use_wallclock_as_timestamps", "1", "-i", "pipe:0", "-an", "-c:v", "mpeg4",
-                    "-q:v", "4", "-g", "30", "-pix_fmt", "yuv420p", "-fps_mode", "passthrough",
+                    # Startup buffering can deliver several frames in one encoder
+                    # time tick. Drop duplicate timestamps instead of terminating
+                    # the MPEG-4 encoder, while retaining wall-clock recording gaps.
+                    "-q:v", "4", "-g", "30", "-pix_fmt", "yuv420p", "-fps_mode", "vfr",
                     "-f", "segment", "-segment_time", "30", "-reset_timestamps", "1", "-segment_list",
                     str(folder / "segments.csv"), "-segment_list_type", "csv", str(folder / "segment_%05d.mkv")]
             self.process = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,

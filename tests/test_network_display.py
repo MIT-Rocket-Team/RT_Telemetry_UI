@@ -116,6 +116,9 @@ def test_visible_tables_plots_pose_and_banner_read_remote_without_local_connecti
     window = MainWindow(tmp_path)
     qtbot.addWidget(window)
     c = window.controller
+    # This source-routing fixture compares its SI values directly.
+    from dataclasses import replace
+    window.apply_settings(replace(c.settings, display_units="metric"))
     c.timer.stop()
     local = TelemetryDecoder().feed(frame(8, altitude=10))[0]
     c.accept(local)

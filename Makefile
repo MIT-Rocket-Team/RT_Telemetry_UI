@@ -13,7 +13,7 @@ VEHICLE ?=
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup run away video test lint runtime bridge network-media package package-macos package-macos-universal package-windows smoke verify-package clean
+.PHONY: help setup run away video test lint runtime bridge network-media package package-macos package-macos-universal package-windows package-linux smoke verify-package clean
 
 help:
 	@$(PYTHON) scripts/build.py help
@@ -44,6 +44,8 @@ package-macos-universal:
 	$(VENV_PY) scripts/package_macos_universal.py --arm64-app "$(MAC_ARM64_APP)" --x86_64-app "$(MAC_X86_64_APP)" --output-dir "$(if $(UNIVERSAL_OUTPUT),$(UNIVERSAL_OUTPUT),dist)"
 package-windows:
 	$(VENV_PY) scripts/build.py package --platform Windows $(ENGINE_OPTIONS)
+package-linux:
+	$(VENV_PY) scripts/build.py package --platform Linux $(ENGINE_OPTIONS)
 smoke:
 	$(VENV_PY) -m rocket_gnc_monitor --replay-smoke --data-dir build/smoke
 verify-package:

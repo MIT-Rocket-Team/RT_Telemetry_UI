@@ -1,6 +1,6 @@
 # RT Telemetry UI
 
-The MIT Rocket Team's native **Rocket GNC Monitor v0a** for macOS and Windows. This repository contains the current application, tests, runtime resources, hardware references and build scripts, migrated from `MIT-RT-26_27-Work/ui_work/rocket_UI_v0a`. It has no dependency on that checkout. The application name, version (`0.1.1`), saved-file formats and preferences identity are preserved.
+The MIT Rocket Team's native **Telemetry UI v1.0.0** for macOS, Windows, and Linux x86-64. This repository contains the application, tests, runtime resources, hardware references, and build scripts. The `RocketGNCMonitor-v0a` executable name, saved-file formats, and preferences identity remain compatible with earlier releases.
 
 ## Station workspaces
 
@@ -92,7 +92,9 @@ make -f Makefile.macos all OPENROCKET_DOWNLOAD=v6.2
 make -f Makefile.windows all OPENROCKET_DOWNLOAD=v6.2
 ```
 
-Use `OPENROCKET_JAR=/path/to/OpenRocket-MIT-v6.2.jar` for a local engine or `OPENROCKET_DOWNLOAD=latest` to resolve the latest stable team release. Pin a tested release for repeatable builds. macOS packages require macOS 14 or later; native ARM64 and Intel payloads can be combined into the universal distribution. Windows packaging targets x64. Keep the entire extracted Windows folder together.
+Use `OPENROCKET_JAR=/path/to/OpenRocket-MIT-v6.2.jar` for a local engine or `OPENROCKET_DOWNLOAD=latest` to resolve the latest stable team release. Pin a tested release for repeatable builds. macOS packages require macOS 14 or later; native ARM64 and Intel payloads can be combined into the universal distribution. Windows packaging targets x64. Linux packages target x86-64 and are qualified on Ubuntu 24.04. Keep the entire extracted Windows or Linux folder together.
+
+For Linux, run `python scripts/build.py setup`, then use `.venv/bin/python` to run `scripts/build_mission_srt.py`, `scripts/build.py runtime`, `scripts/build.py bridge --download v6.2`, and `scripts/build.py package --platform Linux`. This produces a portable `.tar.gz` with executable permissions and library symlinks preserved. Launch the extracted `RocketGNCMonitor-v0a/RocketGNCMonitor-v0a` executable in a desktop session. Linux still needs the operating system's graphics/font libraries; the release workflow lists the Ubuntu packages used for verification.
 
 Generated environments, downloaded vendor runtimes, package outputs and verification captures are ignored. They are rebuilt locally instead of being committed. Historical planning documents, old validation screenshots and the superseded v0 LaTeX report remain in the original repository.
 

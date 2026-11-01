@@ -32,6 +32,8 @@ def test_station_refresh_retains_all_readout_items_and_updates_values(qtbot, tmp
     window = StationWindow(tmp_path, station="base", auto_place=False)
     qtbot.addWidget(window)
     window.controller.timer.stop()
+    from dataclasses import replace
+    window.apply_settings(replace(window.controller.settings, display_units="metric"))
 
     def refresh(sample):
         window.controller.latest = sample

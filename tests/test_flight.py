@@ -193,6 +193,8 @@ def test_save_completed_capture_includes_final_video_segment(qtbot, tmp_path):
         c.start_video("file", video_fixture(tmp_path))
         qtbot.waitUntil(lambda: c.video is not None and c.video.received_frames > 3, timeout=5000)
         c.start_recording(tmp_path / "recordings")
+        qtbot.waitUntil(lambda: c.video is not None and c.video.record_dir is not None
+                       and c.video.received_frames > 3, timeout=20000)
         qtbot.wait(1000)
         c.stop_recording()
         archive = tmp_path / "capture.rktflight"
@@ -202,7 +204,14 @@ def test_save_completed_capture_includes_final_video_segment(qtbot, tmp_path):
         qtbot.waitUntil(lambda: not c.flight_busy, timeout=10000)
         assert c.reader.manifest["complete"]
         assert list(c.reader.path.glob("video*/segment_*.mkv"))
-        c.seek(c.reader.duration * 0.5)
+        # Capture finalization extends the session beyond its recorded video.
+        start, event = next((t, e) for t, e in c.reader.events(c.reader.duration)
+                            if e["name"] == "Video recording started")
+        directory = c.reader.path / Path(event["data"]["directory"]).name
+        with (directory / "segments.csv").open(newline="") as handle:
+            _, begin, end = list(csv.reader(handle))[-1]
+        assert float(end) - float(begin) > 0.1
+        c.seek(start + (float(begin) + float(end)) / 2)
         qtbot.waitUntil(lambda: c.video is not None and c.video.received_frames > 0, timeout=6000)
         assert c.video.single_frame
     finally:
