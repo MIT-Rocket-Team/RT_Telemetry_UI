@@ -104,7 +104,7 @@ def test_unit_quaternion_rounding_and_sign_are_supported_without_mutating_input(
 
 
 def test_orientation_contract_does_not_require_legacy_gyro_totals_and_remains_stale():
-    value = sample(None, details={"orientation": orientation([0, 0, 1, 0]), "flight_status": {
+    value = sample(None, phase="PARACHUTE DEPLOYED", details={"orientation": orientation([0, 0, 1, 0]), "flight_status": {
         "motor_burning": False, "parachute_deployed": True,
     }})
     pose = telemetry_pose(value, fresh=False)
@@ -180,7 +180,7 @@ def test_legacy_phase_and_pyro_firing_do_not_confirm_motor_or_parachute():
 
 @pytest.mark.parametrize("flag", [True, False])
 def test_normalized_adapter_flags_preserve_confirmed_on_and_off(flag):
-    pose = telemetry_pose(sample(details={"flight_status": {
+    pose = telemetry_pose(sample(phase="PARACHUTE DEPLOYED", details={"flight_status": {
         "motor_ignited": flag, "motor_burning": flag, "parachute_deployed": flag,
     }}))
     assert pose.motor is flag and pose.parachute is flag and pose.ignited is flag
@@ -284,7 +284,7 @@ def test_simulation_missing_events_do_not_turn_absence_into_confirmed_off():
     (1, "yes", None, None),
 ])
 def test_per_effect_event_availability_gates_confirmation_independently(motor_available, chute_available, motor, chute):
-    value = frame(powered=True, recovery=True, inflation=1)
+    value = frame(powered=True, recovery=True, inflation=1, state="PARACHUTE DEPLOYED")
     pose = simulation_pose(value, motor_events_available=motor_available,
                            parachute_events_available=chute_available)
     assert pose.motor is motor and pose.parachute is chute
@@ -337,3 +337,17 @@ def test_real_flight_scene_event_boundaries_and_eventless_reference():
     assert deployed.parachute is True and deployed.inflation == pytest.approx(1)
     old = simulation_pose(FlightScene(Trajectory(points, manifest)).frame(1))
     assert old.motor is old.parachute is None
+
+
+@pytest.mark.parametrize("state,shown", [("COAST / PAD", False), ("MOTOR BURNING", False),
+                                       ("PARACHUTE DEPLOYED", True), ("LANDED", False)])
+def test_reference_canopy_requires_current_deployment_state(state, shown):
+    pose = simulation_pose(frame(recovery=True, inflation=1, state=state))
+    assert pose.parachute is shown and pose.inflation == int(shown)
+
+
+def test_ambiguous_live_code_four_is_not_assumed_to_be_deployment():
+    value = sample(phase="Main", details={"state_code": 4, "flight_status": {"parachute_deployed": True}})
+    assert telemetry_pose(value).parachute is False
+    assert telemetry_pose(value, state_name="LOW_BATTERY").parachute is False
+    assert telemetry_pose(value, state_name="MAIN").parachute is True

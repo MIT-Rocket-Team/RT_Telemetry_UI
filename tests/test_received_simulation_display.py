@@ -15,8 +15,10 @@ from rocket_gnc_monitor.rocket_pose_view import RocketPoseView
 from rocket_gnc_monitor.simulation_display import SCHEMA, received_display
 
 
-def delivery():
-    raw = bytes.fromhex(resource("legacy-vectors.json")["frameHex"])
+def delivery(state=4):
+    raw = bytearray.fromhex(resource("legacy-vectors.json")["frameHex"])
+    raw[2 + 63] = state
+    raw[129] = sum(raw[2:129]) % 256
     return dict(packetId="tx-1", txTimeUs="1000000", data=base64.b64encode(raw).decode(),
         unavailable=["attitude", "rates", "acceleration"], simulationDisplay=dict(schema=SCHEMA,
             packet_id="tx-1", tx_time_us="1000000", frame="body_to_ENU", body_axis="+Z",
@@ -69,3 +71,19 @@ def test_corrupted_receiver_packet_cannot_deliver_simulation_pose():
     station = MissionStation(dict(id="gs3", origin=[42, -77, 0]))
     assert station.receive(message, 1_200_000) == []
     assert station.policy.latest is None
+
+
+@pytest.mark.parametrize("state,shown", [(0, False), (1, False), (2, False), (3, False),
+                                       (4, True), (5, False), (255, False)])
+@pytest.mark.parametrize("measured_orientation", [False, True])
+def test_received_state_gates_canopy_even_with_a_lingering_deployment_flag(state, shown, measured_orientation):
+    station = MissionStation(dict(id="gs3", origin=[42, -77, 0]))
+    sample = Sample.from_dict(station.receive(delivery(state), 1_200_000)[0])
+    if measured_orientation:
+        sample.details["orientation"] = dict(frame="body_to_ENU", body_axis="+Z", quaternion_wxyz=[1, 0, 0, 0])
+    original = copy.deepcopy(sample.to_dict())
+    pose = telemetry_pose(sample)
+    assert pose.parachute is shown
+    assert pose.inflation == int(shown)
+    assert pose.attitude_known
+    assert sample.to_dict() == original

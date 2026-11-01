@@ -57,14 +57,14 @@ def add_peer(qtbot, bridge, service):
 
 def publish(service, altitude=120, state=2, quaternion=(1, 0, 0, 0), counter=1, simulated_display=False):
     sample = Sample(t=counter, sequence=counter, source="SIMULATION", received=time.monotonic(),
-                    altitude=altitude, details={"state_code": state})
+                    altitude=altitude, details={"state_code": state, "state_schema": "zephyrus-v1"})
     if simulated_display:
         from rocket_gnc_monitor.simulation_display import SCHEMA
         sample.details.update(packetId=f"packet-{counter}", txTimeUs=str(counter * 1_000_000))
         sample.details["simulation_display"] = dict(schema=SCHEMA, packet_id=f"packet-{counter}",
             tx_time_us=str(counter * 1_000_000), frame="body_to_ENU", body_axis="+Z",
             quaternion_wxyz=list(quaternion), motor_ignited=True, motor_burning=state == 2,
-            parachute_deployed=state == 3)
+            parachute_deployed=state in (3, 4))
     payload = observation_from_sample(sample, raw=None, raw_unavailable_reason="Test fixture",
         station=service.station, node_id=service.node_id, boot_id=service.boot_id,
         connection_id=str(uuid.uuid4()), observation_counter=counter,
@@ -72,7 +72,7 @@ def publish(service, altitude=120, state=2, quaternion=(1, 0, 0, 0), counter=1, 
     if not simulated_display:
         payload["values"]["orientation"] = dict(body_axes="right_handed_nose_+Z", quaternion_wxyz=list(quaternion))
         payload["values"]["flight_status"] = dict(motor_ignited=True, motor_burning=state == 2,
-            parachute_deployed=state == 3, evidence_source="test")
+            parachute_deployed=state in (3, 4), evidence_source="test")
     service.publish_observation(payload)
 
 
@@ -83,7 +83,7 @@ def test_packet_associated_illustration_follows_selected_receiver(window, qtbot,
     try:
         bridge.join_peer(add_peer(qtbot, bridge, services[0]))
         add_peer(qtbot, bridge, services[1])
-        for service, q, state in zip(services, ((1, 0, 0, 0), (0, 1, 0, 0)), (2, 3)):
+        for service, q, state in zip(services, ((1, 0, 0, 0), (0, 1, 0, 0)), (2, 4)):
             publish(service, quaternion=q, state=state, simulated_display=True)
         qtbot.waitUntil(lambda: all(bridge._history.get(s.node_id) for s in services), timeout=5000)
         for service, expected, motor, chute in ((services[1], np.diag([1, -1, -1]), False, True),
@@ -155,7 +155,7 @@ def test_both_dropdowns_drive_pose_state_tables_and_preserve_apply(window, qtbot
         assert window.metrics["altitude"].text() == "900.0"
         assert window.altitude_curve.yData.tolist() == [900]
         np.testing.assert_allclose(window.attitude.view.pose.rotation, np.diag([1, -1, -1]))
-        assert window.attitude.view.pose.parachute is True and window.attitude.view.pose.motor is False
+        assert window.attitude.view.pose.parachute is False and window.attitude.view.pose.motor is False
         assert "GS2" in window.attitude.view._source_text()
         # Changing the main menu also refreshes a dialog whose option list is unchanged.
         window.telemetry_source.setCurrentIndex(window.telemetry_source.findData(services[0].node_id))

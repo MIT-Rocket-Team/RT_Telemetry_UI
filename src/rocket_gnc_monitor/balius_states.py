@@ -27,4 +27,4 @@ def balius_state_name(sample):
     name = str(getattr(sample, "phase", "")).upper().replace(" ", "_").replace("-", "_")
     if name == "PRE_FLIGHT":
         name = "PREFLIGHT"
-    return name if name in BALIUS_STATE_NAMES else "UNKNOWN"
+    return name if name in (*BALIUS_STATE_NAMES, "PARACHUTE_DEPLOYED") else "UNKNOWN"

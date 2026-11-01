@@ -6,6 +6,8 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QSlider
 
 from .rocket_pose import telemetry_pose, simulation_pose
+from .balius_states import balius_state_name
+from .rocket_state_badge import telemetry_state_name
 from .rocket_pose_view import RocketPoseView
 from .widgets import ComboBox
 
@@ -88,8 +90,12 @@ class RocketPosePanel(QWidget):
                 )
                 self.timeline.setText(f"{frame.time:.2f} s · {playback_state}")
         else:
+            sample = getattr(c, "display_latest", c.latest)
+            state_name = (balius_state_name(sample)
+                          if getattr(self.window(), "main_base", False) and c.vehicle == "balius"
+                          else telemetry_state_name(sample))
             pose = telemetry_pose(
-                getattr(c, "display_latest", c.latest), mode=c.mode,
+                sample, mode=c.mode, state_name=state_name,
                 fresh=getattr(c, "display_fresh", c.mode != "LIVE" or c.rocket_link_state()[0] == "RECEIVING"),
             )
         self.view.set_pose(pose)

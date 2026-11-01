@@ -219,7 +219,7 @@ class FlightView(QWidget):
             flicker = 0.96 + 0.04 * math.sin(frame.time * 45)
             plume_mesh().draw(p, project, forward, [rotation @ np.diag([1, 1, flicker])], [position])
         rocket_mesh(self.canards).draw(p, project, forward, [rotation], [position])
-        if frame.recovery:
+        if frame.recovery and frame.state == "PARACHUTE DEPLOYED":
             canopy = position + np.array([0, 0, size * 1.1])
             for i in range(8):
                 angle = i * math.tau / 8

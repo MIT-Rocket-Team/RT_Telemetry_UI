@@ -66,6 +66,32 @@ def test_all_telemetry_workspaces_replace_horizon_with_slider_controlled_rocket(
     assert not panel.timer.isActive() and not panel.view.animation.isActive()
 
 
+def test_base_canopy_uses_the_same_state_interpretation_as_the_badge(qtbot, tmp_path):
+    w = StationWindow(tmp_path, profile=StationProfile(), auto_place=False)
+    qtbot.addWidget(w)
+    c = w.controller
+    sample = TelemetryDecoder().feed(frame())[0]
+    sample.details.update(state_code=4, flight_status={"parachute_deployed": True})
+    c.latest = sample
+    try:
+        w.last_ui = w.last_table = 0
+        w.refresh()
+        w.attitude.refresh()
+        assert w.rocket_state_badge.state_name == "LOW_BATTERY"
+        assert w.attitude.view.pose.parachute is False
+        sample.details["state_schema"] = "zephyrus-v1"
+        w.last_ui = w.last_table = 0
+        w.refresh()
+        w.attitude.refresh()
+        assert w.rocket_state_badge.state_name == "MAIN"
+        assert w.attitude.view.pose.parachute is True
+        sample.details["state_code"] = 2
+        w.attitude.refresh()
+        assert w.attitude.view.pose.parachute is False
+    finally:
+        w.close()
+
+
 def test_reference_events_follow_existing_player_without_becoming_telemetry(pose_window):
     w, c = pose_window, pose_window.controller
     panel = w.attitude

@@ -18,6 +18,7 @@ STATE_COLORS = {
     "POST_APOGEE": ("#ed941e", "#201306"),
     "APOGEE": ("#ed941e", "#201306"),
     "MAIN": ("#ed941e", "#201306"),
+    "PARACHUTE_DEPLOYED": ("#ed941e", "#201306"),
     "END": ("#ed941e", "#201306"),
 }
 UNKNOWN_COLORS = ("#000000", "#ffffff")

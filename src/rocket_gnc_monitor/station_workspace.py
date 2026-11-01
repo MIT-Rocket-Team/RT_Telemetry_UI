@@ -506,7 +506,16 @@ class StationWindow(InstrumentWindow):
             column.addWidget(header)
             self.attach(column, plot, 1)
             plots.addLayout(column, 1)
-        self.card("live_plots", "LIVE FLIGHT / telemetry history").addLayout(plots, 1)
+        plot_card = self.card("live_plots", "LIVE FLIGHT / telemetry history")
+        title = plot_card.takeAt(0).widget()
+        heading = QHBoxLayout()
+        heading.addWidget(title)
+        heading.addStretch()
+        self.clear_plots_button = button("Clear plots", self.clear_plots)
+        self.clear_plots_button.setToolTip("Clear the displayed plot history for this source. New samples continue; recordings and telemetry stay intact.")
+        heading.addWidget(self.clear_plots_button)
+        plot_card.addLayout(heading)
+        plot_card.addLayout(plots, 1)
         for plot in (self.rate_plot, self.angle_plot):
             plot.plotItem.legend.hide()
         for pane in (self.details, self.log_view, self.timeline):

@@ -16,6 +16,8 @@ values ``motor_ignited`` (ignition occurred), ``motor_burning`` (burning now) an
 unknown. This is an internal adapter contract, not a telemetry wire definition.
 Ignition history does not establish whether a motor is still burning. Rocket
 phase, pyro firing bits and continuity are never treated as event confirmation.
+Parachute rendering additionally requires the current deployment state (MAIN
+in Zephyrus, or an explicit PARACHUTE_DEPLOYED state), not an earlier event alone.
 
 OpenRocket frames already contain a body-to-ENU matrix; it is copied directly.
 Callers must set ``events_available=False`` when their reference lacks a usable
@@ -32,6 +34,8 @@ from dataclasses import dataclass, field
 from numbers import Real
 
 import numpy as np
+
+from .zephyrus_states import ZEPHYRUS_STATE_SCHEMA, zephyrus_state_name
 
 
 def _number(value):
@@ -168,7 +172,12 @@ def _source(mode, sample):
     return source
 
 
-def telemetry_pose(sample, mode="LIVE", fresh=True):
+def deployment_state(state):
+    """Permit a canopy only in the source's current deployment state."""
+    return isinstance(state, str) and state.upper().replace(" ", "_") in {"MAIN", "PARACHUTE_DEPLOYED"}
+
+
+def telemetry_pose(sample, mode="LIVE", fresh=True, *, state_name=None):
     """Preserve gyro totals while requiring explicit orientation for rotation."""
     source = _source(mode, sample)
     if sample is None:
@@ -188,17 +197,28 @@ def telemetry_pose(sample, mode="LIVE", fresh=True):
     # This extension follows an accepted packet from the selected station. It
     # is explicitly a simulation illustration, separate from measured attitude.
     simulated_display = False
-    if not known and (getattr(sample, "source", "") == "SIMULATION"
-                      or details.get("network_source_mode") == "simulation"):
+    if (getattr(sample, "source", "") == "SIMULATION"
+            or details.get("network_source_mode") == "simulation"):
         from .simulation_display import received_display
         display = details.get("simulation_display")
         display = received_display(display, display.get("packet_id"), display.get("tx_time_us")) if isinstance(display, dict) else None
         if display is not None:
-            rotation, known = _orientation_rotation(display)
-            angles, angle_kind = _rpy_from_rotation(rotation), "orientation"
-            motor, parachute, ignited = (_flag(display, key) for key in
-                ("motor_burning", "parachute_deployed", "motor_ignited"))
-            simulated_display = True
+            if not known:
+                rotation, known = _orientation_rotation(display)
+                angles, angle_kind = _rpy_from_rotation(rotation), "orientation"
+                simulated_display = True
+            motor, parachute, ignited = (current if current is not None else _flag(display, key)
+                for current, key in zip((motor, parachute, ignited),
+                    ("motor_burning", "parachute_deployed", "motor_ignited")))
+    if state_name is None:
+        if details.get("state_schema") == ZEPHYRUS_STATE_SCHEMA:
+            state_name = zephyrus_state_name(details.get("state_code"))
+        elif "state_code" not in details:
+            state_name = getattr(sample, "phase", None)
+    # A lingering simulation/adapter event cannot deploy the displayed canopy
+    # while the selected receiver reports a different (or unknown) state.
+    if parachute is True and not deployment_state(state_name):
+        parachute = False
     stale = source in {"LIVE", "NETWORK"} and not fresh
     state = "STALE · last telemetry" if stale else "Telemetry"
     if simulated_display:
@@ -255,6 +275,8 @@ def simulation_pose(frame, events_available=True, *, motor_events_available=None
     flags = {"motor": getattr(frame, "powered", None), "parachute": getattr(frame, "recovery", None)}
     motor = _flag(flags, "motor") if motor_reliable else None
     parachute = _flag(flags, "parachute") if parachute_reliable else None
+    if parachute is True and not deployment_state(getattr(frame, "state", None)):
+        parachute = False
     inflation = _number(getattr(frame, "inflation", None))
     inflation = min(1.0, max(0.0, inflation)) if parachute is True and inflation is not None else 0.0
     description = attitude or "Orientation source unavailable"

@@ -311,6 +311,7 @@ class MainWindow(QMainWindow):
         self.last_pixmap = None
         self.last_video_error = ""
         self.last_sample_key = None
+        self.plot_clear_markers = {}
         root = QWidget()
         self.setCentralWidget(root)
         outer = QVBoxLayout(root)
@@ -2129,6 +2130,18 @@ class MainWindow(QMainWindow):
             for col, text in enumerate(cells):
                 set_cell(self.actuators, row, col, text)
 
+    def clear_plots(self):
+        """Hide existing plot samples without altering telemetry or recordings."""
+        c = self.controller
+        key = (c.mode, c.remote_display_key)
+        if c.display_history:
+            self.plot_clear_markers[key] = c.display_history[-1]
+        self.last_sample_key = None
+        self.refresh_plots(force=True)
+        for graph in (self.altitude_plot, self.rate_plot, self.angle_plot):
+            graph.enableAutoRange()
+        self.statusBar().showMessage("Plots cleared for this source · recordings unchanged", 5000)
+
     def refresh_plots(self, force=False):
         if not hasattr(self, "trajectory_plot"):
             return
@@ -2153,6 +2166,16 @@ class MainWindow(QMainWindow):
             return
         self.last_sample_key = key
         history = list(c.display_history)[-1200:]
+        source_key = (c.mode, c.remote_display_key)
+        marker = self.plot_clear_markers.get(source_key)
+        if marker is not None:
+            for index, item in enumerate(history):
+                if item is marker:
+                    history = history[index + 1:]
+                    break
+            else:
+                # The buffer moved beyond the cleared sample, or a new run began.
+                self.plot_clear_markers.pop(source_key, None)
         times = [s.t - flight_zero for s in history]
         for graph in (self.altitude_plot, self.rate_plot, self.angle_plot):
             graph.setLabel("bottom", "Source device uptime" if remote else "Flight time", units="s", color=COLORS["muted"])
