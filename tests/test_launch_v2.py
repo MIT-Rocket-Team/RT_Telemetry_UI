@@ -21,6 +21,11 @@ def test_base_station_keeps_one_window_and_shared_flight_state(qtbot, tmp_path, 
         w.show()
         w.resize(1280, 800)
         qtbot.wait(100)
+        # The first refresh updates row heights and schedules another Qt layout
+        # pass. Observe the settled readouts rather than racing a fixed delay.
+        qtbot.waitUntil(lambda: all(table.verticalScrollBar().maximum() == 0
+                                   and table.y() + table.height() <= table.parentWidget().height()
+                                   for table in (w.rocket_panel.telemetry, w.rocket_panel.gps)), timeout=5000)
         c = w.controller
         assert c.board_layout == "launch" and c.workers == {"telemetry": None}
         assert w.wifi_panel is None and not c.pointer_connected and not c.can_command
