@@ -133,9 +133,13 @@ def release_asset(release):
         raise SystemExit("OPENROCKET_DOWNLOAD must be latest or a release tag such as v6.2")
     endpoint = "latest" if release == "latest" else "tags/" + release
     url = f"https://api.github.com/repos/{RELEASE_REPOSITORY}/releases/{endpoint}"
-    request = urllib.request.Request(
-        url, headers={"User-Agent": "RocketGNCMonitor-build/0.1", "Accept": "application/vnd.github+json"}
-    )
+    headers = {"User-Agent": "RocketGNCMonitor-build/0.1", "Accept": "application/vnd.github+json"}
+    # Hosted runners share public IPs and routinely exhaust the anonymous limit.
+    # Authenticate only the GitHub API request, never third-party asset downloads.
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if token:
+        headers["Authorization"] = "Bearer " + token
+    request = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(request, timeout=30) as response:
         metadata = json.load(response)
     tag = metadata.get("tag_name", "")
