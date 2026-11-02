@@ -18,7 +18,9 @@ if (-not (Test-Path $Archive)) {
     Invoke-WebRequest 'https://github.com/Haivision/srt/archive/refs/tags/v1.5.4.tar.gz' -OutFile $Archive
 }
 if ((Get-FileHash $Archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Expected) { throw 'SRT source digest mismatch' }
-& tar -xzf $Archive -C $Work
+# This POSIX launcher is a symlink and is unused with ENABLE_APPS=OFF.
+# Windows tar cannot create it on a normal machine without symlink privileges.
+& tar -xzf $Archive -C $Work --exclude 'srt-1.5.4/srt-ffplay'
 if ($LASTEXITCODE) { throw 'SRT source extraction failed' }
 $Source = Join-Path $Work 'srt-1.5.4'
 $Build = Join-Path $Work 'srt-build'

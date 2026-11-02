@@ -1,0 +1,18 @@
+Generated with the built-in image_gen tool on 2026-11-01.
+Concept preview; all flight values are illustrative.
+
+Use case: ui-mockup.
+Create exactly ONE polished flat broadcast frame, landscape 16:9, preferably 1920x1080 or 2048x1152. This is a design sketch of a future MIT Rocket Team / Balius YouTube launch webcast. Show only the audience program, edge to edge: no laptop, browser, operating-system chrome, player controls, operator controls, or surrounding presentation board.
+
+Style: restrained professional launch webcast, inspired by SpaceX webcast composition but with MIT Rocket Team text identity, never a SpaceX logo. Crisp highly legible condensed sans-serif typography, tabular large numbers, midnight navy and charcoal surfaces, white text, cool grey secondary text, a restrained muted MIT-red accent for identity, warm amber for the SIMULATION badge. Thin fine separators. No rounded dashboard cards or excessive sci-fi embellishment.
+
+Use these exact layout proportions on a 1920x1080 coordinate canvas:
+- Full-canvas camera image is a dark OpenRocket transmission-placeholder slate: near-black navy with a faint calibration grid and subtle crosshair ticks. Center at x=860,y=500 the understated but clearly readable words "OPENROCKET", beneath them "TRANSMISSION PLACEHOLDER", and below that much smaller "BALIUS · ONBOARD CAMERA". No photographed rocket launch, earth footage, or invented live camera view. This slate stands in for the future full-screen onboard video.
+- At x=48,y=32, compact text branding "MIT ROCKET TEAM", with a small red rule. Below it "BALIUS". Beside that identity put a compact amber-outline badge "SIMULATION".
+- At the top right within a 48 pixel margin, small label "MISSION ELAPSED" and large clean tabular readout "T+ 00:12.4". Keep generous space between identity and clock.
+- Optional orientation inset at x=1424,y=148,width448,height252. Thin cool-grey rectangular border, dark navy. At top a small label "SIMULATED ORIENTATION". In its center show a very simple elegant silver/white rocket silhouette with small red fins leaning about 15 degrees off vertical, a sparse horizon/ground reference underneath. No flame or parachute, no numerical attitude claims. This is a simulation illustration only.
+- Near bottom left above the data strip, at x=48,y=840, a quiet source caption "ONBOARD · BALIUS".
+- Lower telemetry strip x=48,y=880,width1824,height120: one continuous dark translucent band, not separate cards, divided by two thin vertical separators into THREE equally weighted readable groups. First group label "ALTITUDE ABOVE LAUNCH", large value "5,820" with smaller "ft". Second group label "VERTICAL SPEED", large value "+332.0" with smaller "ft/s". Third group label "FLIGHT STATE", large value "COAST". These are illustrative simulated values. Metrics should be the largest type after the mission clock, white on dark.
+- At x=48,y=1016,width1824,height40, a compact thin mission-event rail with evenly spaced event points and labels: "LAUNCH", "BURNOUT", "APOGEE", "DROGUE", "MAIN", "LANDING". Launch and burnout are completed with bright filled points; later events have dim hollow points. No invented event timestamps. Keep all bottom labels inside the frame with at least 24px bottom safety.
+
+Aim for lots of open central video area, restrained overlays, exceptional typography, clean precise alignment, realistic broadcast visual hierarchy. The entire frame must be visible, rectangular and undistorted. No external annotations, arrows, dimension markings, explanatory panels, watermarks, or multiple variations. Render all specified text accurately.

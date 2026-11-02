@@ -1,0 +1,17 @@
+{
+  "mission": "BALIUS",
+  "mode": "SIMULATION",
+  "camera_label": "ONBOARD · BALIUS",
+  "telemetry_source": "GS3",
+  "altitude_m": 1773.936,
+  "altitude_datum": "above_launch",
+  "vertical_speed_m_s": 101.1936,
+  "vertical_speed_valid": true,
+  "flight_state": "COAST",
+  "mission_elapsed_s": 12.4,
+  "clock_state": "elapsed",
+  "telemetry_status": "fresh",
+  "telemetry_age_s": 0.04,
+  "completed_events": ["LIFTOFF", "BURNOUT"],
+  "camera_notice": ""
+}
