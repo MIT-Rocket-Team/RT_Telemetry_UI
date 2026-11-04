@@ -50,9 +50,9 @@ def publisher(path, mission, station="away1", role="telemetry"):
 def add_peer(qtbot, bridge, service):
     qtbot.waitUntil(lambda: bool(service.local_endpoint), timeout=5000)
     bridge.runtime.add_endpoint(service.local_endpoint)
-    qtbot.waitUntil(lambda: any(p.get("info", {}).get("node_id") == service.node_id
+    qtbot.waitUntil(lambda: any((p.get("info") or {}).get("node_id") == service.node_id
                                for p in bridge.peers), timeout=5000)
-    return next(p for p in bridge.peers if p.get("info", {}).get("node_id") == service.node_id)
+    return next(p for p in bridge.peers if (p.get("info") or {}).get("node_id") == service.node_id)
 
 
 def publish(service, altitude=120, state=2, quaternion=(1, 0, 0, 0), counter=1, simulated_display=False):

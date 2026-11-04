@@ -82,6 +82,7 @@ class MediaReceiver:
         self.endpoint, self.identity, self.peer = endpoint, dict(identity), dict(peer)
         self.stream, self.rendition = dict(stream), rendition
         self.frames = queue.Queue(maxsize=2)
+        self._listeners = frozenset()
         self.stopped = threading.Event()
         self.process = self.connection = self.session = None
         self.received_frames, self.last_frame = 0, None
@@ -186,7 +187,13 @@ class MediaReceiver:
                     self.last_frame = time.monotonic()
                     self.received_frames += 1
                     self.error = ""
-                    _replace_pending(self.frames, (bytes(frame), self.last_frame))
+                    raw = bytes(frame)
+                    for listener in self._listeners:
+                        try:
+                            listener(raw, self.last_frame)
+                        except Exception:
+                            pass  # A presentation consumer cannot stop reception.
+                    _replace_pending(self.frames, (raw, self.last_frame))
                     attempts = 0
                 if not self.stopped.is_set() and not self.error:
                     self.error = "Video connection ended"
@@ -218,6 +225,12 @@ class MediaReceiver:
         except (ValueError, OSError):
             pass
 
+    def add_frame_listener(self, listener):
+        self._listeners = self._listeners | {listener}
+
+    def remove_frame_listener(self, listener):
+        self._listeners = self._listeners - {listener}
+
     def stop(self):
         self.stopped.set()
         if self.connection:
@@ -233,6 +246,7 @@ class VideoWallNetwork(QObject):
         self.runtime, self.wall = runtime, wall
         self.workers, self.descriptions = {}, {}
         self.pending = {}
+        self.sources, self.consumers, self.consumer_errors = {}, {}, {}
         self.on_received = None
         self.mapping = {value: key for key, value in channel_ids(wall.profile).items()}
         wall.external_selection = True
@@ -241,6 +255,19 @@ class VideoWallNetwork(QObject):
         self.timer.setInterval(100)
         self.timer.timeout.connect(self.refresh)
         self.timer.start()
+
+    def subscribe(self, consumer, key, listener):
+        """One independent lease on a main decoder; callbacks must never block."""
+        self.consumers[consumer] = (tuple(key), listener)
+
+    def unsubscribe(self, consumer):
+        self.consumers.pop(consumer, None)
+        self.consumer_errors.pop(consumer, None)
+
+    def _deliver(self, key, info, stream, raw, stamp):
+        for requested, listener in tuple(self.consumers.values()):
+            if requested == key[:2]:
+                listener(raw, stamp, info, stream)
 
     def request_source(self, station, channel):
         if station == "local":
@@ -258,6 +285,8 @@ class VideoWallNetwork(QObject):
             worker.stop()
         worker = MediaReceiver(peer["endpoint"], self.runtime.info(), peer["info"], stream, key[2])
         self.workers[key], self.descriptions[key] = worker, signature
+        if key[2] == "main" and hasattr(worker, "add_frame_listener"):
+            worker.add_frame_listener(lambda raw, stamp: self._deliver(key, peer["info"], stream, raw, stamp))
         return worker
 
     def refresh(self):
@@ -299,6 +328,7 @@ class VideoWallNetwork(QObject):
                         sources[key] = None
                     else:
                         sources[key] = (peer, stream)
+        self.sources = sources
         wanted = set()
         for key in self.wall.thumbnails:
             entry = sources.get(key)
@@ -349,6 +379,22 @@ class VideoWallNetwork(QObject):
             if self.pending.get(channel) == key and main and main.error and main.error != "Connecting":
                 self.wall.primary_status[channel].setText(
                     f"GS{key[0][-1]} main unavailable; previous source retained · {main.error}")
+        for consumer, (source, _) in tuple(self.consumers.items()):
+            entry = sources.get(source)
+            self.consumer_errors[consumer] = "Source unavailable or conflicting"
+            if not entry:
+                continue
+            peer, stream = entry
+            key = (*source, "main")
+            if key not in self.workers:
+                mains = [k for k in self.workers if k[2] == "main"]
+                same_publisher = sum(self.descriptions[k][0] == peer["info"]["node_id"] for k in mains)
+                if len(mains) >= 6 or (same_publisher >= 2 and stream.get("source_mode") != "simulation"):
+                    self.consumer_errors[consumer] = "Main-video capacity reached; keep current sources or choose another station"
+                    continue
+            worker = self._start(key, peer, stream)
+            wanted.add(key)
+            self.consumer_errors[consumer] = worker.error
         for key in set(self.workers) - wanted:
             self.workers.pop(key).stop()
             self.descriptions.pop(key, None)
@@ -358,4 +404,5 @@ class VideoWallNetwork(QObject):
         for worker in self.workers.values():
             worker.stop()
         self.workers.clear()
+        self.consumers.clear()
         self.wall.external_selection = False

@@ -21,6 +21,26 @@ from .domain import finite
 BEST_CONNECTION = "best"
 
 
+def best_telemetry_node(peers, freshness_ms, current=None, vehicle_id=None):
+    """Shared Rocket-age then LTU-XR RTT policy; optional per-vehicle partition."""
+    candidates = []
+    for peer in peers:
+        info = peer.get("info") or {}
+        if (peer.get("state") != "ONLINE" or peer.get("conflict") or not peer.get("synchronized")
+                or info.get("station") not in {"gs1", "gs2", "gs3", "gs4"}):
+            continue
+        ages = [p.get("sample_age_ms_lower_bound") for p in peer.get("latest", [])
+                if vehicle_id is None or p.get("vehicle", {}).get("id") == vehicle_id]
+        ages = [age for age in ages if finite(age) and age >= 0]
+        if not ages or min(ages) > freshness_ms:
+            continue
+        ping = peer.get("rtt_ms")
+        ping = ping if finite(ping) and ping >= 0 else float("inf")
+        node = info["node_id"]
+        candidates.append((max(60, min(ages)), ping, node != current, info["station"], node))
+    return min(candidates)[-1] if candidates else None
+
+
 def network_configuration(data_dir, **overrides):
     config = dict(network_bind_host="0.0.0.0", network_port=8766,
                   network_discovery=True, peers=[], mission_id=None)
@@ -50,6 +70,7 @@ def validate_configuration(config):
 
 class StationNetworkBridge(QObject):
     changed = Signal()
+    observation_received = Signal(object)
     configuration_finished = Signal(str, object)
 
     def __init__(self, window, config):
@@ -280,23 +301,8 @@ class StationNetworkBridge(QObject):
         if self._last_source_evaluation is not None and now - self._last_source_evaluation < 1:
             return
         self._last_source_evaluation = now
-        candidates = []
-        for peer in self.telemetry_peers():
-            info = peer["info"]
-            if peer.get("state") != "ONLINE" or info.get("station") not in {"gs1", "gs2", "gs3", "gs4"}:
-                continue
-            ages = [p.get("sample_age_ms_lower_bound") for p in peer.get("latest", [])]
-            ages = [age for age in ages if finite(age) and age >= 0]
-            if not ages or min(ages) > self.controller.mission.freshness * 1000:
-                continue
-            # Match the Rocket bar: full quality at <=60 ms, then 60/age.
-            # LTU-XR quality is measured by application RTT, not RF strength.
-            age = max(60, min(ages))
-            ping = peer.get("rtt_ms")
-            ping = ping if finite(ping) and ping >= 0 else float("inf")
-            node = info["node_id"]
-            candidates.append((age, ping, node != self.controller.remote_display_key, info["station"], node))
-        node = min(candidates)[-1] if candidates else BEST_CONNECTION
+        node = best_telemetry_node(self.telemetry_peers(), self.controller.mission.freshness * 1000,
+                                   self.controller.remote_display_key) or BEST_CONNECTION
         if self.controller.remote_display_key != node:
             self._set_display_source(node)
 
@@ -344,9 +350,10 @@ class StationNetworkBridge(QObject):
             peer = eligible.get(event.get("node_id"))
             if event.get("kind") == "telemetry.observation" and peer and event["boot_id"] == peer["info"]["boot_id"]:
                 payload = event["payload"]
-                age = max(0, int(event["sent_mono_ms"]) - int(payload["timing"]["received_mono_ms"]))
-                age += max(0, now - event["received_local_mono"]) * 1000
-                self._accept_remote(peer, payload, now, age)
+                arrival_age = max(0, int(event["sent_mono_ms"]) - int(payload["timing"]["received_mono_ms"]))
+                age = arrival_age + max(0, now - event["received_local_mono"]) * 1000
+                self._accept_remote(peer, payload, now, age,
+                                    arrival=event["received_local_mono"], arrival_age=arrival_age)
         if now - self._last_status >= .5:
             self._last_status = now
             runtime.update_status(dict(
@@ -550,7 +557,13 @@ class StationNetworkBridge(QObject):
                 self.error = f"Remote update applied, but local device mapping could not be saved: {exc}"
         self.changed.emit()
 
-    def _accept_remote(self, peer, payload, now, age):
+    def _accept_remote(self, peer, payload, now, age, *, arrival=None, arrival_age=None):
+        # Independent presentation consumer gets canonical metadata before the
+        # legacy node-level projection; its own ID dedupe handles bootstraps.
+        self.observation_received.emit(dict(peer=peer["info"], payload=payload,
+            received_local_mono=now if arrival is None else arrival,
+            source_age_ms=age if arrival_age is None else arrival_age,
+            timing_basis="snapshot" if arrival is None else "event"))
         info, identity = peer["info"], payload["observation_id"]
         node = info["node_id"]
         previous = self._last_observations.get(node, "")
