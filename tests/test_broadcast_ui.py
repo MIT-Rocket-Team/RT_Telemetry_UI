@@ -151,12 +151,19 @@ def test_small_replay_seek_invalidates_presentation_epoch(qtbot, tmp_path, monke
     c = window.controller
     broadcast = window.broadcast
     c.reader = SimpleNamespace(
-        duration=10, manifest={}, events=lambda *a: [], between=lambda *a: [], close=lambda: None
+        path=tmp_path / "replay",
+        count=0,
+        duration=10,
+        manifest={},
+        events=lambda *a: [],
+        between=lambda *a: [],
+        close=lambda: None,
     )
     monkeypatch.setattr(c, "replay_video", lambda: None)
     epoch = broadcast.epoch
     broadcast.session.program = BroadcastSelection("Flight", "old-camera")
     c.seek(0.1)
+    window.refresh()  # The fixture must also support an interleaved UI timer refresh.
     assert broadcast.epoch != epoch and broadcast.session.program.scene == "Standby"
     assert not broadcast.session.frames.frames
     window.close()
