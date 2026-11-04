@@ -548,16 +548,19 @@ class BroadcastPanel(QDialog):
                 (self.inset, [("Off", None), ("Rocket orientation", "orientation")]),
             ]:
                 selected = combo.currentData()
+                selected_label = combo.currentText().removesuffix(" · unavailable")
                 combo.blockSignals(True)
                 combo.clear()
                 for label, value in initial + [(label, key) for key, label in catalog]:
                     combo.addItem(label, value)
                 index = combo.findData(selected)
-                combo.setCurrentIndex(max(0, index))
+                if index < 0:
+                    # A transient catalog loss must not discard the operator's
+                    # prepared shot or crop. Readiness still requires live frames.
+                    combo.addItem(selected_label + " · unavailable", selected)
+                    index = combo.count() - 1
+                combo.setCurrentIndex(index)
                 combo.blockSignals(False)
-                if combo is self.main and combo.currentData() != selected:
-                    for field in self.crop:
-                        field.setValue(0)
         target = s.pause_time if s.paused and s.pause_time is not None else now - s.timing.delay
         elapsed, state, basis = s.clock.at(target)
         from .broadcast_renderer import mission_clock
