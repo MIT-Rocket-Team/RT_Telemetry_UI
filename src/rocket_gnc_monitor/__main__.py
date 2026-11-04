@@ -95,6 +95,7 @@ def argument_parser():
     startup.add_argument("--startup-smoke", action="store_true", help="Verify locked Live startup and exit")
     startup.add_argument("--station-smoke", action="store_true", help="Verify station workspace layout and exit")
     startup.add_argument("--setup-smoke", action="store_true", help="Render the startup wizard without opening instruments")
+    startup.add_argument("--broadcast-smoke", action="store_true", help="Verify packaged Base Video broadcast output without OBS or hardware")
     startup.add_argument(
         "--virtual-pointer-smoke",
         type=Path,
@@ -215,7 +216,7 @@ def main():
         remember_choices = args.remember_setup
     smoke = any((
         args.replay_smoke, args.startup_smoke, args.station_smoke, args.virtual_pointer_smoke,
-        args.flight_3d_smoke, args.flight_smoke, args.setup_smoke,
+        args.flight_3d_smoke, args.flight_smoke, args.setup_smoke, args.broadcast_smoke,
     ))
     if args.setup_smoke or not (args.skip_setup or smoke):
         from .startup_wizard import StartupWizard
@@ -295,6 +296,31 @@ def main():
 
         profile_fields["startup_mission"] = asdict(window.controller.mission)
     window.show()
+    if args.broadcast_smoke:
+        if profile.station != 'base' or profile.role != 'video':
+            window.close()
+            raise SystemExit('Broadcast verification requires --site base --role video')
+        window.open_broadcast()
+        window.broadcast.open_program()
+        def broadcast_check():
+            c = window.broadcast
+            report = dict(rendered=c.rendered, error=c.error, logo_loaded=not c.logo.isNull(),
+                          raster=[c.last_program.width(),c.last_program.height()],
+                          window_title=c.program_window.windowTitle(),
+                          content_pixels=[round(c.program_window.width()*c.program_window.devicePixelRatioF()),
+                                          round(c.program_window.height()*c.program_window.devicePixelRatioF())],
+                          obs_connected=c.panel.obs.fresh(), hardware_open=any(window.controller.workers.values()))
+            report['passed'] = (report['rendered'] > 10 and not report['error'] and report['logo_loaded']
+                                and report['raster'] == [1920,1080] and not report['hardware_open']
+                                and not report['obs_connected'])
+            data.mkdir(parents=True,exist_ok=True)
+            (data/'broadcast-smoke-report.json').write_text(json.dumps(report,indent=2))
+            c.last_program.save(str(data/'broadcast-program.png'))
+            c.panel.grab().save(str(data/'broadcast-panel.png'))
+            window.close()
+            app.exit(0 if report['passed'] else 1)
+        QTimer.singleShot(2000,broadcast_check)
+        return app.exec()
     if args.station_smoke:
         def station_check():
             try:

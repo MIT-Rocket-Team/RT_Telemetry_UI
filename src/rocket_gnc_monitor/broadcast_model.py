@@ -116,6 +116,7 @@ class BroadcastSelection:
     inset: str | None = None  # None, "orientation", or a logical camera.
     title: str = "MIT ROCKET TEAM"
     caption: str = ""
+    main_crop: tuple[float, float, float, float] = (0, 0, 0, 0)  # left/top/right/bottom fractions
 
     @property
     def cameras(self):
@@ -148,6 +149,7 @@ class FrameView:
     scene: str = "Standby"
     caption: str = ""
     paused: bool = False
+    camera_crop: tuple[float, float, float, float] = (0, 0, 0, 0)
 
 
 @dataclass(frozen=True)

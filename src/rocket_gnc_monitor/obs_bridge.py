@@ -100,8 +100,9 @@ class OBSBridge(QObject):
         try:
             asyncio.run(self._connection(generation, stopped, commands, port, password))
         except (OSError, ValueError, KeyError, TypeError, asyncio.TimeoutError, aiohttp.ClientError):
-            self._update.emit(generation, dict(connected=False,
-                message='OBS disconnected or authentication failed — output state unknown. Check OBS and reconnect.'))
+            if not stopped.is_set():
+                self._update.emit(generation, dict(connected=False,
+                    message='OBS disconnected or authentication failed — output state unknown. Check OBS and reconnect.'))
         finally:
             while not commands.empty():
                 try:
@@ -134,6 +135,8 @@ class OBSBridge(QObject):
                     now, size = time.monotonic(), stream.get('outputBytes', 0)
                     bitrate = max(0, (size-previous_bytes)*8/(now-previous_time)/1000) if previous_time else 0
                     previous_bytes, previous_time = size, now
+                    if stopped.is_set():
+                        break
                     self._update.emit(generation, dict(connected=True, updated=now, message=message,
                         streaming=bool(stream.get('outputActive')), reconnecting=bool(stream.get('outputReconnecting')),
                         recording=bool(recording.get('outputActive')), recording_paused=bool(recording.get('outputPaused')),

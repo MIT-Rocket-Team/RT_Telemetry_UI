@@ -71,3 +71,29 @@ def test_only_one_new_camera_can_warm_at_a_time():
     s,_ = populated()
     with pytest.raises(ValueError,match='one new camera'):
         s.stage(BroadcastSelection('Flight','a','b'))
+
+
+def test_pause_retains_picture_but_reports_transport_loss():
+    s,source = populated()
+    selection = BroadcastSelection('Flight',source.logical)
+    s.program = selection
+    before = s.snapshot(selection,11.3,EVENTS)
+    s.paused = True
+    s.pause_time = before.program_time
+    paused = s.snapshot(selection,11.4,EVENTS)
+    assert paused.main is before.main and paused.view.paused
+    assert paused.program_time == before.program_time
+    assert s.snapshot(selection,14,EVENTS).main is None
+    s.set_scope(replace(s.scope,mission='other'))
+    assert not s.previous_snapshots
+
+
+def test_crop_is_explicit_staged_and_validated():
+    s,source=populated()
+    selection=BroadcastSelection('Flight',source.logical,main_crop=(.1,.1,.1,.1))
+    s.stage(selection)
+    assert s.program.main_crop==(0,0,0,0)
+    s.request_take(11.3); s.output_boundary(11.3)
+    assert s.snapshot(s.program,11.3,EVENTS).view.camera_crop==(.1,.1,.1,.1)
+    with pytest.raises(ValueError,match='crop'):
+        s.stage(replace(selection,main_crop=(.9,0,0,0)))

@@ -112,6 +112,10 @@ def compose(camera: QImage | None, view: FrameView, units: DisplayUnits, logo: Q
     painter.setRenderHints(QPainter.RenderHint.Antialiasing | QPainter.RenderHint.TextAntialiasing
                            | QPainter.RenderHint.SmoothPixmapTransform)
     if camera is not None and not camera.isNull() and view.scene not in {"Standby", "End card"}:
+        if any(view.camera_crop):
+            left, top, right, bottom = view.camera_crop
+            camera = camera.copy(round(camera.width()*left), round(camera.height()*top),
+                                 round(camera.width()*(1-left-right)), round(camera.height()*(1-top-bottom)))
         letterbox(painter, camera, QRectF(0, 0, WIDTH, HEIGHT))
     else:
         camera_slate(painter, view.mode)

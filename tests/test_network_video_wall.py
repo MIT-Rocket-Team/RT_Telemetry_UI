@@ -84,3 +84,47 @@ def test_all_eight_previews_and_transactional_main_promotion(qtbot, monkeypatch,
         assert wall.selected_sources["digital"] == ("local", "digital")
     finally:
         manager.close()
+
+
+def test_broadcast_and_wall_own_one_decoder_independently(qtbot,monkeypatch):
+    class SharedReceiver(Receiver):
+        def __init__(self,*args):
+            super().__init__(*args)
+            self.listeners = set()
+        def add_frame_listener(self,callback): self.listeners.add(callback)
+        def send_to_listeners(self):
+            for callback in self.listeners: callback(b'frame',time.monotonic())
+    monkeypatch.setattr('rocket_gnc_monitor.network.media_receiver.MediaReceiver',SharedReceiver)
+    mission = str(uuid.uuid4())
+    service = MediaService(StationProfile(station='away1',role='video'))
+    streams = service.streams(); service.close()
+    peer = dict(endpoint='http://192.0.2.1:8766',state='ONLINE',streams=streams,
+                info=dict(station='gs1',role='video',mission_id=mission,source_mode='live',
+                          node_id=str(uuid.uuid4()),boot_id=str(uuid.uuid4())))
+    class Runtime:
+        mission_id = mission
+        def peers_snapshot(self): return [peer]
+        def info(self): return peer['info']
+    wall = VideoWall(StationProfile(station='base',role='video'))
+    qtbot.addWidget(wall)
+    manager = VideoWallNetwork(Runtime(),wall); manager.timer.stop()
+    seen = []
+    try:
+        manager.subscribe('broadcast:one',('away1','digital'),lambda *a: seen.append(a))
+        manager.subscribe('broadcast:two',('away1','digital'),lambda *a: seen.append(a))
+        manager.refresh()
+        worker = manager.workers[('away1','digital','main')]
+        worker.send_to_listeners()
+        assert len(seen) == 2
+        manager.unsubscribe('broadcast:one'); manager.refresh()
+        assert not worker.stopped
+        worker.send_to_listeners(); assert len(seen) == 3
+        wall.select_remote('away1','digital'); manager.refresh()
+        worker.deliver(); manager.refresh()
+        manager.unsubscribe('broadcast:two'); manager.refresh()
+        assert manager.workers[('away1','digital','main')] is worker and not worker.stopped
+        wall.select_local_digital(); manager.refresh()
+        manager.workers[('away1','digital','preview')].deliver(); manager.refresh()
+        assert worker.stopped
+    finally:
+        manager.close()

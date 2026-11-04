@@ -38,7 +38,8 @@ class ProgramWindow(FrameCanvas):
     def __init__(self, controller):
         super().__init__(controller.owner)
         self.controller = controller
-        self.setWindowFlags(Qt.WindowType.Window)
+        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.CustomizeWindowHint
+                            | Qt.WindowType.WindowTitleHint | Qt.WindowType.WindowCloseButtonHint)
         self.setWindowTitle('Rocket Broadcast — Program')
         self.setCursor(Qt.CursorShape.BlankCursor)
         self.reset_size()
@@ -67,6 +68,9 @@ class BroadcastPanel(QDialog):
         self.setWindowTitle('Broadcast · Base Video')
         self.resize(1060, 900)
         self.setModal(False)
+        self.setStyleSheet('QTabWidget::pane { border: 1px solid #284358; } '
+            'QTabBar::tab { background: #172b3b; color: #dce7ef; padding: 9px 16px; } '
+            'QTabBar::tab:selected { background: #284358; color: #57d7c8; }')
         root = QVBoxLayout(self)
         self.overview = QLabel()
         self.overview.setWordWrap(True)
@@ -120,6 +124,7 @@ class BroadcastPanel(QDialog):
         self.preview_status = QLabel()
         layout.addWidget(self.preview_status)
         form = QFormLayout()
+        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         layout.addLayout(form)
         self.scene = self.combo([(s,s) for s in SCENES])
         self.main = self.combo([('Choose a camera', None)])
@@ -128,11 +133,23 @@ class BroadcastPanel(QDialog):
         self.title.setMaxLength(60)
         self.caption = QLineEdit()
         self.caption.setMaxLength(96)
+        self.crop = [QDoubleSpinBox() for _ in range(4)]
+        crop_widget = QWidget()
+        crop_row = QHBoxLayout(crop_widget)
+        crop_row.setContentsMargins(0,0,0,0)
+        for field,name in zip(self.crop,('L','T','R','B')):
+            field.setRange(0,45)
+            field.setSuffix(' %')
+            field.setAccessibleName('Main camera crop ' + name)
+            crop_row.addWidget(QLabel(name))
+            crop_row.addWidget(field)
+        self.main.currentIndexChanged.connect(lambda: [f.setValue(0) for f in self.crop])
         self.telemetry = self.combo([('Best connection (each second)', 'best')] + [(f'Away station {n}',f'gs{n}') for n in range(1,5)])
         vehicles = ['balius'] if self.c.owner.profile.vehicle == 'balius' else ['unknown', 'sustainer', 'booster']
         self.vehicle = self.combo([(x.title(),x) for x in vehicles])
         for name, widget in [('Scene', self.scene), ('Main camera',self.main), ('Inset',self.inset),
                              ('Mission title',self.title), ('Caption',self.caption),
+                             ('Main crop (Preview before Take)',crop_widget),
                              ('Telemetry receiver',self.telemetry), ('Qualified vehicle',self.vehicle)]:
             form.addRow(name,widget)
         self.telemetry.currentIndexChanged.connect(self.receiver_changed)
@@ -152,8 +169,12 @@ class BroadcastPanel(QDialog):
         layout.addWidget(note)
 
     def prepare(self):
-        self.c.stage(BroadcastSelection(self.scene.currentData(), self.main.currentData(), self.inset.currentData(),
-                                        self.title.text().strip() or 'MIT ROCKET TEAM', self.caption.text().strip()))
+        self.c.stage(self.draft_selection())
+
+    def draft_selection(self):
+        return BroadcastSelection(self.scene.currentData(), self.main.currentData(), self.inset.currentData(),
+                                  self.title.text().strip() or 'MIT ROCKET TEAM', self.caption.text().strip(),
+                                  tuple(f.value()/100 for f in self.crop))
 
     def receiver_changed(self):
         self.c.session.telemetry_choice = self.telemetry.currentData()
@@ -167,7 +188,7 @@ class BroadcastPanel(QDialog):
         self.obs_ready.setChecked(False)
 
     def build_timing(self):
-        layout = self.page('Timing & field qualification')
+        layout = self.page('Timing and telemetry')
         note = QLabel('All output uses one delayed timeline. Measure each path with a visible flash/time marker and matching telemetry event. Unknown fields stay blank. Changing timing returns Program to a slate and clears the event clock; take the camera again after buffering.')
         note.setWordWrap(True)
         layout.addWidget(note)
@@ -249,7 +270,7 @@ class BroadcastPanel(QDialog):
         self.c.settings.save(self.c.settings_path)
 
     def build_clock(self):
-        layout = self.page('Clock & events')
+        layout = self.page('Clock and events')
         label = QLabel('Observed now means the real event happened now; it reaches Program after the common delay. On Program means the event is visible in the delayed frame now. Planned zero always waits for an actual liftoff mark.')
         label.setWordWrap(True)
         layout.addWidget(label)
@@ -353,9 +374,11 @@ class BroadcastPanel(QDialog):
         c, s = self.c, self.c.session
         now = time.monotonic()
         ready, reason = s.readiness(s.preview,now)
-        self.preview_status.setText('PREVIEW · ' + reason)
-        self.take_button.setEnabled(ready)
-        program = 'PROGRAM OPEN' if c.active else 'PROGRAM STOPPED'
+        prepared = self.draft_selection() == s.preview
+        crop_notice = ' · MAIN CAMERA CROPPED' if any(s.preview.main_crop) else ''
+        self.preview_status.setText('PREVIEW · ' + (reason+crop_notice if prepared else 'Changes not prepared — click Prepare Preview'))
+        self.take_button.setEnabled(ready and prepared)
+        program = 'PROGRAM ERROR' if c.error else 'PROGRAM OPEN' if c.active else 'PROGRAM STOPPED'
         sending = ('OBS SENDING' if self.obs.state.get('streaming') else 'OBS NOT SENDING') if self.obs.fresh() else 'OBS STATE UNKNOWN'
         self.overview.setText(f'{program}  •  {sending}  •  YouTube visibility unverified')
         self.health.setText(f'Render {c.render_ms:.1f} ms · Frames {c.rendered:,} · Missed slots {c.skipped:,} · '
@@ -368,11 +391,16 @@ class BroadcastPanel(QDialog):
             for combo,initial in [(self.main,[('Choose a camera',None)]),
                                   (self.inset,[('Off',None),('Rocket orientation','orientation')])]:
                 selected = combo.currentData()
+                combo.blockSignals(True)
                 combo.clear()
                 for label,value in initial + [(label,key) for key,label in catalog]:
                     combo.addItem(label,value)
                 index = combo.findData(selected)
                 combo.setCurrentIndex(max(0,index))
+                combo.blockSignals(False)
+                if combo is self.main and combo.currentData() != selected:
+                    for field in self.crop:
+                        field.setValue(0)
         elapsed,state,basis = s.clock.at(now-s.timing.delay)
         from .broadcast_renderer import mission_clock
         self.clock_status.setText(mission_clock(elapsed,state) + ' · ' + basis)
@@ -388,7 +416,7 @@ class BroadcastPanel(QDialog):
             f" · Render lag {status.get('render_lag',0)} · Encode lag {status.get('encode_lag',0)}"
             f"\nRecording: {'PAUSED' if status.get('recording_paused') else 'ACTIVE' if status.get('recording') else 'STOPPED'}"
             f"\n{status.get('recording_path','')}" if fresh else '\nOutput state unknown; check OBS directly.'))
-        verified = c.active and self.obs_ready.isChecked()
+        verified = c.active and not c.error and self.obs_ready.isChecked()
         if c.program_window:
             window = c.program_window
             ratio = window.devicePixelRatioF()

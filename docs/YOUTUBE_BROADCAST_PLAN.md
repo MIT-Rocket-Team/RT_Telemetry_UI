@@ -1,7 +1,7 @@
 # Base Station Video → YouTube broadcast implementation plan
 
 Date: 2026-11-01, America/New_York\
-Status: detailed implementation proposal with a runnable single-frame composition sketch; live broadcast integration is not yet implemented\
+Status: implementation underway/locally verified; see BROADCAST_VERIFICATION.md for the authoritative tested scope and remaining gates\
 Consistency reviews: 2026-11-01, including the Camera + Arc HUD and script review; resolutions recorded in section 22\
 Repository baseline inspected: `978b618d69b8bfc8a66b058b270bed3ead43af13`
 
@@ -13,7 +13,7 @@ The accepted first implementation uses **OBS on that same Base Video computer** 
 
 The public program is a dedicated clean output window. The normal Base Video wall remains the operator's working view, with station thumbnails, network information and source controls. Operator dialogs and hardware controls never form part of the program image.
 
-This document records confirmed requirements separately from proposed defaults. It describes future implementation; application code, station settings and YouTube configuration are unchanged by writing this plan.
+This document records the accepted design and its qualification gates. The implementation and operator workflow are described in [BROADCAST_OPERATOR_GUIDE.md](BROADCAST_OPERATOR_GUIDE.md). The original one-frame sketch remains a design example; production uses the broadcast modules in src/rocket_gnc_monitor. The user authorized implementation and GitHub milestone pushes on 2026-11-03, stopping before the real YouTube test.
 
 ### Confirmed requirements
 
@@ -239,7 +239,7 @@ Preview uses the same delayed presentation timeline as Program for the proposed 
 
 Only Base / Video exposes these controls. Away Video keeps its capture/transmit role; Base Telemetry keeps its instruments and command ownership. Keyboard shortcuts apply only when the Broadcast panel has focus and must not collide with existing serial/pointer shortcuts.
 
-In the first release, the operator starts/stops internet streaming in OBS. Base Video reports **Program output ready**, not “YouTube live.” Opening a local window, seeing video in OBS, OBS sending data, and YouTube publicly serving the event are distinct states.
+In the first release, the operator starts/stops internet streaming explicitly in OBS or through the authenticated local OBS panel. Base Video reports **Program output ready**, not “YouTube live.” Opening a local window, seeing video in OBS, OBS sending data, and YouTube publicly serving the event are distinct states.
 
 Opening Program initially shows the built-in slate. The first content scene also requires a ready Preview/Take. Readiness applies only to inputs required by that scene: an end card or camera-free slate must remain available when every camera is down. A missing optional telemetry field produces its defined unavailable presentation rather than preventing an otherwise valid camera shot.
 
@@ -437,8 +437,8 @@ Presentation freshness determines whether an on-air number can be shown as curre
 | Telemetry alive, camera lost | Continue qualified telemetry on the slate or manually selected alternate | Offer healthy camera candidates |
 | Explicitly paused replay/simulation | Retain the paused frame, clock and historical values with PAUSED and mode labels | Report actual transport loss separately; do not infer pause from silence |
 | Mission/vehicle/source mode changes | Clear incompatible content to a slate immediately; persistent SIMULATION/REPLAY label where applicable | Require a ready Preview/Take for the new scope |
-| OBS/internet fails | Local Program and application data collection continue independently | In v1 the operator checks OBS and YouTube; app delivery status remains unmonitored, not inferred connected/disconnected |
-| Application output fails while OBS stays alive | Use a prepared OBS emergency slate manually in v1 | Do not claim automatic heartbeat protection without an OBS integration |
+| OBS/internet fails | Local Program and application data collection continue independently | The app reports measured OBS output/status when connected and unknown otherwise; the operator checks the YouTube return separately |
+| Application output fails while OBS stays alive | Use a prepared OBS emergency slate manually in v1 | The current integration does not implement an automatic OBS emergency-scene heartbeat; use the independent OBS slate |
 
 Loss overrides apply per tile. A failed inset does not blank the healthy main picture. A failed main feed does not remove healthy telemetry or an independently healthy inset. Slate generation does not require a camera receiver slot.
 
@@ -463,7 +463,7 @@ Public fallback captions use plain language. Detailed sockets, IP addresses, nod
 
 The profile/scene template cannot hard-code another computer's window ID, microphone device ID or credentials. Supply a short first-run mapping checklist and verify the saved selections survive an application restart.
 
-V1 has no OBS status/control connection. Its delivery panel states that OBS/YouTube are monitored externally. Program ready means only that the local visual output is ready; streaming, recording and public visibility must each be checked in their owning application. The optional adapter below is the first point at which Base Video can report measured encoder status.
+The user expanded v1 on 2026-11-03 to include local authenticated OBS status and explicit recording/streaming Start/Stop controls. Program ready, OBS output state and YouTube visibility are separate. OBS status becomes unknown after disconnection/staleness; YouTube visibility remains externally verified. No stream key is read by the app.
 
 ### Output presets
 
@@ -481,9 +481,9 @@ Set a planning target of at least 1.5× the total stream bitrate in sustained us
 
 First-time YouTube live activation may take up to 24 hours, so account readiness belongs in pre-event preparation. The first end-to-end test is unlisted and includes motion and audio. [YouTube encoder setup](https://support.google.com/youtube/answer/2907883?hl=en)
 
-### Optional OBS control integration
+### Accepted v1 OBS control integration
 
-After the manual OBS workflow is qualified, add a local authenticated adapter for status and explicit Start/Stop commands. OBS provides a WebSocket API and includes it in modern releases. Keep credentials outside exported plans and mission archives. Do not change the station network protocol to carry OBS control. [Official obs-websocket project](https://github.com/obsproject/obs-websocket)
+The accepted v1 extension adds a local authenticated adapter for status and explicit Start/Stop commands. OBS provides a WebSocket API and includes it in modern releases. Keep credentials outside exported plans and mission archives. Do not change the station network protocol to carry OBS control. [Official obs-websocket project](https://github.com/obsproject/obs-websocket)
 
 Model connection, authentication, encoder-output state and platform publication separately. OBS “streaming” means the encoder is sending, not proof that the intended YouTube event is publicly visible. If OBS status becomes stale, display unknown. Reconnecting the adapter must never resend a Start command automatically. Direct program rendering remains usable without this adapter.
 
@@ -493,7 +493,7 @@ Rocket video is currently silent in this application. The first release's audio 
 
 Audio must align to Program, not the operator's immediate monitor. If commentary describes the delayed Program preview, measure the remaining microphone/video offset; do not automatically add the full B again to that commentary. If range audio is captured directly from the live event, compensate for its own path delay against B and the measured Program capture path. Each input may need a different OBS offset. Avoid adding the same delay twice. If the required correction cannot be implemented by the qualified OBS input settings, revise the common delay on a slate and requalify, or leave that input muted.
 
-Record which view the commentator watches and which audio path each offset applies to. Any camera/path-delay or B change requires rechecking the relevant audio compensation before returning to the scene. V1 does not silently adjust OBS audio settings, because it has no OBS control connection.
+Record which view the commentator watches and which audio path each offset applies to. Any camera/path-delay or B change requires rechecking the relevant audio compensation before returning to the scene. V1 does not silently adjust OBS audio settings. Its control adapter is restricted to output Start/Stop and status polling; audio setup and offset verification remain explicit OBS work.
 
 Keep two independent records:
 
@@ -539,7 +539,7 @@ Names below are proposed additions; they do not currently exist unless explicitl
 | `packaging/obs/` | Credential-free OBS scene/profile templates and platform setup notes |
 | `scripts/verify_broadcast.py` | Proposed reproducible composition/network/package verification entry point |
 | `docs/BROADCAST_OPERATOR_GUIDE.md` | Event-day procedure after the feature exists |
-| `obs_bridge.py` | Optional later local OBS integration; not required for first manual delivery |
+| `obs_bridge.py` | Accepted v1 local authenticated OBS control/status adapter; rendering remains independent |
 
 Do not couple core broadcast composition to OBS APIs. The snapshot/renderer boundary should support a future direct encoder without rewriting source selection, units or failure behavior. Conversely, do not build a generic plugin system before the first backend works.
 
@@ -557,7 +557,7 @@ The clean output is an audience canvas rendered from data, not a cropped screens
 | M5 — OBS delivery | Scene/profile templates, window mapping, local audio, MKV recording, emergency slate | Local recording and unlisted YouTube return show the intended layout, source, units and audio alignment |
 | M6 — Packaging and field rehearsal | Native app build, relocation test, one-hour soak, fault injection, launch-site network test | All acceptance criteria below pass on the intended sending computer; verified artifacts and runbook available |
 
-Each milestone should be reviewable independently. Keep higher-resolution changes, automatic camera selection and OBS remote control out of the first implementation's critical path. Estimate calendar time after M0 identifies camera formats, simultaneous receiver load and field internet capacity.
+Each milestone should be reviewable independently. Keep higher-resolution changes, automatic camera selection out of the first implementation's critical path; local OBS control is now included by explicit user request. Estimate calendar time after M0 identifies camera formats, simultaneous receiver load and field internet capacity.
 
 For release, build from the reviewed source revision with its pinned runtime, verify the relocated package, and retain the previous installed application before replacing `/Applications/RocketGNCMonitor-v0a.app`. Record package hashes and the tested OBS version/template. The ordinary Base Video wall must still open and function when Broadcast is disabled, OBS is absent, or internet access is unavailable. Rollback restores the previous app and leaves raw recordings intact; new broadcast settings use their own schema so older applications can ignore them.
 
@@ -594,7 +594,7 @@ Use unit tests for pure selection/timing logic, integration tests for actual net
 | Artwork/text | Packaged web logo hash/transparency verified; long titles, status qualifiers, all scenes and units stay inside 48 px side/24 px bottom text margins and remain readable at 720p |
 | Window capture | Correct Program window and measured capture pixel dimensions; no cursor/chrome/dialogs; Retina/display changes trigger revalidation |
 | Audio | Commentary/range audio each use their own qualified offset; no feedback or YouTube-return loop; bounded drift over the rehearsal |
-| Internet loss | Application reception/archives continue; v1 explicitly leaves delivery unmonitored in-app; operator confirms failure/recovery in OBS and YouTube |
+| Internet loss | Application reception/archives continue; OBS connection/output/reconnection status is monitored locally; YouTube visibility and failure/recovery are confirmed externally |
 | Lifecycle | Closing panel/Preview leaves Program active; explicit Program stop releases only its consumers; OBS remains independently controlled; no leaked listeners/processes/buffers |
 | One-hour soak | All expected feeds active plus Program/OBS/recording; stable memory; no broadcast-caused archive loss; render/decode metrics retained |
 | Overrun handling | Slow renders skip slots using finish time; no catch-up burst; buffer overflow drops only broadcast copies, reports gaps and preserves wall/archival operation |
@@ -644,7 +644,7 @@ Reviewed on 2026-11-01 against the inspected repository and the plan's architect
 | Freshness could double-count the intentional buffer, and Best with no eligible GS had ambiguous stale behavior | Separate current source health, presentation freshness, resolved receiver and explicitly last-presented values. Define age-to-unavailable behavior. |
 | Mission resets, camera epochs and replay seeks had overly broad or incomplete reset rules | Scope changes clear incompatible output; a single camera epoch clears only that camera; replay seek creates a playback epoch without inventing live timing. |
 | Iris family, vehicle identity, local ground video and simulation labels could imply unsupported attribution | Keep family/vehicle/provenance separate; unknown Iris telemetry cannot claim Sustainer or Booster; local ground views are explicitly associated and labelled. |
-| V1 implied knowledge or control of OBS/YouTube without its deferred integration | App readiness covers local Program only. OBS and public event status are checked externally; stopping Program does not stop OBS. |
+| V1 implied knowledge or control of OBS/YouTube without its deferred integration | App readiness covers local Program; the accepted extension adds measured OBS status and explicit controls. Public event visibility remains external; stopping Program does not stop OBS. |
 | One audio delay could double-delay commentary while still misaligning range audio | Qualify each input against the view it describes and recheck audio after timeline changes. V1 does not remotely change OBS offsets. |
 | Replay and recording language implied simultaneous live instant replay and isolated archives of every camera | V1 uses the existing exclusive REPLAY lifecycle and preserves only recordings actually supported; OBS records the finished show. Other archival/playback features remain later work. |
 | 1920×1080 canvas dimensions could be mistaken for macOS window points | Composition pixels, window points and OBS capture pixels are distinct; qualify and lock the actual capture geometry. |
@@ -815,7 +815,7 @@ local microphone / range audio ────────────────�
                                                                YouTube Live
 ```
 
-In OBS, capture only that Program window, crop any window chrome, set the canvas/output and encoder preset from section 14, add the individually aligned audio inputs, and configure the YouTube destination there. Start recording and streaming deliberately in OBS, then verify the intended event's return. No stream key belongs in this script or JSON. The app reports local Program readiness; v1 still has no automatic OBS/YouTube status/control integration.
+In OBS, capture only that Program window, crop any window chrome, set the canvas/output and encoder preset from section 14, add the individually aligned audio inputs, and configure the YouTube destination there. Start recording and streaming deliberately in OBS or through the accepted local control panel, then verify the intended event's return. No stream key belongs in this script or JSON. The app reports Program readiness and measured OBS state separately; it never infers YouTube visibility.
 
 ### Verification of the sketch versus the later live feature
 

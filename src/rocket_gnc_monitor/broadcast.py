@@ -5,7 +5,7 @@ import time
 import uuid
 
 from PySide6.QtCore import QObject, QTimer, Signal, Qt
-from PySide6.QtGui import QImage
+from PySide6.QtGui import QImage, QPainter, QColor, QFont
 
 from .broadcast_events import ProductionLog
 from .broadcast_model import BroadcastFrame, BroadcastScope, BroadcastSelection, BroadcastTelemetry, CameraKey, CameraSource
@@ -38,6 +38,7 @@ class BroadcastController(QObject):
         self.panel = self.program_window = None
         self.last_program = self.last_preview = QImage()
         self.last_snapshot = None
+        self.last_notices = self.last_units = None
         self.last_preview_time = self.last_status_time = 0
         self.last_metrics_time = 0
         self.start_time = time.monotonic()
@@ -221,6 +222,8 @@ class BroadcastController(QObject):
                 logical = f'camera:local:{channel}'
                 sources[logical] = CameraSource(logical, 'LOCAL GROUND VIEW · ' + channel.upper(), key, 'local', channel)
         self.session.sources = sources
+        self.session.frames.path_retention = {source.key:self.session.timing.retention(logical)
+                                              for logical,source in sources.items()}
         self.session.frames.retain([s.key for k, s in sources.items() if k in self.wanted()])
         self.sync_leases()
 
@@ -278,21 +281,55 @@ class BroadcastController(QObject):
                        self.logo, inset=image(snapshot.inset), pose=snapshot.pose)
 
     def tick(self):
+        try:
+            self._tick()
+            self.error = ''
+        except Exception as exc:
+            # Last-resort presentation boundary: never leave a believable frozen
+            # live picture if an unexpected widget/renderer error occurs.
+            error = type(exc).__name__ + ': Program unavailable; see production log'
+            if self.error != error:
+                self.log.write('program.error', error_type=type(exc).__name__)
+            self.error = error
+            slate = QImage(1920,1080,QImage.Format.Format_ARGB32)
+            slate.fill(QColor('#101820'))
+            painter = QPainter(slate)
+            painter.setPen(QColor('white'))
+            painter.setFont(QFont('Arial',32))
+            painter.drawText(slate.rect(),Qt.AlignmentFlag.AlignCenter,'PROGRAM UNAVAILABLE · PLEASE STAND BY')
+            painter.end()
+            self.last_program = slate
+            if self.active:
+                self.program_frame.emit(slate)
+            self.changed.emit()
+            self.timer.start(100)
+
+    def _tick(self):
         start = time.monotonic()
+        units = self.owner.controller.settings.display_units
+        if units != self.last_units:
+            self.log.write('units.changed', units=units)
+            self.last_units = units
         if start - self.last_status_time >= .1:
             self.refresh_sources()
             old_node = self.session.node
             self.session.evaluate_receiver(start)
             if old_node != self.session.node:
-                self.log.write('telemetry.selected', node=self.session.node, policy=self.session.telemetry_choice)
+                self.log.write('telemetry.selected', node=self.session.node, policy=self.session.telemetry_choice,
+                               program_time=start-self.session.timing.delay)
             self.last_status_time = start
             self.changed.emit()
         if self.active:
             if self.session.output_boundary(start):
                 self.log.write('program.take', scene=self.session.program.scene, main=self.session.program.main,
-                               inset=self.session.program.inset)
+                               inset=self.session.program.inset, program_time=start-self.session.timing.delay)
                 self.sync_leases()
             self.last_snapshot = self.session.snapshot(self.session.program, start, self.settings.events)
+            notices = (self.last_snapshot.view.camera_notice, self.last_snapshot.view.telemetry_status,
+                       self.last_snapshot.view.telemetry_notice)
+            if notices != self.last_notices:
+                self.log.write('program.health', camera=notices[0], telemetry=notices[1], detail=notices[2])
+                self.last_notices = notices
             self.last_program = self.render(self.last_snapshot)
             self.program_frame.emit(self.last_program)
             self.rendered += 1

@@ -117,3 +117,20 @@ def test_renderer_all_scenes_and_pose(qapp, units):
                          QImage(), pose=RocketPose(attitude_known=True, motor=True))
         assert (result.width(), result.height()) == (1920, 1080)
         assert not result.isNull()
+
+
+def test_telemetry_history_bounds_receiver_churn():
+    history = TelemetryHistory()
+    base = BroadcastTelemetry.from_event(event(), BroadcastScope('mission'))
+    for i in range(20):
+        history.offer(replace(base,node=str(i),observation_id=str(i)))
+    assert len(history.histories)==8
+    for i in range(2100):
+        history.offer(replace(base,node='19',observation_id='last:'+str(i),arrival=10+i/100))
+    assert len(history.histories['19'])==2000
+
+
+def test_path_retention_matches_memory_admission():
+    timing=TimingConfig(2,True,{'camera':Calibration(1,.1,'fixture','today',10)})
+    assert timing.retention('camera') < timing.delay
+    timing.validate(['camera'])

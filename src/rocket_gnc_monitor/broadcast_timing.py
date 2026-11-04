@@ -11,7 +11,7 @@ from .domain import finite
 FPS = 30
 GUARD = 1 / FPS
 FRAME_BYTES = 960 * 540 * 3
-RESERVED_BYTES = 4 * 1920 * 1080 * 4 + 4 * FRAME_BYTES  # renders, snapshots, inset copies
+RESERVED_BYTES = 4 * 1920 * 1080 * 4 + 4 * FRAME_BYTES + 24 * 1024 * 1024  # images + telemetry
 
 
 @dataclass(frozen=True)
@@ -58,9 +58,12 @@ class TimingConfig:
 
     def required_bytes(self, cameras):
         return RESERVED_BYTES + sum(
-            FRAME_BYTES * (math.ceil(max(1.1, max(0, self.delay - (self.path_delay(name) or 0))
-                          + (self.paths[name].jitter if name in self.paths else 0) + .15) * FPS) + 2)
+            FRAME_BYTES * (math.ceil(self.retention(name) * FPS) + 2)
             for name in set(cameras))
+
+    def retention(self, name):
+        return max(1.15, max(0, self.delay - (self.path_delay(name) or 0))
+                   + (self.paths[name].jitter if name in self.paths else 0) + GUARD + .1)
 
 
 class FrameHistory:
@@ -72,6 +75,7 @@ class FrameHistory:
     def __init__(self, budget=256 * 1024 * 1024, retention=1.0):
         self.limit = budget - RESERVED_BYTES
         self.retention = retention
+        self.path_retention = {}
         self.frames = {}
         self.bytes = self.dropped = self.offered = 0
         self.lock = threading.Lock()
@@ -89,8 +93,8 @@ class FrameHistory:
             if queue and frame.arrival <= queue[-1].arrival:
                 self.dropped += 1
                 return False
-            cutoff = frame.arrival - self.retention
-            for history in self.frames.values():
+            for key, history in self.frames.items():
+                cutoff = frame.arrival - self.path_retention.get(key, self.retention)
                 while len(history) > 1 and history[1].arrival < cutoff:
                     self.bytes -= len(history.popleft().pixels)
             if self.bytes + len(frame.pixels) > self.limit:
@@ -142,7 +146,9 @@ class TelemetryHistory:
         self.order.append(record.observation_id)
         while len(self.order) > 24000:
             self.identities.discard(self.order.popleft())
-        history = self.histories.setdefault(record.node, deque(maxlen=6000))
+        if record.node not in self.histories and len(self.histories) >= 8:
+            self.histories.pop(next(iter(self.histories)))
+        history = self.histories.setdefault(record.node, deque(maxlen=2000))
         if history and (history[-1].boot, history[-1].connection) != (record.boot, record.connection):
             history.clear()
         if history and record.arrival < history[-1].arrival:
@@ -206,12 +212,12 @@ class EventLedger:
     def __init__(self):
         self.events = {}
 
-    def mark(self, event, stamp, evidence, *, correction=False):
+    def mark(self, event, stamp, evidence, *, correction=False, uncertain=False):
         old = self.events.get(event)
         if old and not correction:
             # Repeated received states confirm the milestone, not its exact time.
             return False
-        self.events[event] = (stamp, evidence, bool(old and correction))
+        self.events[event] = (stamp, evidence, bool(uncertain or (old and correction)))
         return True
 
     def at(self, stamp):

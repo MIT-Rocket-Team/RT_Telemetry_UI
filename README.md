@@ -99,3 +99,9 @@ For Linux, run `python scripts/build.py setup`, then use `.venv/bin/python` to r
 Generated environments, downloaded vendor runtimes, package outputs and verification captures are ignored. They are rebuilt locally instead of being committed. Historical planning documents, old validation screenshots and the superseded v0 LaTeX report remain in the original repository.
 
 [Migration validation](docs/MIGRATION_VALIDATION.md) · [Station setup and current capabilities](docs/V0A_STATION_MODES.md) · [Operator reference](docs/OPERATOR_GUIDE.md) · [Developer guide](docs/DEVELOPER.md) · [Build guide](docs/BUILD.md) · [macOS universal build](docs/MAC_UNIVERSAL.md) · [Wire protocol](docs/PROTOCOL.md) · [Legacy parity and shortcuts](docs/LEGACY_PARITY.md) · [Recording test fixtures](docs/RECORDING_FIXTURES.md) · [Third-party notices](docs/THIRD_PARTY_NOTICES.md)
+
+## Base Video broadcast
+
+Base station → Video → **Broadcast…** opens a separate production workspace with Preview/Take, a clean 1920×1080 camera-and-telemetry Program window, MIT Rocket Team branding, clock/event controls and local OBS start/stop/status controls. OBS handles audio, MKV recording and YouTube delivery. No account/key is needed for local composition; the YouTube key belongs only in OBS.
+
+Read the [operator guide](docs/BROADCAST_OPERATOR_GUIDE.md), [implementation plan](docs/YOUTUBE_BROADCAST_PLAN.md), and [verification report](docs/BROADCAST_VERIFICATION.md). Generate OBS presets with `scripts/prepare_broadcast_obs.py`; rehearse the real local SRT/telemetry path with `scripts/verify_broadcast.py --duration 60`.

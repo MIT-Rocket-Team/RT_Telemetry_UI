@@ -4,6 +4,7 @@ from dataclasses import replace
 from .broadcast_model import BroadcastScope, BroadcastSelection, BroadcastSnapshot, FrameView, SCENES
 from .broadcast_timing import BroadcastClock, EventLedger, FrameHistory, TelemetryHistory, TimingConfig
 from .network_bridge import best_telemetry_node
+from .domain import finite
 
 
 class BroadcastSession:
@@ -54,6 +55,8 @@ class BroadcastSession:
     def stage(self, selection):
         if selection.scene not in SCENES:
             raise ValueError('Unknown scene')
+        if len(selection.main_crop) != 4 or not all(finite(x) and 0 <= x <= .45 for x in selection.main_crop):
+            raise ValueError('Camera crop must have four margins between 0 and 45 percent')
         if selection.scene == 'Replay' and self.scope.mode != 'replay':
             raise ValueError('Select REPLAY in the Base Video data source first')
         if len(set(selection.cameras) - set(self.program.cameras)) > 1:
@@ -117,8 +120,9 @@ class BroadcastSession:
             return True, 'Slate ready'
         if not selection.main:
             return False, 'Choose a main camera'
+        target = self.pause_time if self.paused and self.pause_time is not None else now - self.timing.delay
         for logical in selection.cameras:
-            frame, notice = self.camera(logical, now, now - self.timing.delay)
+            frame, notice = self.camera(logical, now, target)
             source = self.sources.get(logical)
             if frame is None or notice or not self.frames.continuous(source.key, now):
                 return False, notice or 'Warming camera history (one second)'
@@ -148,7 +152,9 @@ class BroadcastSession:
             for logical in selection.cameras:
                 source = self.sources.get(logical)
                 latest = self.frames.latest(source.key) if source else None
-                if not source or (self.scope.mode != 'replay' and (not latest or now-latest.arrival >= 2)):
+                pinned = previous.main if logical == selection.main else previous.inset
+                if (not source or (pinned and source.key != pinned.key)
+                        or (self.scope.mode != 'replay' and (not latest or now-latest.arrival >= 2))):
                     notice = 'TRANSPORT LOST · PAUSED'
                     main = inset = None
             return replace(previous, output_time=now, main=main, inset=inset,
@@ -163,7 +169,8 @@ class BroadcastSession:
                     notice = notice or 'INSET ' + inset_notice
         node = self.node or self.last_node
         history = self.telemetry.histories.get(node, ())
-        station = history[-1].station if history else ''
+        station = history[-1].station if history else next(((p.get('info') or {}).get('station','')
+                  for p in self.peers if (p.get('info') or {}).get('node_id') == node), '')
         delay = self.timing.path_delay('telemetry:' + station)
         record = self.telemetry.at(node, target, delay)
         # A conflicting identity is never retained as last-known telemetry.
@@ -178,7 +185,8 @@ class BroadcastSession:
                 status = 'unavailable'
         if status == 'fresh' and record:
             if record.state_schema == 'zephyrus-v1' and record.state in {'APOGEE', 'MAIN'}:
-                self.events.mark(record.state, record.arrival - delay, 'received state; event time uncertain')
+                self.events.mark(record.state, record.arrival - delay, 'received state; event time uncertain',
+                                 uncertain=True)
             if selection.inset == 'orientation':
                 pose = record.pose
         completed, uncertain = self.events.at(target)
@@ -187,6 +195,13 @@ class BroadcastSession:
             elapsed, clock_state = record.mission_elapsed, 'elapsed'
         source = self.sources.get(selection.main)
         missing = []
+        if delay is None:
+            missing.append('SELECTED GS TIMING UNQUALIFIED')
+        if history and self.scope.mode != 'replay':
+            latest = history[-1]
+            current_age = (latest.age_at_arrival or 0) + max(0,now-latest.arrival)
+            if current_age > self.freshness:
+                missing.append('CURRENT TELEMETRY LINK STALE')
         if record and record.altitude is None:
             missing.append('ALTITUDE DATUM UNQUALIFIED')
         if record and record.vertical_speed is None:
@@ -204,7 +219,8 @@ class BroadcastSession:
                          completed_events=completed, uncertain_events=uncertain, event_labels=event_labels,
                          camera_notice=notice, telemetry_notice=' · '.join(missing),
                          timing_label='SYNC CALIBRATED' if self.timing.calibrated else 'SYNC UNCALIBRATED',
-                         scene=selection.scene, caption=selection.caption, paused=self.paused)
+                         scene=selection.scene, caption=selection.caption, paused=self.paused,
+                         camera_crop=selection.main_crop)
         ready, reason = self.readiness(selection, now)
         snapshot = BroadcastSnapshot(now, target, view, main, inset, pose, ready, reason)
         if not self.paused:

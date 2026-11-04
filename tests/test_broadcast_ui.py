@@ -29,3 +29,28 @@ def test_no_broadcast_entrypoint_on_away_video(qtbot,tmp_path):
     qtbot.addWidget(window)
     assert not hasattr(window,'broadcast_button')
     window.close()
+
+
+def test_renderer_fault_slates_and_keeps_scheduler_alive(qtbot,tmp_path,monkeypatch):
+    window = StationWindow(tmp_path,profile=StationProfile(station='base',role='video'),auto_place=False)
+    qtbot.addWidget(window)
+    window.open_broadcast()
+    c = window.broadcast
+    c.open_program()
+    monkeypatch.setattr(c,'render',lambda snapshot: (_ for _ in ()).throw(ValueError('fixture')))
+    c.tick()
+    assert c.error and c.timer.isActive() and not c.last_program.isNull()
+    assert 'PROGRAM ERROR' in c.panel.overview.text()
+    window.close()
+
+
+def test_unprepared_edits_cannot_take_the_previous_preview(qtbot,tmp_path):
+    window=StationWindow(tmp_path,profile=StationProfile(station='base',role='video'),auto_place=False)
+    qtbot.addWidget(window); window.open_broadcast()
+    panel=window.broadcast.panel
+    panel.refresh(); assert panel.take_button.isEnabled()
+    panel.caption.setText('New caption'); panel.refresh()
+    assert not panel.take_button.isEnabled()
+    panel.prepare(); panel.refresh()
+    assert panel.take_button.isEnabled()
+    window.close()
