@@ -1,0 +1,206 @@
+{
+  "date": "2026-11-04",
+  "timezone": "America/New_York",
+  "kind": "OBS individual-window capture of live installed Base Video Program",
+  "captured_app_source": "f844fee830bf2bd82eacc45827cfb4ceb48f6c50",
+  "following_ui_fix_source": "30a42996f90ebc357d9d9e1e9375394c2f9a3230",
+  "obs_version": "33.0.1",
+  "capture": {
+    "permission": "Granted with explicit user approval and user-completed macOS authentication",
+    "source_type": "screen_capture, individual window",
+    "source_pixels": [
+      1920,
+      1136
+    ],
+    "crop_top_pixels": 56,
+    "scale": 1,
+    "canvas_output_pixels": [
+      1920,
+      1080
+    ],
+    "cursor": false,
+    "capture_source_audio_muted": true,
+    "note": "Measured on this Retina display; reselect current Program window and recheck geometry after relaunch/display changes. macOS rounded corner pixels remain at the extreme boundary."
+  },
+  "recording": {
+    "path": "~/Movies/Rocket Broadcast/Rocket-2026-11-04_09-25-39.mkv",
+    "sha256": "1ce4e1ed96ff389a803ddff527dbce72c723ff5962a0777714c45a7f57f9b553",
+    "bytes": 367918847,
+    "duration_seconds": 208.433,
+    "decoded_frames": 6253,
+    "video": {
+      "codec": "H.264 High",
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "pixel_format": "yuv420p",
+      "colors": "limited-range Rec.709"
+    },
+    "audio": {
+      "codec": "AAC LC",
+      "rate_hz": 48000,
+      "channels": 2,
+      "source": "Isolated synthetic test tone only; not a physical microphone",
+      "peak_dbfs": -24.2,
+      "mean_dbfs": -37.8,
+      "monitoring": "none"
+    },
+    "complete_decode_exit_code": 0,
+    "start_stop": "Installed app native Start local recording and Stop recording controls"
+  },
+  "fault_injection": [
+    {
+      "event": "baseline",
+      "elapsed_s": 0.0,
+      "recording_ms": 16299,
+      "encode_skipped": 0,
+      "render_skipped_lifetime": 685385,
+      "streaming": false
+    },
+    {
+      "event": "video_off",
+      "elapsed_s": 10.001,
+      "recording_ms": 26299,
+      "encode_skipped": 0,
+      "render_skipped_lifetime": 685392,
+      "streaming": false
+    },
+    {
+      "event": "video_on",
+      "elapsed_s": 18.001,
+      "recording_ms": 34299,
+      "encode_skipped": 0,
+      "render_skipped_lifetime": 685393,
+      "streaming": false
+    },
+    {
+      "event": "telemetry_off",
+      "elapsed_s": 30.001,
+      "recording_ms": 46299,
+      "encode_skipped": 0,
+      "render_skipped_lifetime": 685393,
+      "streaming": false
+    },
+    {
+      "event": "telemetry_on",
+      "elapsed_s": 44.001,
+      "recording_ms": 60299,
+      "encode_skipped": 0,
+      "render_skipped_lifetime": 685393,
+      "streaming": false
+    },
+    {
+      "event": "faults_complete",
+      "elapsed_s": 60.002,
+      "recording_ms": 76299,
+      "encode_skipped": 0,
+      "render_skipped_lifetime": 685393,
+      "streaming": false
+    }
+  ],
+  "performance": {
+    "whole_recording_encode_skipped": 17,
+    "whole_recording_encode_total": 6290,
+    "timed_60_second_fault_segment_encode_skipped": 0,
+    "timed_60_second_fault_segment_render_skipped_delta": 8,
+    "note": "Functional capture/recovery passed; this was not a lossless or long-duration complete OBS workload qualification. Large pre-existing lifetime render totals are not attributed to this recording."
+  },
+  "preceding_diagnostic_run": {
+    "path": "~/Movies/Rocket Broadcast/Rocket-2026-11-04_08-46-49.mkv",
+    "encode_skipped": 1619,
+    "encode_total": 9624,
+    "control_disconnect_recovered": true,
+    "note": "Unclean diagnostic run; wall-clock discontinuity and audio-buffer warnings observed. Cause not isolated. Preserved rather than counted as a passing performance run."
+  },
+  "frames": [
+    {
+      "file": "obs-live-imperial.png",
+      "at_seconds": 8,
+      "sha256": "63ffa9ced508616065fab3d7d4eb103035fbf4ea91d458a445da672534ecc220",
+      "observed": "Moving numbered camera, current telemetry in ft and ft/s, clock and SIMULATION label"
+    },
+    {
+      "file": "obs-live-video-lost.png",
+      "at_seconds": 31,
+      "sha256": "6be8784bd0fd18efc99de479faf0971a7ae33ba2bde6e57cc7b01ddaf675a23f",
+      "observed": "Camera unavailable placeholder, independent telemetry remains populated"
+    },
+    {
+      "file": "obs-live-recovered.png",
+      "at_seconds": 40,
+      "sha256": "1b2bd2e1dc76d1c8588865a2903cf08f7a76999eaab1293852eba8131b2831eb",
+      "observed": "Numbered moving camera and telemetry recovered without a new Take"
+    },
+    {
+      "file": "obs-live-telemetry-lost.png",
+      "at_seconds": 56,
+      "sha256": "9f485f4e75632e809cb156413d7ab38749f28f8792dc6778de3f612f3dbe733f",
+      "observed": "Camera continues; stale telemetry notice and blank gauges"
+    },
+    {
+      "file": "obs-live-metric.png",
+      "at_seconds": 85,
+      "sha256": "0a4de97824ba5f088b90c07d2a0101127cc90439e88955c9980d15811844542a",
+      "observed": "Telemetry recovered; display changed to m and m/s"
+    },
+    {
+      "file": "obs-live-program-slate.png",
+      "at_seconds": 150,
+      "sha256": "a13a82b21e22571f3a0563612a0c01726b817c9f5ada7a156d5c372903b1b94e",
+      "observed": "App Emergency slate visible with independent telemetry overlay"
+    },
+    {
+      "file": "obs-live-obs-slate.png",
+      "at_seconds": 200,
+      "sha256": "a75a82f2412f6447a63ffb5c68f0ab699c75505035e4564ae31d49e41f243fa1",
+      "observed": "Independent OBS Emergency slate visible after Program stopped"
+    }
+  ],
+  "evidence_hashes": {
+    "recording-analysis.txt": "22cd64dd63673c2043c114c6d6babf772d4aafaeaa0dee6b7c8e7400313a547f",
+    "timed-capture-events.json": "d44968631e6d0f883f330b75229a96d9e0b57b57001e82f5ef0ec04bc91f509e",
+    "final-state.jsonl": "c14804c37e1557b40102bcedc7871aa0ae98fc961eac750e65ddcafdf1a4fc7a",
+    "first-capture-final.jsonl": "69f2a901c2e59ffadf01f8e093f164f03033044414237e72767550f796a9d05b"
+  },
+  "final_state": {
+    "recording": false,
+    "streaming": false,
+    "scene": "Emergency slate",
+    "program": "stopped",
+    "test_tone": "disabled and muted",
+    "synthetic_publisher": "stopped",
+    "display_units": "restored to Imperial"
+  },
+  "youtube_tested": false,
+  "remaining": [
+    "Physical range/microphone audio, path timing and A/V drift",
+    "Sustained complete event-equipment load and uplink",
+    "Real YouTube account/key/unlisted return test"
+  ],
+  "installed_artifact": {
+    "source": "30a42996f90ebc357d9d9e1e9375394c2f9a3230",
+    "dmg_sha256": "be49d884146b32859d0ac648f81233163ec62156dab58c3706f7dbec4ee128c1",
+    "executable_sha256": "00d06657abbe8b0290b5686ccb67e67355ceae8d51d249e012d9d3a31811138c",
+    "smoke": {
+      "rendered": 60,
+      "error": "",
+      "logo_loaded": true,
+      "raster": [
+        1920,
+        1080
+      ],
+      "window_title": "Rocket Broadcast \u2014 Program",
+      "content_pixels": [
+        1920,
+        1080
+      ],
+      "obs_connected": false,
+      "hardware_open": false,
+      "obs_presets_exported": true,
+      "passed": true
+    },
+    "signature": "codesign --verify --deep --strict passed",
+    "focused_tests_passed": 35,
+    "ci_url": "https://github.com/MIT-Rocket-Team/RT_Telemetry_UI/actions/runs/41849370216"
+  }
+}

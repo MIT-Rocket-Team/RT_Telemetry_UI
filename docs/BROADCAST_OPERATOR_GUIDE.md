@@ -16,7 +16,7 @@ Opening the app never starts Program or OBS. Opening Program initially presents 
 
 ## Main picture and telemetry
 
-Camera selection is manual. Optional left/top/right/bottom main-camera crop margins are staged with Preview/Take and visibly labelled in Preview; changing the camera resets those margins. The remaining image is letterboxed with its aspect ratio preserved. Browsing the normal video wall or changing the telemetry receiver never cuts the audience camera. One new camera warms at a time; take a main camera before adding a second-camera inset. Admission preserves existing wall/Program decoders and respects the local memory cap and ordinary publisher main-session limit. A publisher may also reject a request because other computers consume its capacity.
+Camera selection is manual. Optional left/top/right/bottom main-camera crop margins are staged with Preview/Take and visibly labelled in Preview; intentionally choosing a different camera resets those margins. A temporary camera disappearance preserves the draft choice and crop, marks that choice unavailable, and keeps Take disabled until video recovers. The remaining image is letterboxed with its aspect ratio preserved. Browsing the normal video wall or changing the telemetry receiver never cuts the audience camera. One new camera warms at a time; take a main camera before adding a second-camera inset. Admission preserves existing wall/Program decoders and respects the local memory cap and ordinary publisher main-session limit. A publisher may also reject a request because other computers consume its capacity.
 
 Telemetry can follow Away station 1–4 or **Best connection**. Best reevaluates once per second, ranks qualified observations for the selected vehicle by rocket sample age, then LTU-XR application RTT, and retains the current receiver on an exact tie. Ages up to 60 ms share the full-quality rocket score, matching the existing connection display. Missing history/calibration for the winning receiver stays unavailable; it does not silently select another station.
 
@@ -70,6 +70,10 @@ With OBS closed, `--install` installs new named presets on macOS and refuses to 
 4. Add the intended local microphone/range inputs. Keep monitoring off unless routed to headphones. Current rocket video transport has no audio.
 5. Use 1080p30, H.264 CBR 14 Mb/s, two-second keyframes, SDR Rec.709, AAC stereo 128 kb/s / 48 kHz, and MKV recording. The reduced preset is 720p30 at 5 Mb/s and must be qualified on the actual uplink.
 6. Record locally and inspect motion, source labels, clock, both unit settings, audio alignment and a loss/recovery sequence. Then configure YouTube in OBS for the real unlisted test.
+
+On this Mac, OBS capture permission was approved and enabled on 2026-11-04. The tested Retina source was 1920×1136 including a 56-pixel title bar; a top crop of 56 at scale 1 produced the recorded 1920×1080 audience picture. These are measured values for that window/display, not universal settings. Select the current Program window again after relaunch; macOS window IDs change. The native window's rounded corner pixels can remain at the extreme output edge; all content stays inside the safe margins.
+
+The local rehearsal's **LOCAL TEST TONE — NOT RANGE AUDIO** source is left disabled and muted. Keep it off for a real broadcast. Screen-capture audio was also muted during qualification; configure and measure your intended physical inputs separately.
 
 The software encoder preset is portable. Switch to Apple VideoToolbox only after checking the desired settings and repeating the recording test. OBS updates, encoder changes and audio-device changes require requalification.
 

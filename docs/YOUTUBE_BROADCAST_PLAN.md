@@ -1,7 +1,7 @@
 # Base Station Video → YouTube broadcast implementation plan
 
 Date: 2026-11-01, America/New_York\
-Status: software implemented and locally installed; see BROADCAST_VERIFICATION.md for the authoritative tested scope and remaining OBS/equipment/account gates\
+Status: software implemented and locally installed; see BROADCAST_VERIFICATION.md for the authoritative tested scope and measured live OBS capture results and remaining equipment/account gates\
 Consistency reviews: 2026-11-01, including the Camera + Arc HUD and script review; resolutions recorded in section 22\
 Repository baseline inspected: `978b618d69b8bfc8a66b058b270bed3ead43af13`
 
