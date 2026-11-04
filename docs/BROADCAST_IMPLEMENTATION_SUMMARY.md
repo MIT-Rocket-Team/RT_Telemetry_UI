@@ -28,8 +28,9 @@ The existing Windows archive in `dist/` is older and was not rebuilt for this de
 
 ## Verification results
 
+- Latest local desktop-qualification run: **145 passed, 1 skipped**.
 - Earlier full regression run: **919 passed, 1 skipped**; latest focused broadcast/OBS run: **35 passed** (including the outage regression).
-- GitHub qualification passed on Apple Silicon Mac, Intel Mac, Windows and Linux. One existing Intel video timeout passed on an unchanged retry; the report preserves that history.
+- The application has passed desktop checks across all four platforms. Latest test-only correction: Intel Mac, Windows and Linux CI passed; GitHub’s Apple Silicon rerun is still queued. The corrected suite passed locally on this Apple Silicon Mac. The report preserves earlier failures and their resolutions.
 - Package verification: **17 checks passed**, followed by a successful broadcast/OBS-preset smoke check from the final installed app.
 - One-hour local camera/telemetry soak: **passed**, 29.72 fps, no broadcast-history or archive drops. It exercised the earlier core milestone; the final-source load and focused tests cover subsequent changes.
 - Core implementation ten-minute Iris load: **passed**, 29.87 fps with eight feeds, five main receivers and zero archive loss. Rendering did incur bounded presentation drops; the report records them and the preceding concurrent-load readiness failure.
@@ -56,7 +57,7 @@ The local software and live OBS capture workflow are implemented and tested. Act
 
 OBS was left on **Rocket Broadcast → Emergency slate**, with recording and streaming confirmed stopped. Program and the isolated rehearsal app are closed; the synthetic publisher is stopped. The test-tone source is disabled and muted, and display units were restored to Imperial. No YouTube credentials were entered.
 
-Saved recording on this Mac: `~/Movies/Rocket Broadcast/Rocket-2026-11-04_09-25-39.mkv`. [Recorded frame examples and machine-readable evidence](assets/broadcast/obs-live-capture-verification.json) are committed; the full video stays local.
+Saved recording on this Mac: `~/Movies/Rocket Broadcast/Rocket-2026-11-04_09-25-39.mkv`. A same-name `.mp4` playback copy is also available (remuxed without re-encoding). [Recorded frame examples and machine-readable evidence](assets/broadcast/obs-live-capture-verification.json) are committed; the full video stays local.
 
 Synthetic network, renderer, recovery, UI and packaged-app tests do not qualify real camera/telemetry latency, audio drift, launch-site radio load or internet upload capacity. Missing field semantics remain suppressed; in particular, current physical Iris samples do not establish a Sustainer/Booster identity or a validated attitude merely because the operator selects one.
 

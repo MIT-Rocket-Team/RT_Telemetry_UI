@@ -46,7 +46,13 @@
       "monitoring": "none"
     },
     "complete_decode_exit_code": 0,
-    "start_stop": "Installed app native Start local recording and Stop recording controls"
+    "start_stop": "Installed app native Start local recording and Stop recording controls",
+    "playback_copy": {
+      "path": "~/Movies/Rocket Broadcast/Rocket-2026-11-04_09-25-39.mp4",
+      "sha256": "83d6169483aa569fa9c48b5320e15bbdfe5608f08e492c97f349bbd2e60f2c99",
+      "bytes": 368189031,
+      "method": "FFmpeg stream-copy remux to MP4 with faststart; no re-encoding"
+    }
   },
   "fault_injection": [
     {
@@ -201,6 +207,22 @@
     },
     "signature": "codesign --verify --deep --strict passed",
     "focused_tests_passed": 35,
-    "ci_url": "https://github.com/MIT-Rocket-Team/RT_Telemetry_UI/actions/runs/41849370216"
+    "ci_url": "https://github.com/MIT-Rocket-Team/RT_Telemetry_UI/actions/runs/41850992358",
+    "test_fixture_correction": "818f494bac4ad144752328c4a20b8fc0457b6ce4",
+    "local_desktop_qualification": {
+      "source": "818f494",
+      "passed": 145,
+      "skipped": 1,
+      "seconds": 92.47,
+      "junit_sha256": "a0a361043e729e564082e66617be267a248b1b19ce1713daa9f49b8bb332b536"
+    },
+    "ci_status_at_handoff": {
+      "source": "818f494",
+      "macos-15-intel": "success",
+      "windows-2022": "success",
+      "ubuntu-24.04": "success",
+      "macos-15": "queued",
+      "note": "Same application code passed macos-15 on 30a4299; 818f494 changes a test fixture only. Corrected full selection passed locally on Apple Silicon."
+    }
   }
 }

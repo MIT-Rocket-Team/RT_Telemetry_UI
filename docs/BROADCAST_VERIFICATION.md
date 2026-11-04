@@ -130,7 +130,7 @@ OBS.app's capture permission was observed on after user authentication. OBS **33
 
 ### Saved recording and fault checks
 
-Main file: `~/Movies/Rocket Broadcast/Rocket-2026-11-04_09-25-39.mkv`.
+Main file: `~/Movies/Rocket Broadcast/Rocket-2026-11-04_09-25-39.mkv`. A same-name `.mp4` playback copy was remuxed without re-encoding; its hash is in the machine-readable evidence.
 
 - **208.433 s**, **6,253 decoded frames**, **1920×1080**, **30 fps**, H.264 High, limited-range Rec.709, stereo AAC LC **48 kHz**.
 - Complete FFmpeg decode succeeded. Test-tone peak **−24.2 dBFS**, mean **−37.8 dBFS**.
@@ -150,7 +150,7 @@ The timed retake above was functionally successful, but OBS reported **17 encode
 
 The rehearsal exposed a draft-camera issue: removing a source from discovery reset Main/Inset to their defaults and cleared main crop, even though Program itself recovered correctly. **30a4299** retains missing selections with an `unavailable` label and preserves their crop; fresh continuous frames are still required before Take. Intentionally choosing another main camera still clears crop. The regression failed on the old code, then the complete focused broadcast/OBS suite passed **35 tests**, and Ruff passed. This final change affects the operator's draft selection, not composition or OBS commands.
 
-The final build is installed in Applications, with the package smoke/signature checks listed above. [Desktop qualification for 30a4299](https://github.com/MIT-Rocket-Team/RT_Telemetry_UI/actions/runs/41849370216) tracks the four-platform checks.
+The final build is installed in Applications, with the package smoke/signature checks listed above. [Desktop qualification for 30a4299](https://github.com/MIT-Rocket-Team/RT_Telemetry_UI/actions/runs/41849370216) passed Apple Silicon Mac, Windows and Linux; Intel Mac reported **144 passed, 1 skipped, 1 failed**. That failure was an incomplete test-only replay reader: an interleaved UI refresh accessed missing `path`/`count` metadata. **818f494** supplies those fields and explicitly exercises refresh in that test, without changing application code, timeouts or assertions. The focused suite again passed **35 tests**. The full desktop-qualification selection also passed locally: **145 passed, 1 skipped in 92.47 s**. [Follow-up qualification](https://github.com/MIT-Rocket-Team/RT_Telemetry_UI/actions/runs/41850992358) passed Intel Mac, Windows and Linux. Its Apple Silicon job is still queued for GitHub runner capacity at handoff; the same application code passed that platform in the preceding run, and the corrected full selection passed locally on this Apple Silicon Mac. This remaining queued job is not reported as a completed pass.
 
 OBS was left on **Rocket Broadcast → Emergency slate**, with recording and streaming confirmed inactive. Program and the rehearsal app were closed, the synthetic publisher was stopped, the test tone was disabled/muted, and Imperial display units were restored. On next launch, reselect the new Program window in OBS and verify its crop. No YouTube stream was started or key entered.
 
