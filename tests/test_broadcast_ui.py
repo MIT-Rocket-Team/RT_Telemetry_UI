@@ -100,3 +100,18 @@ def test_new_camera_epoch_invalidates_measured_timing(qtbot, tmp_path):
     c.check_timing_bindings()
     assert not c.session.timing.calibrated and c.session.program.scene == "Standby"
     window.close()
+
+
+def test_custom_timeline_does_not_remove_actual_liftoff_control(qtbot, tmp_path):
+    window = StationWindow(tmp_path, profile=StationProfile(station="base", role="video"), auto_place=False)
+    qtbot.addWidget(window)
+    window.open_broadcast()
+    c = window.broadcast
+    c.panel.events.setText("ASCENT, DESCENT")
+    c.panel.save_events()
+    c.panel.refresh()
+    assert c.settings.events == ("ASCENT", "DESCENT")
+    assert c.panel.event.findText("LIFTOFF") >= 0
+    c.clock_action("on_program", event="LIFTOFF")
+    assert c.session.clock.revisions[-1].state == "elapsed"
+    window.close()

@@ -379,7 +379,7 @@ class BroadcastPanel(QDialog):
         )
         self.action("Hold", lambda: self.c.clock_action("hold"), buttons)
         self.action("Resume countdown", lambda: self.c.clock_action("resume"), buttons)
-        self.event = self.combo([(s, s) for s in self.c.settings.events])
+        self.event = self.combo([(s, s) for s in dict.fromkeys(("LIFTOFF", *self.c.settings.events))])
         layout.addWidget(self.event)
         self.correction = QCheckBox("Correct an existing event time (logged)")
         layout.addWidget(self.correction)
@@ -566,9 +566,10 @@ class BroadcastPanel(QDialog):
         self.ledger.setText(
             "\n".join(f"{name}: {evidence}" for name, (_, evidence, _) in s.events.events.items())
         )
-        if tuple(self.event.itemText(i) for i in range(self.event.count())) != c.settings.events:
+        event_choices = tuple(dict.fromkeys(("LIFTOFF", *c.settings.events)))
+        if tuple(self.event.itemText(i) for i in range(self.event.count())) != event_choices:
             self.event.clear()
-            self.event.addItems(c.settings.events)
+            self.event.addItems(event_choices)
         status = self.obs.state
         fresh = self.obs.fresh()
         obs_health = (
