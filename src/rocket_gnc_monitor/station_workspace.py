@@ -422,6 +422,11 @@ class StationWindow(InstrumentWindow):
                     action.setVisible(False)
         view_menu.addAction("Arrange station displays", self.arrange_displays)
         view_menu.addAction("Station network…", self.open_station_network)
+        if self.profile.station == 'base' and self.profile.role == 'video':
+            self.broadcast_action = view_menu.addAction("Broadcast controls…", self.open_broadcast)
+            self.broadcast_action.setShortcut("Ctrl+Shift+B")
+            self.broadcast_action.setShortcutContext(Qt.ShortcutContext.ApplicationShortcut)
+            self.addAction(self.broadcast_action)
         if self.main_base:
             self.configure_main_base_actions()
         if not self.profile_locked:

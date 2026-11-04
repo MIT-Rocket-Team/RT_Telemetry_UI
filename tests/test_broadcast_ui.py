@@ -28,6 +28,25 @@ def test_no_broadcast_entrypoint_on_away_video(qtbot, tmp_path):
     window = StationWindow(tmp_path, profile=StationProfile(station="away1", role="video"), auto_place=False)
     qtbot.addWidget(window)
     assert not hasattr(window, "broadcast_button")
+    assert not hasattr(window, "broadcast_action")
+    window.close()
+
+
+def test_operator_can_return_from_program_without_stopping_output(qtbot, tmp_path):
+    from PySide6.QtWidgets import QApplication
+
+    window = StationWindow(tmp_path, profile=StationProfile(station="base", role="video"), auto_place=False)
+    qtbot.addWidget(window)
+    window.show()
+    window.open_broadcast()
+    controller = window.broadcast
+    controller.open_program()
+    qtbot.waitUntil(lambda: QApplication.activeWindow() is controller.program_window)
+    window.broadcast_action.trigger()
+    qtbot.waitUntil(lambda: QApplication.activeWindow() is controller.panel)
+    assert window.broadcast is controller
+    assert controller.active and controller.program_window.isVisible()
+    assert not controller.panel.obs.fresh()
     window.close()
 
 

@@ -86,6 +86,7 @@ class BroadcastController(QObject):
             self.panel = BroadcastPanel(self)
         self.panel.show()
         self.panel.raise_()
+        self.panel.activateWindow()
         self.preview_active = True
 
     def open_program(self):
@@ -96,6 +97,7 @@ class BroadcastController(QObject):
         self.active = True
         self.program_window.show()
         self.program_window.raise_()
+        self.program_window.activateWindow()
         self.log.write("program.open")
         self.changed.emit()
 

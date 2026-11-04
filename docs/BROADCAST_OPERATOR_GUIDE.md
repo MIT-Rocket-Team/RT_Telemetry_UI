@@ -10,6 +10,8 @@ The **Base Video** application composes the audience picture. OBS, on the same M
 4. In **Produce**, choose a scene and main camera, enter the mission title/caption, then **Prepare Preview**. Start with the inset off.
 5. Wait for **Ready to take**, then **Take → Program**. The clean window is titled **Rocket Broadcast — Program**. Take commits at an output boundary, using delayed history for the newly selected camera.
 
+Return to the operator panel with **View → Broadcast controls…** or **⌘⇧B** on macOS (**Ctrl+Shift+B** elsewhere), including while Program has focus. This leaves Program running and does not change OBS outputs.
+
 Opening the app never starts Program or OBS. Opening Program initially presents a slate. Closing the control panel leaves Program running. **Stop Program** closes the visual output and releases its camera subscriptions; it does **not** stop OBS. Stop OBS separately before quitting the application.
 
 ## Main picture and telemetry
