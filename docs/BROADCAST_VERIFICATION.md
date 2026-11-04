@@ -6,7 +6,8 @@ Implementation date: 2026-11-03, America/New_York. This report separates impleme
 
 - `5190c9f`: immutable broadcast models, branded renderer, bounded timing histories, shared frame subscriptions, canonical observation signal and per-vehicle receiver ranking. Focused core/media/network suite: 36 passed. The pre-existing settings shortcut test passed in isolation after its baseline timeout. A network-test helper was corrected to tolerate an unresolved peer identity while discovery is in flight.
 - `23b158a`: Base Video production UI/controller, scene and Preview/Take workflow, mission-clock/event controls, source handling, authenticated local OBS control/status, native UI tests and real SRT rehearsal harness. 21 focused checks passed, including no duplicate/replayed OBS starts.
-- Subsequent hardening adds explicit independent decoder ownership tests, renderer-error slate, bounded telemetry-node history, native-package smoke entry point, OBS presets and the operator guide. See Git history for the final revision.
+- `35325bc`: independent decoder ownership tests, renderer-error slate, bounded telemetry-node history, native-package smoke entry point, OBS presets and the operator guide.
+- `4d2edc9`: production hardening milestone. Adds packaged OBS preset export with independent slate assets, replay-seek invalidation, pause/resume clock behavior, calibration identity checks, operator clock labels, recovery tests and cross-platform CI coverage. Broadcast implementation/scripts pass Ruff. The final `16e0fd3` application revision retains actual liftoff controls when custom timeline labels omit LIFTOFF; its broadcast/OBS focused suite passed **33 tests**. Later commits contain verification tooling and evidence only.
 
 ## Sending computer and dependencies
 
@@ -43,7 +44,11 @@ The current transport decodes to 960×540 and the compositor scales that image i
 
 ## Test evidence
 
-The baseline before changes was **886 passed, 1 skipped, 1 settings-shortcut focus timeout**. A later native full suite was **907 passed, 1 skipped, 2 keyboard-focus timeouts** while the Mac was locked. Both failing shortcut cases subsequently passed in an offscreen targeted run. The complete offscreen suite passed **910 tests, 1 skipped** in 224.65 seconds. Later focused hardening tests are recorded with the final revision.
+The baseline before changes was **886 passed, 1 skipped, 1 settings-shortcut focus timeout**. A later native full suite was **907 passed, 1 skipped, 2 keyboard-focus timeouts** while the Mac was locked. Both failing shortcut cases subsequently passed in an offscreen targeted run. A complete offscreen suite passed **910 tests, 1 skipped** in 224.65 seconds; the final expanded full run passed **919 tests, 1 skipped** in 221.54 seconds. The subsequently added calibration-identity case passed with the focused session/UI suite (**17 passed**); the complete broadcast/OBS focused suite passed **32 tests**.
+
+[GitHub desktop qualification at 4d2edc9](https://github.com/MIT-Rocket-Team/RT_Telemetry_UI/actions/runs/41769683413) passed on macOS 15 Apple Silicon, macOS 15 Intel, Windows 2022 and Ubuntu 24.04. Its matrix now includes the broadcast model, session, UI, preset and OBS protocol tests alongside the existing real station lifecycle tests. This establishes portable software checks, not platform-specific OBS capture qualification.
+
+[Final qualification at 16e0fd3](https://github.com/MIT-Rocket-Team/RT_Telemetry_UI/actions/runs/41770651554) also passed all four platforms. Its first Intel attempt had 142 passed, 1 skipped and a 20-second timeout in the existing `test_two_base_video_viewers_receive_both_mission_streams`; the broadcast tests passed. Rerunning only that failed job passed without changing code, timeouts or assertions. The transient timing failure is retained in the workflow history.
 
 Focused tests cover canonical field suppression/scope rejection, observation deduplication and actual arrival, no-future selection, buffer limits and epoch retirement, per-vehicle Best ranking/tie retention, timing admission, countdown/hold/actual liftoff, independent camera and telemetry choice, Take readiness, stale/slate/recovery, pause/transport loss, settings restart behavior, receiver lease ownership, renderer failure recovery, native panel lifecycle and OBS authentication/status/control behavior.
 
@@ -52,15 +57,41 @@ OBS tests use an authenticated local WebSocket test server. They verify start/st
 The local transport rehearsal (`scripts/verify_broadcast.py`) publishes numbered synthetic camera frames through the actual HTTP/SRT/H.264 stack and canonical telemetry through the station runtime. A Base Video owner receives both, composes Program and writes separate production metrics. It creates a short 30 fps reference MKV from sampled rendered frames; that file is a reference artifact, not a claim of an OBS-captured recording.
 
 - Initial 35 s transport smoke: 940 Program frames, 28.14 average fps including synchronous image-save overhead; no broadcast buffer or archive drops. Image saves were subsequently moved off the GUI thread.
-- One-hour local transport/compositor soak: **running; final metrics to be recorded before handoff**. Started from milestone `23b158a`; later hardening has separate focused tests.
+- Final 45 s fault rehearsal: **passed**, 1,299 Program frames, 29.93 fps, all seven fault checks passed: delayed notice, loss slate, recovery, explicit pause, frozen picture/clock during five seconds without new camera frames, resume, and exclusion of the paused interval from the clock. 73 broadcast-history frame drops during injected loss/pause recovery; zero archive drops. Bounded presentation drops do not block original reception/archives.
+- One-hour local transport/compositor soak: **passed**, 3,600.02 seconds, **106,952 Program frames at 29.72 fps**, fresh telemetry at completion, zero broadcast-history drops and zero archive drops. Camera-history high water was 66.74 MiB; whole Python process RSS high water was 505.56 MiB. Median sampled render time was 4.90 ms. This run started from milestone `23b158a`; later hardening has separate focused tests and the final-source Iris load run.
 - Native source smoke: bundled logo loaded; Program raster and device-pixel content both 1920×1080; no hardware workers or OBS connection opened.
 - Native packaged app: **17 existing package checks passed**, including startup/station/video wall, Sustainer/Booster playback and bundled OpenRocket; the separate broadcast smoke passed with 1920×1080 raster/content, logo loaded, no hardware workers and no OBS connection. Final relocated installation evidence follows below.
 
-Generated detailed reports, captured Program frames and reference movies are under `build/broadcast-*`. Build products are under `dist/`. The final local artifact hash and installation/backup paths are recorded below after verification.
+### Full synthetic Iris load
+
+`scripts/verify_broadcast_load.py` publishes all eight camera feeds from four local simulated away stations. The Base wall has three main views; Program shares one of those decoders and adds a camera inset; Preview warms a different main camera. The resulting load is **five main receivers plus five remaining preview receivers**, with three retained broadcast camera histories. The test deliberately leaves Iris telemetry unavailable instead of inventing a qualified physical adapter.
+
+- First 600-second run, concurrent with package/native-app verification: **strict readiness check failed**. Program averaged 29.78 fps; all five main receivers and Program/inset were healthy at all 59 loaded samples, but next-shot Preview was not ready at two samples. The application correctly withheld Take. There were 179 broadcast-history drops, 104 missed output slots and zero archive drops. Concurrent activity coincided with the brief readiness loss; the exact cause was not isolated.
+- A separate 600-second steady run of the final source: **passed**, 29.87 fps, all 59 loaded samples had five healthy main receivers, both Program images and a ready Preview. Median sampled render time was 4.78 ms. There were 92 bounded broadcast-history drops and 65 missed output slots; no archive drops. These counters are retained rather than described as perfectly lossless rendering.
+- Steady-run camera-history high water: **173.53 MiB**; entire Python process RSS high water: **799.58 MiB**, including the wall, four publishers, receiver services and test generator. The 256 MiB broadcast budget is not a cap on that whole process or its separate encoder/decoder processes. This ten-minute fixture does not establish a one-hour complete OBS/audio field workload.
+
+Both load runs were concurrent with the simpler one-hour transport soak. Their machine-readable reports are under `build/broadcast-iris-load/` and `build/broadcast-iris-steady/`.
+
+The UI's missed-slot counter records rendering overruns; it is not a complete count of every scheduling gap. Average Program fps is measured over the actual active output interval and includes those gaps. A compact [verification summary](assets/broadcast/verification-summary.json) retains the measured results and detailed-report hashes. The [captured Program example](assets/broadcast/verified-program-fixture.png) is explicitly synthetic test video, not flight footage or an OBS capture.
+
+Generated detailed reports, captured Program frames and reference movies are under `build/broadcast-*`. Build products are under `dist/`.
+
+## Installed artifact
+
+- App: `/Applications/RocketGNCMonitor-v0a.app`, source revision `16e0fd3`.
+- Previous app retained at `build/application-backups/20261103-before-broadcast/RocketGNCMonitor-v0a.app`.
+- Distribution: `dist/RocketGNCMonitor-v0a-Darwin-arm64.dmg` (Apple Silicon macOS).
+- DMG SHA-256: `4f6fcc65cdd708ea5e093a2f6e33f04bf125acca87d3323faf0cf20e4a71355b`.
+- Installed executable SHA-256: `150b392f30b097dd50016c52091d44f0505ac2c27b650542e2c2426cdf353328`.
+- The 4d2edc9 app passed all **17 package checks**. After the final custom-timeline UI correction, the installed 16e0fd3 `/Applications` copy independently produced **52 frames**, loaded the logo, exported the bundled OBS profiles/slate, reported a **1920×1080** raster and content area, and opened no hardware or OBS connection.
+- macOS Launch Services registration was refreshed for the installed path. The old Dock shortcut can continue pointing at that app.
+- The preceding package encountered a transient disk-image “resource busy” error; retrying only disk-image creation succeeded. The final 16e0fd3 package completed the full build/DMG/checksum sequence successfully.
+
+The separate Windows archive already in `dist/` predates this implementation and is not part of this delivery. Cross-platform CI success does not relabel an old binary as newly built.
 
 ## Unfinished external qualification
 
-The Mac locked during OBS setup. Native computer control reported that manual unlock is required. OBS also presented first-run screen/microphone permission setup, which was left unchanged. Consequently:
+The Mac locked during OBS setup. Native computer control reported that manual unlock is required, and a final access check confirmed it was still locked. OBS also presented first-run screen/microphone permission setup, which was left unchanged. Consequently:
 
 - OBS's actual Program-window capture, crop and Retina behavior have not been verified through an OBS recording.
 - Actual OBS local start/stop via WebSocket remains unqualified until its local server is enabled/authenticated. The app's implementation is protocol-tested; no OBS authentication settings or credentials were silently changed.

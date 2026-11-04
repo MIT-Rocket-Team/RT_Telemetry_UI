@@ -1,0 +1,126 @@
+{
+  "installed_source": "16e0fd3c64d4a8648513f23b6093141da4dac177",
+  "full_suite": {
+    "passed": 919,
+    "skipped": 1
+  },
+  "final_broadcast_tests": 33,
+  "package_checks_at_4d2edc9": 17,
+  "ci": "https://github.com/MIT-Rocket-Team/RT_Telemetry_UI/actions/runs/41770651554",
+  "real_youtube_test": false,
+  "native_obs_capture_audio_qualified": false,
+  "one_hour": {
+    "duration_s": 3600.019136124989,
+    "program_fps": 29.72154546261964,
+    "rendered": 106952,
+    "missed_slots": 745,
+    "buffer_bytes": 57542400,
+    "broadcast_drops": 0,
+    "telemetry_status": "fresh",
+    "taken": true,
+    "scope": "Local SRT and telemetry fixture; excludes OBS capture/audio and real YouTube delivery",
+    "passed": true,
+    "source_revision": "23b158a",
+    "report": "build/broadcast-soak/result.json",
+    "report_sha256": "3acc67ee3994bda97b9fa6942e862ecb575012543d92875f4eaf53e56b708cf2",
+    "metric_samples": 360,
+    "maximum_archive_drops": 0,
+    "max_rss_mib": 505.5625,
+    "max_history_mib": 66.741943359375,
+    "median_sampled_render_ms": 4.895874997600913
+  },
+  "iris_concurrent": {
+    "duration_s": 600.0034704169957,
+    "program_fps": 29.78227465111307,
+    "error": null,
+    "scope": "Synthetic four-station Iris SRT wall, Program/inset and warm Preview; no OBS/audio/YouTube/field radios",
+    "passed": false,
+    "source_revision": "4d2edc9",
+    "report": "build/broadcast-iris-load/result.json",
+    "report_sha256": "ba642d62729c173cfd580ee38dc283bb0fac31d5d65335a92b079e5655a768d8",
+    "metric_samples": 60,
+    "maximum_archive_drops": 0,
+    "max_rss_mib": 766.046875,
+    "max_history_mib": 194.293212890625,
+    "median_sampled_render_ms": 5.330832995241508,
+    "loaded_samples": 59,
+    "ready_preview_samples": 57,
+    "max_broadcast_drops": 179,
+    "max_render_overrun_slots": 104
+  },
+  "iris_steady": {
+    "duration_s": 600.005858916993,
+    "program_fps": 29.869871423394972,
+    "error": null,
+    "scope": "Synthetic four-station Iris SRT wall, Program/inset and warm Preview; no OBS/audio/YouTube/field radios",
+    "passed": true,
+    "source_revision": "16e0fd3",
+    "report": "build/broadcast-iris-steady/result.json",
+    "report_sha256": "536a31616ab0ab98869990f2e31fc69ef380278201be6837b7944a4242034504",
+    "metric_samples": 60,
+    "maximum_archive_drops": 0,
+    "max_rss_mib": 799.578125,
+    "max_history_mib": 173.529052734375,
+    "median_sampled_render_ms": 4.7811249969527125,
+    "loaded_samples": 59,
+    "ready_preview_samples": 59,
+    "max_broadcast_drops": 92,
+    "max_render_overrun_slots": 65
+  },
+  "faults": {
+    "duration_s": 45.02527395897778,
+    "program_fps": 29.925785175859495,
+    "rendered": 1299,
+    "missed_slots": 3,
+    "buffer_bytes": 52876800,
+    "broadcast_drops": 73,
+    "telemetry_status": "fresh",
+    "taken": true,
+    "scope": "Local SRT and telemetry fixture; excludes OBS capture/audio and real YouTube delivery",
+    "fault_checks": [
+      "delay_notice",
+      "explicit_pause",
+      "loss_slate",
+      "paused_frame_and_clock",
+      "recovery",
+      "resume",
+      "resume_excludes_pause"
+    ],
+    "error": null,
+    "passed": true,
+    "source_revision": "4d2edc9 worktree before calibration-identity hardening",
+    "report": "build/broadcast-final-faults/result.json",
+    "report_sha256": "5506cfb0b61b404063de03f11a5773a10cb334564e5ad6b2327c80909fea03c0",
+    "metric_samples": 5,
+    "maximum_archive_drops": 0,
+    "max_rss_mib": 559.765625,
+    "max_history_mib": 56.35986328125,
+    "median_sampled_render_ms": 4.777624999405816
+  },
+  "installed_smoke": {
+    "rendered": 52,
+    "error": "",
+    "logo_loaded": true,
+    "raster": [
+      1920,
+      1080
+    ],
+    "window_title": "Rocket Broadcast \u2014 Program",
+    "content_pixels": [
+      1920,
+      1080
+    ],
+    "obs_connected": false,
+    "hardware_open": false,
+    "obs_presets_exported": true,
+    "passed": true
+  },
+  "dmg": {
+    "path": "dist/RocketGNCMonitor-v0a-Darwin-arm64.dmg",
+    "sha256": "4f6fcc65cdd708ea5e093a2f6e33f04bf125acca87d3323faf0cf20e4a71355b"
+  },
+  "executable": {
+    "path": "/Applications/RocketGNCMonitor-v0a.app/Contents/MacOS/RocketGNCMonitor-v0a",
+    "sha256": "150b392f30b097dd50016c52091d44f0505ac2c27b650542e2c2426cdf353328"
+  }
+}

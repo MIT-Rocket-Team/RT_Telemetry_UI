@@ -1,7 +1,7 @@
 # Base Station Video → YouTube broadcast implementation plan
 
 Date: 2026-11-01, America/New_York\
-Status: implementation underway/locally verified; see BROADCAST_VERIFICATION.md for the authoritative tested scope and remaining gates\
+Status: software implemented and locally installed; see BROADCAST_VERIFICATION.md for the authoritative tested scope and remaining OBS/equipment/account gates\
 Consistency reviews: 2026-11-01, including the Camera + Arc HUD and script review; resolutions recorded in section 22\
 Repository baseline inspected: `978b618d69b8bfc8a66b058b270bed3ead43af13`
 
@@ -508,7 +508,7 @@ Closing the Broadcast panel leaves Program running if deliberately enabled. Clos
 
 ## 16. Persistence and startup behavior
 
-Proposed file: `broadcast-settings.json` in the existing application data directory, with a versioned schema and atomic writes.
+Implemented file: `broadcast.json` in the existing application data directory, with a versioned schema and atomic writes.
 
 Persist mission-independent production preferences: layout/theme, asset paths, output preset, caption choices, delay defaults and panel positions. Reference the saved app units preference rather than creating conflicting Imperial/Metric defaults. Validate missing assets and unsupported preset values, and fall back to the built-in slate.
 
