@@ -1,4 +1,5 @@
 """Immutable presentation contracts. Nothing here can command flight hardware."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -77,10 +78,16 @@ class BroadcastTelemetry:
     def from_event(cls, event, scope, *, datum_override="unknown", vertical_contract=False):
         info, payload = event["peer"], event["payload"]
         vehicle = payload.get("vehicle", {}).get("id", "unknown")
-        if (not scope.mission or scope.vehicle == "unknown" or vehicle != scope.vehicle
-                or info.get("mission_id") != scope.mission
-                or info.get("vehicle_mode") != scope.family or info.get("source_mode") != scope.mode
-                or info.get("role") != "telem" or info.get("station") not in {"gs1", "gs2", "gs3", "gs4"}):
+        if (
+            not scope.mission
+            or scope.vehicle == "unknown"
+            or vehicle != scope.vehicle
+            or info.get("mission_id") != scope.mission
+            or info.get("vehicle_mode") != scope.family
+            or info.get("source_mode") != scope.mode
+            or info.get("role") != "telem"
+            or info.get("station") not in {"gs1", "gs2", "gs3", "gs4"}
+        ):
             return None
         arrival = event.get("received_local_mono")
         if not finite(arrival):
@@ -88,25 +95,47 @@ class BroadcastTelemetry:
         values = payload["values"]
         baro = values.get("baro_altitude") or {}
         datum = {"agl_launch": "above_launch", "msl": "msl", "wgs84_ellipsoid": "ellipsoid"}.get(
-            baro.get("datum"), datum_override)
+            baro.get("datum"), datum_override
+        )
         altitude = baro.get("value_m") if datum != "unknown" and finite(baro.get("value_m")) else None
         # The existing schema's ENU field is null. Only an explicitly qualified
         # native scalar adapter may supply vertical speed; never guess a schema.
         native = values.get("native") or {}
-        speed = native.get("velocity") if vertical_contract and values.get("native_schema") == "rocket-telemetry.sample/1" else None
+        speed = (
+            native.get("velocity")
+            if vertical_contract and values.get("native_schema") == "rocket-telemetry.sample/1"
+            else None
+        )
         speed = speed if finite(speed) else None
         age = event.get("source_age_ms")
         age = max(0, age / 1000) if finite(age) else None
-        sample = observation_to_sample(payload, received_monotonic=arrival,
-                                       source_age_ms=(age or 0) * 1000, source_label=info["station"].upper())
+        sample = observation_to_sample(
+            payload,
+            received_monotonic=arrival,
+            source_age_ms=(age or 0) * 1000,
+            source_label=info["station"].upper(),
+        )
         sample.details["network_source_mode"] = scope.mode
         sample.details["network_station"] = info["station"]
         state = values.get("state") or {}
         name = state.get("name") if isinstance(state.get("name"), str) else "UNKNOWN"
-        return cls(payload["observation_id"], info["node_id"], info["boot_id"],
-                   payload["receiver"]["connection_id"], info["station"], vehicle, arrival, age,
-                   event.get("timing_basis", "unknown"), altitude, datum, speed, name,
-                   state.get("schema", "provisional"), telemetry_pose(sample, fresh=True, state_name=name))
+        return cls(
+            payload["observation_id"],
+            info["node_id"],
+            info["boot_id"],
+            payload["receiver"]["connection_id"],
+            info["station"],
+            vehicle,
+            arrival,
+            age,
+            event.get("timing_basis", "unknown"),
+            altitude,
+            datum,
+            speed,
+            name,
+            state.get("schema", "provisional"),
+            telemetry_pose(sample, fresh=True, state_name=name),
+        )
 
 
 @dataclass(frozen=True)
@@ -138,6 +167,7 @@ class FrameView:
     flight_state: str = "UNAVAILABLE"
     mission_elapsed_s: float | None = None
     clock_state: str = "unavailable"
+    clock_basis: str = ""
     telemetry_status: str = "unavailable"
     telemetry_age_s: float | None = None
     completed_events: tuple[str, ...] = ()
@@ -162,4 +192,3 @@ class BroadcastSnapshot:
     pose: Any = None
     ready: bool = False
     reason: str = ""
-

@@ -42,6 +42,7 @@ class VideoStream:
 
 class Controller(QObject):
     changed = Signal()
+    playback_reset = Signal()
     event = Signal(str)
     frame = Signal(bytes)  # First-stream compatibility for existing integrations.
     video_frame = Signal(str, bytes)
@@ -877,6 +878,7 @@ class Controller(QObject):
     def seek(self, elapsed):
         if not self.reader:
             return
+        self.playback_reset.emit()
         self.replay_time = max(0, min(elapsed, self.reader.duration))
         self.history.clear()
         self.track.clear()

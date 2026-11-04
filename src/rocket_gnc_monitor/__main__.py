@@ -304,15 +304,20 @@ def main():
         window.broadcast.open_program()
         def broadcast_check():
             c = window.broadcast
+            from .obs_presets import prepare
+            presets = data/'exported-obs-presets'
+            if not presets.exists():
+                prepare(presets, window.resource_root/'resources/broadcast', data/'recordings')
             report = dict(rendered=c.rendered, error=c.error, logo_loaded=not c.logo.isNull(),
                           raster=[c.last_program.width(),c.last_program.height()],
                           window_title=c.program_window.windowTitle(),
                           content_pixels=[round(c.program_window.width()*c.program_window.devicePixelRatioF()),
                                           round(c.program_window.height()*c.program_window.devicePixelRatioF())],
-                          obs_connected=c.panel.obs.fresh(), hardware_open=any(window.controller.workers.values()))
+                          obs_connected=c.panel.obs.fresh(), hardware_open=any(window.controller.workers.values()),
+                          obs_presets_exported=(presets/'scenes/Rocket_Broadcast.json').is_file())
             report['passed'] = (report['rendered'] > 10 and not report['error'] and report['logo_loaded']
                                 and report['raster'] == [1920,1080] and not report['hardware_open']
-                                and not report['obs_connected'])
+                                and not report['obs_connected'] and report['obs_presets_exported'])
             data.mkdir(parents=True,exist_ok=True)
             (data/'broadcast-smoke-report.json').write_text(json.dumps(report,indent=2))
             c.last_program.save(str(data/'broadcast-program.png'))

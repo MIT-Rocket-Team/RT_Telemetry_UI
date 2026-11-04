@@ -15,6 +15,11 @@ on:
       - 'src/rocket_gnc_monitor/network/**'
       - 'src/rocket_gnc_monitor/recording.py'
       - 'scripts/build_mission_srt.py'
+      - 'src/rocket_gnc_monitor/broadcast*'
+      - 'src/rocket_gnc_monitor/obs_*'
+      - 'tests/test_broadcast*'
+      - 'tests/test_obs_bridge.py'
+      - 'resources/broadcast/**'
 
 permissions:
   contents: read
@@ -53,6 +58,8 @@ jobs:
           tests/test_mission_station.py tests/test_mission_lifecycle.py
           tests/test_mission_network.py tests/test_mission_video.py
           tests/test_network_runtime.py tests/test_network_ui_integration.py
+          tests/test_broadcast_core.py tests/test_broadcast_session.py
+          tests/test_broadcast_ui.py tests/test_broadcast_obs_presets.py tests/test_obs_bridge.py
           --basetemp=build/mission-desktop-fixtures
           --junitxml=build/mission-desktop.xml
       - uses: actions/upload-artifact@v4

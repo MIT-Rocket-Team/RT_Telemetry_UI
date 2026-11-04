@@ -40,7 +40,7 @@ The 0.5 second default is **uncalibrated receive-time buffering**, visibly marke
 4. Measure each OBS audio offset. A commentator watching delayed Program and a direct range microphone generally need different offsets. Do not add the common delay twice.
 5. Check the measurement and audio confirmations, then **Apply timing → slate**. This clears presentation histories and the presentation clock; re-establish the clock, warm the scene and Take again.
 
-Unsupported delay/memory combinations are rejected. Missing calibrated paths remain unavailable. Recheck after changing devices, codec, network route or media epoch. Saved measurements are reference preferences: calibration is unqualified again on the next app launch.
+Unsupported delay/memory combinations are rejected. Missing calibrated paths remain unavailable. Qualification requires connected source identities. A changed measured camera epoch or telemetry connection invalidates timing and returns Program to a slate. Mission/vehicle/source-mode changes also clear qualification. Recheck after changing devices, codec or network route even when its identity is unchanged. Saved measurements are reference preferences: calibration is unqualified again on the next app launch.
 
 ## Clock, timeline and replay
 
@@ -50,17 +50,17 @@ Select LIFTOFF and use **Mark event observed now** when the event is happening i
 
 Only explicitly received supported states can mark their own milestones; later states do not fill in earlier missing events. A received APOGEE/MAIN state supplies reception evidence, not an exact event timestamp. Custom timeline labels are supported, up to six labels of 12 characters.
 
-Replay uses the existing exclusive replay mode. Local replay has a recorded flight clock only when the existing recording has a time-aligned sample/zero mapping. Otherwise a clock remains unavailable until explicitly anchored. Known pauses retain the last picture/time with PAUSED; a disconnected remote transport is still reported. Seek/source changes invalidate incompatible history. Production annotations from a different run are not replayed as flight truth. Hardware-specific remote replay/simulation time qualification remains part of field rehearsal.
+Replay uses the existing exclusive replay mode. Local replay has a recorded flight clock only when the existing recording has a time-aligned sample/zero mapping. Otherwise a clock remains unavailable until explicitly anchored. Operator clocks are labelled, including APPROXIMATE when timing is uncalibrated. Known pauses retain the last picture/time with PAUSED; a disconnected remote transport is still reported. Resume excludes the paused interval from an operator-anchored playback clock. Resume playback before editing its clock or marking new events. Seek/source changes invalidate incompatible history. Production annotations from a different run are not replayed as flight truth. Hardware-specific remote replay/simulation time qualification remains part of field rehearsal.
 
 ## Prepare OBS
 
-OBS **33.0.1 Apple Silicon** is installed for this Mac. The repository includes a preset generator and a separate emergency slate. It creates named profiles without changing existing profiles or installing credentials:
+OBS **33.0.1 Apple Silicon** is installed for this Mac. The packaged app includes **OBS / YouTube → Export OBS presets…** and a separate emergency slate. Export to a new folder, then import the profile/scene collection in OBS. The repository also includes the same preset generator. It creates named profiles without changing existing profiles or installing credentials:
 
 ```bash
 .venv/bin/python scripts/prepare_broadcast_obs.py --output build/obs-setup
 ```
 
-With OBS closed, `--install` installs new named presets on macOS and refuses to overwrite existing named files. The prepared local profiles are **Rocket 1080p30** and **Rocket 720p30**. The production scene collection is **Rocket Broadcast** and starts on **Emergency slate**. The optional **Rocket Local Rehearsal** collection contains only an explicitly supplied test movie.
+With OBS closed, `--install` installs new named presets on macOS and refuses to overwrite existing named files. The prepared local profiles are **Rocket 1080p30** and **Rocket 720p30**. The production scene collection is **Rocket Broadcast** and starts on **Emergency slate**. The optional **Rocket Local Rehearsal** collection contains only an explicitly supplied test movie. Keep an exported folder in place: it contains the independent slate artwork. When moving presets to another computer, remap that image and the recording folder; the export README explains this.
 
 1. Open OBS with the team profile/collection. Keep the independent Emergency slate available.
 2. Open Program in the telemetry app. In the OBS **Rocket Program** scene, map the macOS Screen Capture source to that **individual Program window**. Grant the necessary screen-capture permission when ready; never capture the entire desktop or application.

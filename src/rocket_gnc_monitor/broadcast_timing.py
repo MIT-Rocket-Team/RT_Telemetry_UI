@@ -1,10 +1,12 @@
 """Bounded presentation histories and explicit clock/event evidence."""
+
 from __future__ import annotations
 
-from collections import deque
-from dataclasses import dataclass, field
+import itertools
 import math
 import threading
+from collections import deque
+from dataclasses import dataclass, field
 
 from .domain import finite
 
@@ -33,7 +35,7 @@ class Calibration:
 
 @dataclass(frozen=True)
 class TimingConfig:
-    delay: float = .5
+    delay: float = 0.5
     calibrated: bool = False
     paths: dict = field(default_factory=dict)
     budget: int = 256 * 1024 * 1024
@@ -45,7 +47,9 @@ class TimingConfig:
             raise ValueError("Broadcast memory budget must be between 64 and 256 MiB")
         for path in self.paths.values():
             path.validate()
-        if self.calibrated and any(self.delay + 1e-9 < p.delay + p.jitter + GUARD for p in self.paths.values()):
+        if self.calibrated and any(
+            self.delay + 1e-9 < p.delay + p.jitter + GUARD for p in self.paths.values()
+        ):
             raise ValueError("Broadcast delay must cover every calibrated path, jitter and one output frame")
         if self.required_bytes(cameras) > self.budget:
             raise ValueError("These cameras and delay exceed the broadcast memory budget")
@@ -58,12 +62,17 @@ class TimingConfig:
 
     def required_bytes(self, cameras):
         return RESERVED_BYTES + sum(
-            FRAME_BYTES * (math.ceil(self.retention(name) * FPS) + 2)
-            for name in set(cameras))
+            FRAME_BYTES * (math.ceil(self.retention(name) * FPS) + 2) for name in set(cameras)
+        )
 
     def retention(self, name):
-        return max(1.15, max(0, self.delay - (self.path_delay(name) or 0))
-                   + (self.paths[name].jitter if name in self.paths else 0) + GUARD + .1)
+        return max(
+            1.15,
+            max(0, self.delay - (self.path_delay(name) or 0))
+            + (self.paths[name].jitter if name in self.paths else 0)
+            + GUARD
+            + 0.1,
+        )
 
 
 class FrameHistory:
@@ -72,6 +81,7 @@ class FrameHistory:
     Memory limit reserves room for all retained composition/camera image copies.
     Main-thread snapshots hold frames only until the next render completes.
     """
+
     def __init__(self, budget=256 * 1024 * 1024, retention=1.0):
         self.limit = budget - RESERVED_BYTES
         self.retention = retention
@@ -110,8 +120,10 @@ class FrameHistory:
         if path_delay is None:
             return None
         with self.lock:
-            return next((f for f in reversed(self.frames.get(key, ()))
-                         if f.arrival - path_delay <= program_time), None)
+            return next(
+                (f for f in reversed(self.frames.get(key, ())) if f.arrival - path_delay <= program_time),
+                None,
+            )
 
     def latest(self, key):
         with self.lock:
@@ -120,9 +132,13 @@ class FrameHistory:
 
     def continuous(self, key, now, duration=1.0):
         with self.lock:
-            items = [f.arrival for f in self.frames.get(key, ()) if f.arrival >= now - duration - .1]
-            return bool(len(items) > 1 and now - items[0] >= duration
-                        and now - items[-1] < .5 and all(b - a < .5 for a, b in zip(items, items[1:])))
+            items = [f.arrival for f in self.frames.get(key, ()) if f.arrival >= now - duration - 0.1]
+            return bool(
+                len(items) > 1
+                and now - items[0] >= duration
+                and now - items[-1] < 0.5
+                and all(b - a < 0.5 for a, b in itertools.pairwise(items))
+            )
 
     def retain(self, keys):
         with self.lock:
@@ -159,7 +175,9 @@ class TelemetryHistory:
     def at(self, node, program_time, delay):
         if delay is None:
             return None
-        return next((r for r in reversed(self.histories.get(node, ())) if r.arrival - delay <= program_time), None)
+        return next(
+            (r for r in reversed(self.histories.get(node, ())) if r.arrival - delay <= program_time), None
+        )
 
     def clear(self):
         self.histories.clear()
@@ -185,8 +203,10 @@ class BroadcastClock:
         self.revisions = self.revisions[-1000:]
 
     def at(self, program_time):
-        revision = next((r for r in reversed(self.revisions) if r.effective <= program_time),
-                        ClockRevision(float("-inf"), "unavailable"))
+        revision = next(
+            (r for r in reversed(self.revisions) if r.effective <= program_time),
+            ClockRevision(float("-inf"), "unavailable"),
+        )
         if revision.state == "hold":
             return revision.held, "hold", revision.basis
         if revision.anchor is None:

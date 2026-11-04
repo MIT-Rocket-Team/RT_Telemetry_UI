@@ -1,11 +1,23 @@
 """Pure 1920x1080 Camera + Arc HUD composition from a qualified snapshot."""
-from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QFont, QFontMetricsF, QImage, QLinearGradient, QPainter, QPainterPath, QPen, QPolygonF
+
 import numpy as np
+from PySide6.QtCore import QPointF, QRectF, Qt
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+    QFontMetricsF,
+    QImage,
+    QLinearGradient,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QPolygonF,
+)
+
+from .broadcast_model import FrameView
 from .display_units import DisplayUnits
 from .fonts import FONT_FAMILY
-from .broadcast_model import FrameView
-from .rocket_geometry import rocket_mesh, plume_mesh
+from .rocket_geometry import plume_mesh, rocket_mesh
 
 WIDTH, HEIGHT = 1920, 1080
 WHITE, MUTED, RED = "#f7f7f7", "#b5bcc4", "#af1f39"
@@ -22,7 +34,7 @@ def draw_pose(painter, pose, rect):
     faces = []
     for mesh in meshes:
         for start, count, material in zip(mesh.starts, mesh.counts, mesh.materials):
-            points = mesh.vertices[start:start + count]
+            points = mesh.vertices[start : start + count]
             rotated = np.asarray(points) @ pose.rotation.T
             projected = [(rect.center().x() + 145 * v[0], rect.center().y() - 145 * v[2]) for v in rotated]
             faces.append((float(rotated[:, 1].mean()), projected, mesh.colors[material][24][0]))
@@ -103,26 +115,45 @@ def mission_clock(seconds, state="elapsed"):
     return f"T{sign}{hours:02}:{minutes:02}:{whole:02}.{tenth}"
 
 
-def compose(camera: QImage | None, view: FrameView, units: DisplayUnits, logo: QImage,
-            *, inset: QImage | None = None, pose=None) -> QImage:
+def compose(
+    camera: QImage | None,
+    view: FrameView,
+    units: DisplayUnits,
+    logo: QImage,
+    *,
+    inset: QImage | None = None,
+    pose=None,
+) -> QImage:
     """Pure composition on the GUI thread. Inputs must already share scope and time T."""
     frame = QImage(WIDTH, HEIGHT, QImage.Format.Format_ARGB32_Premultiplied)
     frame.fill(QColor("#030609"))
     painter = QPainter(frame)
-    painter.setRenderHints(QPainter.RenderHint.Antialiasing | QPainter.RenderHint.TextAntialiasing
-                           | QPainter.RenderHint.SmoothPixmapTransform)
+    painter.setRenderHints(
+        QPainter.RenderHint.Antialiasing
+        | QPainter.RenderHint.TextAntialiasing
+        | QPainter.RenderHint.SmoothPixmapTransform
+    )
     if camera is not None and not camera.isNull() and view.scene not in {"Standby", "End card"}:
         if any(view.camera_crop):
             left, top, right, bottom = view.camera_crop
-            camera = camera.copy(round(camera.width()*left), round(camera.height()*top),
-                                 round(camera.width()*(1-left-right)), round(camera.height()*(1-top-bottom)))
+            camera = camera.copy(
+                round(camera.width() * left),
+                round(camera.height() * top),
+                round(camera.width() * (1 - left - right)),
+                round(camera.height() * (1 - top - bottom)),
+            )
         letterbox(painter, camera, QRectF(0, 0, WIDTH, HEIGHT))
     else:
         camera_slate(painter, view.mode)
         if view.scene in {"Standby", "End card"}:
             painter.fillRect(QRectF(280, 390, 1360, 220), QColor("#101820"))
             text(painter, QRectF(300, 410, 1320, 90), view.mission, 56, bold=True)
-            text(painter, QRectF(300, 510, 1320, 55), view.caption or ("STANDING BY" if view.scene == "Standby" else "THANK YOU FOR WATCHING"), 30)
+            text(
+                painter,
+                QRectF(300, 510, 1320, 55),
+                view.caption or ("STANDING BY" if view.scene == "Standby" else "THANK YOU FOR WATCHING"),
+                30,
+            )
 
     # Scrims preserve legibility over a bright sky as well as over the blank slate.
     for start, end, colors in ((0, 200, (190, 0)), (680, 1080, (0, 235))):
@@ -132,11 +163,23 @@ def compose(camera: QImage | None, view: FrameView, units: DisplayUnits, logo: Q
         painter.fillRect(QRectF(0, start, WIDTH, end - start), gradient)
     if not logo.isNull():
         painter.drawImage(QRectF(48, 32, 240, 240 * logo.height() / logo.width()), logo)
-    text(painter, QRectF(1480, 36, 392, 36), (view.mode + " · PAUSED") if view.paused else view.mode, 24,
-         color="#efbd63" if view.mode != "LIVE SOURCE" else WHITE,
-         align=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, bold=True)
-    text(painter, QRectF(1340, 78, 532, 32), view.camera_label, 21, color=MUTED,
-         align=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+    text(
+        painter,
+        QRectF(1480, 36, 392, 36),
+        (view.mode + " · PAUSED") if view.paused else view.mode,
+        24,
+        color="#efbd63" if view.mode != "LIVE SOURCE" else WHITE,
+        align=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+        bold=True,
+    )
+    text(
+        painter,
+        QRectF(1340, 78, 532, 32),
+        view.camera_label,
+        21,
+        color=MUTED,
+        align=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+    )
     if view.camera_notice:
         painter.fillRect(QRectF(570, 170, 780, 54), QColor(0, 0, 0, 200))
         text(painter, QRectF(580, 177, 760, 40), view.camera_notice, 24)
@@ -146,11 +189,27 @@ def compose(camera: QImage | None, view: FrameView, units: DisplayUnits, logo: Q
     altitude = units.convert(view.altitude_m, "distance") if available else None
     if view.altitude_datum not in altitude_labels:
         altitude = None
-    speed = units.convert(view.vertical_speed_m_s, "velocity") if available and view.vertical_speed_valid else None
-    gauge(painter, 48, "VERT SPEED", "—" if speed is None else f"{speed:+,.1f}",
-          units.unit("velocity"), "SIGNED · VERTICAL")
-    gauge(painter, 264, "ALTITUDE", "—" if altitude is None else f"{altitude:,.0f}",
-          units.unit("distance"), altitude_labels.get(view.altitude_datum, "DATUM UNKNOWN"))
+    speed = (
+        units.convert(view.vertical_speed_m_s, "velocity")
+        if available and view.vertical_speed_valid
+        else None
+    )
+    gauge(
+        painter,
+        48,
+        "VERT SPEED",
+        "—" if speed is None else f"{speed:+,.1f}",
+        units.unit("velocity"),
+        "SIGNED · VERTICAL",
+    )
+    gauge(
+        painter,
+        264,
+        "ALTITUDE",
+        "—" if altitude is None else f"{altitude:,.0f}",
+        units.unit("distance"),
+        altitude_labels.get(view.altitude_datum, "DATUM UNKNOWN"),
+    )
     source = f"{view.telemetry_source} · {view.mission} TELEMETRY"
     if view.telemetry_status == "stale":
         age = "" if view.telemetry_age_s is None else f" · {view.telemetry_age_s:.1f}s"
@@ -169,16 +228,27 @@ def compose(camera: QImage | None, view: FrameView, units: DisplayUnits, logo: Q
     painter.setPen(QPen(QColor("#b8bec5"), 2))
     painter.drawPath(curve)
     # Categorical event order; distance along the arc is not a time prediction.
-    for fraction, event in zip((.09, .26, .43, .60, .77, .94), view.event_labels):
+    for fraction, event in zip((0.09, 0.26, 0.43, 0.60, 0.77, 0.94), view.event_labels):
         point = curve.pointAtPercent(fraction)
         done = event in view.completed_events
         painter.setPen(QPen(QColor(WHITE if done else MUTED), 2))
         painter.setBrush(QColor(WHITE if done else "#111820"))
         painter.drawEllipse(point, 7, 7)
-        text(painter, QRectF(point.x() - 70, point.y() - 41, 140, 27), event, 18,
-             color="#efbd63" if event in view.uncertain_events else WHITE if done else MUTED, bold=done)
-    text(painter, QRectF(820, 941, 800, 85), mission_clock(view.mission_elapsed_s, view.clock_state),
-         48 if view.clock_state in {"countdown", "hold", "awaiting_launch"} else 62, bold=True)
+        text(
+            painter,
+            QRectF(point.x() - 70, point.y() - 41, 140, 27),
+            event,
+            18,
+            color="#efbd63" if event in view.uncertain_events else WHITE if done else MUTED,
+            bold=done,
+        )
+    text(
+        painter,
+        QRectF(820, 941, 800, 85),
+        mission_clock(view.mission_elapsed_s, view.clock_state),
+        48 if view.clock_state in {"countdown", "hold", "awaiting_launch"} else 62,
+        bold=True,
+    )
     state = view.flight_state if available else "TELEMETRY UNAVAILABLE"
     if view.telemetry_status == "stale":
         state = f"LAST KNOWN: {state}"
@@ -186,6 +256,8 @@ def compose(camera: QImage | None, view: FrameView, units: DisplayUnits, logo: Q
     if view.telemetry_notice:
         text(painter, QRectF(510, 105, 900, 36), view.telemetry_notice, 22, color="#efbd63", bold=True)
     text(painter, QRectF(510, 64, 900, 32), view.timing_label, 19, color=MUTED)
+    if view.clock_basis:
+        text(painter, QRectF(510, 32, 900, 28), view.clock_basis, 18, color=MUTED)
     if view.caption and view.scene not in {"Standby", "End card"}:
         text(painter, QRectF(480, 730, 960, 44), view.caption, 26)
     if inset is not None:
@@ -196,4 +268,3 @@ def compose(camera: QImage | None, view: FrameView, units: DisplayUnits, logo: Q
         draw_pose(painter, pose, QRectF(1424, 148, 448, 252))
     painter.end()
     return frame
-

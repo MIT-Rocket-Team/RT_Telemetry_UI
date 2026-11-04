@@ -108,12 +108,12 @@ The first version transfers the finished image to OBS through its window-capture
 - Fixed-rate output, bounded delay buffers and configurable alignment offsets.
 - Manual camera/scene cuts, automatic signal-loss notices/slates and manually selected alternate feeds.
 - OBS profile/scene template, setup instructions, commentary and finished-program recording.
+- Authenticated local OBS status/control integration inside Base Video (accepted v1 extension).
 - Local rehearsal, network fault tests and an unlisted YouTube qualification run.
 
 ### Subsequent additions, after the first release is qualified
 
 - Automatic camera fallback, with candidate warm-up and switching hysteresis.
-- Authenticated local OBS status/control integration inside Base Video.
 - Higher-resolution camera capture and SRT main renditions.
 - Capture timestamps, frame IDs and explicit clock mapping for more precise synchronization.
 - A direct encoder backend if removing OBS becomes a requirement.

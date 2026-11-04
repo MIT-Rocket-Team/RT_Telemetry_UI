@@ -1,11 +1,12 @@
 """Bounded asynchronous production log; never blocks decoding or painting."""
-from datetime import datetime, timezone
+
 import json
-from pathlib import Path
 import queue
 import threading
 import time
 import uuid
+from datetime import UTC, datetime
+from pathlib import Path
 
 
 class ProductionLog:
@@ -14,15 +15,15 @@ class ProductionLog:
         self.stopped = threading.Event()
         self.error = ""
         self.dropped = 0
-        self.path = Path(directory) / (datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-                                       + "-" + uuid.uuid4().hex[:8] + ".jsonl")
+        self.path = Path(directory) / (
+            datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8] + ".jsonl"
+        )
         self.thread = threading.Thread(target=self._run, name="broadcast-log", daemon=True)
         self.thread.start()
 
     def write(self, action, **data):
         # Callers supply only presentation decisions, never OBS response objects.
-        event = dict(action=action, monotonic=time.monotonic(),
-                     utc=datetime.now(timezone.utc).isoformat(), **data)
+        event = dict(action=action, monotonic=time.monotonic(), utc=datetime.now(UTC).isoformat(), **data)
         try:
             self.queue.put_nowait(event)
         except queue.Full:
@@ -34,7 +35,7 @@ class ProductionLog:
             with self.path.open("a", encoding="utf-8") as out:
                 while not self.stopped.is_set() or not self.queue.empty():
                     try:
-                        value = self.queue.get(timeout=.2)
+                        value = self.queue.get(timeout=0.2)
                     except queue.Empty:
                         continue
                     out.write(json.dumps(value, allow_nan=False) + "\n")
