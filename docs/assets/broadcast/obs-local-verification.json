@@ -1,0 +1,63 @@
+{
+  "date": "2026-11-04",
+  "application_revision": "f844fee830bf2bd82eacc45827cfb4ceb48f6c50",
+  "obs_version": "33.0.1",
+  "program_capture_verified": false,
+  "capture_blocker": "OBS screen/system-audio recording permission off; approval pending. Mac relocked.",
+  "youtube_started": false,
+  "recording_source": "Labelled local reference movie plus isolated test tone, not live Program capture",
+  "recording": {
+    "path": "~/Movies/Rocket Broadcast/Rocket-2026-11-04_06-31-36.mkv",
+    "duration_s": 34.566,
+    "decoded_frames": 1035,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 30,
+    "video": "H.264 High, Rec.709 limited",
+    "audio": "AAC stereo 48000 Hz",
+    "audio_peak_dbfs": -24.2,
+    "sha256": "3f3921eb9afdb0429b48c96ebe0aca70f2b3893d160a6d28f4081bd404fb901f"
+  },
+  "bridge": {
+    "scope": "Real OBS bridge start/stop using local movie and tone, not Program capture",
+    "started": true,
+    "stopped": true,
+    "streaming_observed": false,
+    "seconds": 10.457
+  },
+  "final_obs": {
+    "scene": "Emergency slate",
+    "recording": false,
+    "streaming": false
+  },
+  "package_smoke": {
+    "rendered": 61,
+    "error": "",
+    "logo_loaded": true,
+    "raster": [
+      1920,
+      1080
+    ],
+    "window_title": "Rocket Broadcast \u2014 Program",
+    "content_pixels": [
+      1920,
+      1080
+    ],
+    "obs_connected": false,
+    "hardware_open": false,
+    "obs_presets_exported": true,
+    "passed": true
+  },
+  "local_evidence_sha256": {
+    "real-bridge-report.json": "def9fc65102cf6443d82ca219777fa2c768ab5ddd8fadea942054a851b7400d8",
+    "obs-recording-initial.jsonl": "3979f954e52da3d1575ce11e9ebd1c8006a1e241bf512ff53424f430ada37d7d",
+    "obs-controls-disconnected.jsonl": "fbd62e3bc23f0c6beb906a7db5b96be8d06777dd4309f9ea218b870675dd310c",
+    "obs-recording-final.jsonl": "f3f92b6819202310fe1a6874dbaa4cb35e5ff1f24294929aac391fc31791b561",
+    "obs-final-state.jsonl": "2736f746503b6194cd2bfbf1b5eec996a7911b3dbed839227c769dd0f78c4e6d",
+    "recording-analysis.txt": "35744c1d6ad27db30582e8e3dfe49f46e833401fabff1e3286934e09a10f41b8"
+  },
+  "ci": "https://github.com/MIT-Rocket-Team/RT_Telemetry_UI/actions/runs/41821289641",
+  "ci_all_four_platforms": "passed"
+}

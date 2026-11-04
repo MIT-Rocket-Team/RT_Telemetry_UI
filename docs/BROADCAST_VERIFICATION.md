@@ -1,6 +1,6 @@
 # Broadcast implementation and verification
 
-Implementation date: 2026-11-03, America/New_York. This report separates implemented behavior, locally measured evidence and equipment/account-dependent qualification. **No real YouTube stream was started.**
+Implementation date: 2026-11-03; local OBS follow-up: 2026-11-04, America/New_York. This report separates implemented behavior, locally measured evidence and equipment/account-dependent qualification. **No real YouTube stream was started.**
 
 ## Source milestones
 
@@ -78,7 +78,15 @@ Generated detailed reports, captured Program frames and reference movies are und
 
 ## Installed artifact
 
-- App: `/Applications/RocketGNCMonitor-v0a.app`, source revision `16e0fd3`.
+- Current app: `/Applications/RocketGNCMonitor-v0a.app`, source revision `f844fee` (2026-11-04 operator-focus fix).
+- Current DMG SHA-256: `e954fa208daef500488a10efaa9a91c3fbe113e77dfc19d8e8318478cc337088`.
+- Current installed executable SHA-256: `ee2f0f9eea334bdeae0e82bfb2cb4ad29954d20290588fba55a6aebf2dd13fe3`.
+- The prior `16e0fd3` app is retained at `build/application-backups/20261104-before-operator-focus/RocketGNCMonitor-v0a.app`.
+- The current installed app's offscreen package smoke passed: 61 Program frames, 1920×1080 raster/content, logo loaded and OBS presets exported, with no hardware or OBS connection. This checks bundled rendering/resources, not macOS screen-capture permissions or Retina capture.
+
+The following records the preceding 2026-11-03 package; its hashes are historical:
+
+- App source revision: `16e0fd3`.
 - Previous app retained at `build/application-backups/20261103-before-broadcast/RocketGNCMonitor-v0a.app`.
 - Distribution: `dist/RocketGNCMonitor-v0a-Darwin-arm64.dmg` (Apple Silicon macOS).
 - DMG SHA-256: `4f6fcc65cdd708ea5e093a2f6e33f04bf125acca87d3323faf0cf20e4a71355b`.
@@ -89,12 +97,33 @@ Generated detailed reports, captured Program frames and reference movies are und
 
 The separate Windows archive already in `dist/` predates this implementation and is not part of this delivery. Cross-platform CI success does not relabel an old binary as newly built.
 
+## Real OBS follow-up — 2026-11-04
+
+The unlocked Mac allowed native UI testing with OBS 33.0.1 and the installed app. The existing OBS WebSocket password was used, authentication remained enabled, and the password was neither changed nor saved in the repository or app settings. No YouTube credential was entered.
+
+- A standalone, loopback-only simulated away publisher (`scripts/serve_broadcast_fixture.py`) supplied moving numbered camera frames and varying canonical telemetry. The installed `16e0fd3` app explicitly joined that simulation, selected AWAY1 digital, prepared/took Flight, and displayed the moving video, logo, source label and changing imperial altitude/qualified vertical speed in its clean Program window. This was observed directly, **not recorded through OBS window capture**. Synchronization remained visibly uncalibrated.
+- Native testing exposed a focus issue when reopening an already-created Broadcast panel. `f844fee` activates it explicitly and adds **View → Broadcast controls… / ⌘⇧B** (Ctrl+Shift+B elsewhere). The installed replacement was verified returning from Program to the operator panel with output still running.
+- The original 33 focused broadcast/OBS checks passed; the updated eight-test UI subset also passed, including the new focus regression, giving 34 distinct focused checks. [GitHub qualification for f844fee](https://github.com/MIT-Rocket-Team/RT_Telemetry_UI/actions/runs/41821289641) passed Windows, Apple Silicon Mac, Intel Mac and Linux. Packaging and strict deep signature verification passed.
+- The rebuilt installed app connected to the actual authenticated OBS server. Its password field cleared, scene/status matched OBS, and recording state was correctly shown as ACTIVE/STOPPED.
+- Recording started in OBS using **Rocket Local Rehearsal**, which plays the previously generated, explicitly labelled local reference movie, plus an isolated test-tone source. Microphones/system audio were not recorded; test-tone monitoring was off. Disconnecting app controls left recording active and changed app status to UNKNOWN. Reconnecting retained the existing recording. The app's **Stop recording** command finalized the file successfully, even while Program was stopped. A further reconnect while stopped did not start anything.
+- A separate real-server run through the actual `OBSBridge` class successfully issued **StartRecord → active → StopRecord → stopped**, completing in 10.457 seconds, with streaming inactive throughout. This proves the bridge commands, not the panel's capture-readiness checklist.
+- Main local recording: `~/Movies/Rocket Broadcast/Rocket-2026-11-04_06-31-36.mkv`, **34.566 s**, **1,035 decoded frames**, **1920×1080, 30 fps, H.264 High, limited-range Rec.709**, stereo **AAC 48 kHz**. Complete decode passed; the tone was non-silent (peak −24.2 dBFS, mean −37.4 dBFS). The container's combined bitrate was approximately 14.065 Mb/s. SHA-256: `3f3921eb9afdb0429b48c96ebe0aca70f2b3893d160a6d28f4081bd404fb901f`.
+- OBS reported zero encoder-skipped frames for that recording; its process-lifetime render-skipped counter remained unchanged at 541,106 between the sampled initial/final states. The large pre-existing lifetime count is not attributed to this short test, and this does not claim a one-hour OBS load test.
+- The [recorded fixture frame](assets/broadcast/obs-recording-fixture.png) comes from OBS's saved MKV. It shows playback of a synthetic reference movie, **not live Program capture**. Detailed local evidence is under `build/obs-live-rehearsal/`.
+- Final OBS API verification confirmed **Rocket Broadcast → Emergency slate**, recording inactive and streaming inactive. The standalone publisher was stopped. The Mac locked again before final native UI cleanup; the app's clean Program standby window was left open in its isolated test session.
+
+### Capture permission still pending
+
+macOS **Privacy & Security → Screen & System Audio Recording** showed **OBS.app off**. Consequently, OBS's individual-window list was empty. Permission approval was requested and was not assumed. The Mac subsequently locked again. No privacy setting, lock, or permission was bypassed.
+
+After approval/unlock, map the individual Program window, exclude cursor/title bar, verify Retina crop, and record live Program while exercising loss/recovery and the app's Start-recording control. Those steps remain unverified. The successful local media recording above does not substitute for them.
+
 ## Unfinished external qualification
 
-The Mac locked during OBS setup. Native computer control reported that manual unlock is required, and a final access check confirmed it was still locked. OBS also presented first-run screen/microphone permission setup, which was left unchanged. Consequently:
+The 2026-11-04 follow-up resolved real OBS authentication, status, bridge Start/Stop and local fixture recording. Remaining checks are:
 
 - OBS's actual Program-window capture, crop and Retina behavior have not been verified through an OBS recording.
-- Actual OBS local start/stop via WebSocket remains unqualified until its local server is enabled/authenticated. The app's implementation is protocol-tested; no OBS authentication settings or credentials were silently changed.
+- The app panel's Start-recording flow with a verified live Program capture remains pending the capture permission; real bridge Start/Stop and panel Stop were verified separately as described above.
 - No physical microphone/range input, A/V offset or one-hour A/V drift was measured.
 - The complete three-main Iris wall plus candidate, other external viewers and launch-site radio/uplink load still need the intended equipment.
 - The long soak covers the local synthetic SRT/telemetry/compositor path, not OBS capture/audio or the real field network.

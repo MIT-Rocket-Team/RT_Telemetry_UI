@@ -11,6 +11,7 @@ The Base Video application now composes the planned MIT Rocket Team broadcast an
 - Bounded delayed frame/telemetry histories, timing calibration, source-restart invalidation, stale/lost notices, automatic loss slate, pause/seek handling and emergency slate.
 - Operator countdown/hold, observed-now versus on-Program event marks, corrections and a separate production log. Custom timeline labels retain the actual liftoff clock control.
 - An OBS / YouTube tab for authenticated local connection, recording Start/Stop, confirmed streaming Start/Stop and current output health. Reconnecting cannot automatically start a stream.
+- A direct **View → Broadcast controls… / ⌘⇧B** shortcut (Ctrl+Shift+B elsewhere), with reliable operator-panel focus when returning from Program.
 - Exportable OBS 1080p30 and 720p30 presets, an independent emergency slate and an operator guide. Credentials are excluded from exports and production logs.
 
 Broadcast reuses the existing camera receivers and canonical telemetry. It does not send rocket commands or change raw recording units. Opening the app does not automatically start Program or streaming.
@@ -33,7 +34,9 @@ The existing Windows archive in `dist/` is older and was not rebuilt for this de
 - One-hour local camera/telemetry soak: **passed**, 29.72 fps, no broadcast-history or archive drops. It exercised the earlier core milestone; the final-source load and focused tests cover subsequent changes.
 - Final-source ten-minute Iris load: **passed**, 29.87 fps with eight feeds, five main receivers and zero archive loss. Rendering did incur bounded presentation drops; the report records them and the preceding concurrent-load readiness failure.
 
-These are local software/transport results. They do not establish an OBS-captured or YouTube-delivered broadcast.
+On **2026-11-04**, real OBS testing additionally verified authenticated app connection, current recording status, disconnect/reconnect behavior, app-controlled recording Stop and actual bridge Start/Stop. OBS recorded a labelled local test movie and isolated test tone: **34.566 seconds, 1920×1080 H.264 at 30 fps, stereo AAC 48 kHz**, complete decode successful. This was an OBS media-source recording; live Program-window capture remains pending macOS permission. No YouTube delivery is claimed.
+
+The focus fix is pushed as **f844fee**, rebuilt and installed in Applications. Its GitHub qualification passed all four platforms. The updated UI regression subset passed eight tests. The current artifact hashes and recording evidence are in the verification report.
 
 ## Start here when back at the Mac
 
@@ -47,7 +50,9 @@ OBS needs **no account**. The local OBS password is separate from the **YouTube 
 
 ## What still needs the actual setup
 
-The Mac locked during native OBS setup, so its actual Program-window capture, WebSocket connection and local audio/recording rehearsal could not be completed unattended. OS permissions were not bypassed. These checks remain before the real YouTube test, in addition to the intentionally deferred channel/key setup.
+Actual OBS Program-window capture is blocked by macOS **Screen & System Audio Recording → OBS.app**, currently off. Approval was requested; the Mac locked again before native testing could continue. The real OBS connection and local media recording checks above are complete. Live Program capture/crop, the panel's Start-recording flow with capture verified, physical audio and camera/telemetry timing still need qualification. OS permissions were not bypassed. YouTube channel/key setup remains intentionally deferred.
+
+OBS was left on **Rocket Broadcast → Emergency slate**, with recording and streaming confirmed stopped. The isolated app rehearsal's Program standby window remains open; its synthetic publisher is stopped.
 
 Synthetic network, renderer, recovery, UI and packaged-app tests do not qualify real camera/telemetry latency, audio drift, launch-site radio load or internet upload capacity. Missing field semantics remain suppressed; in particular, current physical Iris samples do not establish a Sustainer/Booster identity or a validated attitude merely because the operator selects one.
 

@@ -96,4 +96,12 @@ Production decisions and ten-second metrics are under the app data directory's `
 
 ## Verification and remaining event-day checks
 
+For an installed-app rehearsal without hardware, run:
+
+```bash
+QT_QPA_PLATFORM=offscreen .venv/bin/python scripts/serve_broadcast_fixture.py --output build/obs-live-rehearsal
+```
+
+Read that directory's `endpoints.json`, add its video and telemetry addresses as manual peers in an isolated Base Video session, then explicitly join the SIMULATION mission. Select AWAY1 digital in Broadcast. The publisher is loopback-only and its camera picture is labelled as a local test. `control.json` can disable `video` or `telemetry` for loss/recovery checks; restore both to `true` to recover. Stop the publisher with Ctrl-C. Its scalar velocity is the signed derivative of its sinusoidal altitude in m/s; only qualify that field for this fixture's scope. This does not qualify actual flight telemetry or physical timing.
+
 See [BROADCAST_VERIFICATION.md](BROADCAST_VERIFICATION.md) for measured results and limitations. Local synthetic SRT tests do not qualify real camera latency, the three-feed Iris field configuration, local audio devices, internet routing, or YouTube delivery. Those checks use the actual event equipment and credentials.
