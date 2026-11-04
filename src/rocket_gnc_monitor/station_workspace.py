@@ -129,6 +129,7 @@ class StationWindow(InstrumentWindow):
         self.launch_uplink = None
         self.wifi_panel = None
         self.station_network = None
+        self.broadcast = None
         super().__init__(data_dir, video_channels=self.profile.local_channels,
                          video_labels={key: self.profile.channel_labels[key] for key in self.profile.local_channels},
                          board_layout=("launch" if self.launch_station
@@ -170,6 +171,12 @@ class StationWindow(InstrumentWindow):
         if self.controller.mode != 'SIMULATION':
             mission_menu = self.menuBar().addMenu('Mission Simulation')
             mission_menu.addAction('Prepare OpenRocket connection…', self.prepare_mission_connection)
+
+    def open_broadcast(self):
+        if self.broadcast is None:
+            from .broadcast import BroadcastController
+            self.broadcast = BroadcastController(self)
+        self.broadcast.open_panel()
 
     def prepare_mission_connection(self):
         self.guard(self._prepare_mission_connection)
@@ -271,6 +278,9 @@ class StationWindow(InstrumentWindow):
         self.workspace_network = button("Network…", self.open_station_network)
         heading.addWidget(self.workspace_network)
         heading.addWidget(self.workspace_settings)
+        if self.profile.station == 'base' and self.profile.role == 'video':
+            self.broadcast_button = button('Broadcast…', self.open_broadcast)
+            heading.addWidget(self.broadcast_button)
         outer.addLayout(heading)
         if self.launch_station:
             self.launch_network_notice = label("LAUNCH NETWORK · Ethernet / PoE → four LTU-XR links → Away stations 1–4 · data transport pending", "eyebrow")
@@ -1474,6 +1484,8 @@ class StationWindow(InstrumentWindow):
             event.accept()
             return
         self.closing = True
+        if self.broadcast is not None:
+            self.broadcast.close()
         if self.station_network is not None:
             self.station_network.close()
         if self.wifi_panel is not None:

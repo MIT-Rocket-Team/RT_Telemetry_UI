@@ -71,6 +71,7 @@ class BroadcastTelemetry:
     state: str
     state_schema: str
     pose: Any = None
+    mission_elapsed: float | None = None
 
     @classmethod
     def from_event(cls, event, scope, *, datum_override="unknown", vertical_contract=False):

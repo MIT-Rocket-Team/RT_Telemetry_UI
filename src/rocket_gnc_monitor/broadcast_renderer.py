@@ -147,7 +147,7 @@ def compose(camera: QImage | None, view: FrameView, units: DisplayUnits, logo: Q
           units.unit("velocity"), "SIGNED · VERTICAL")
     gauge(painter, 264, "ALTITUDE", "—" if altitude is None else f"{altitude:,.0f}",
           units.unit("distance"), altitude_labels.get(view.altitude_datum, "DATUM UNKNOWN"))
-    source = f"{view.mission} TELEMETRY · {view.telemetry_source}"
+    source = f"{view.telemetry_source} · {view.mission} TELEMETRY"
     if view.telemetry_status == "stale":
         age = "" if view.telemetry_age_s is None else f" · {view.telemetry_age_s:.1f}s"
         source = f"STALE · {view.telemetry_source}{age}"
