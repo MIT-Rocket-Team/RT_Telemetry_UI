@@ -2,6 +2,17 @@
 
 Implementation date: 2026-11-03; local OBS follow-up: 2026-11-04, America/New_York. This report separates implemented behavior, locally measured evidence and equipment/account-dependent qualification. **No real YouTube stream was started.**
 
+## OpenRocket telemetry follow-up — 2026-11-17
+
+The broadcast received GS telemetry but suppressed the two gauges because the older Mission publisher left canonical barometric datum and ENU velocity empty. The native accepted sample already identified the standard OpenRocket source, which emits above-launch barometric height and signed upward velocity. Its launch-relative `txTimeUs` was also ignored by the broadcast clock. The adapter now consumes that existing contract automatically, while keeping unrelated physical/flight-computer scalar fields subject to their own definitions. Canonical declared datum/ENU values take precedence. The clock follows the selected delayed packet rather than device uptime or wall-time extrapolation; the operator clock display now agrees with Program.
+
+- Final focused broadcast/OBS checks: **50 passed**. New coverage includes exact received bytes through MissionStation → MissionNetwork → Base Video → rendered snapshot without overrides, negative/zero flight time, descending speed, canonical precedence, invalid timestamps, independently missing values, pause, delay and new-run history reset. The desktop CI matrix includes the new test file.
+- Broad suite: **935 passed, 1 skipped, 2 failed**. The failures were an existing dual-video recording timeout and the existing network port-collision cleanup race (`Event loop is closed`). Both passed on a targeted rerun (**2 passed**); no changes were made to those components. Final small adapter/UI refinements were covered by the subsequent 50-test focused run.
+- The user's actual archived run supplied **4,756** received observations with mapped altitude, speed and flight time. A rendered apogee frame showed **2,659 ft**, **−0.3 ft/s**, **T+00:00:12.5**. Local evidence: `build/broadcast-telemetry-fix/archived-mission-check.json` and `archived-mission-frame.png`.
+- Rebuilt macOS ARM64 app passed strict deep code-signature verification and packaged broadcast smoke: 1920×1080 raster/content, logo loaded, no renderer error, OBS presets exported. Installed executable and build executable hashes matched (`f16df60eeb47b549bf4bb2d4848dfc71842d972455f47f9869be31b678504fc4`). DMG SHA-256: `9856291c1dd6fc689dcef518d0df017b8da23d62f31dd8a10cce69e601730f0e`.
+- Replaced `/Applications/RocketGNCMonitor-v0a.app`, preserving the previous copy under `build/application-backups/20261117-134931-before-broadcast-telemetry-fix/`. Rejoined the existing simulation and restored the Flight scene, Away 1 digital camera, orientation inset and Best telemetry selection. OBS streaming and recording were inactive before replacement.
+- Native verification used the existing OpenRocket standard Mission run, briefly resumed and then paused again. Program visibly showed **GS3, 942 ft, −92.4 ft/s, T+00:00:32.8** with received simulation attitude. The paused Program retained **102 ft, −91.3 ft/s, T+00:00:41.0**, explicitly labelled SIMULATION · PAUSED. Program was left open. No OBS output was started.
+
 ## Source milestones
 
 - `5190c9f`: immutable broadcast models, branded renderer, bounded timing histories, shared frame subscriptions, canonical observation signal and per-vehicle receiver ranking. Focused core/media/network suite: 36 passed. The pre-existing settings shortcut test passed in isolation after its baseline timeout. A network-test helper was corrected to tolerate an unresolved peer identity while discovery is in flight.
@@ -32,8 +43,9 @@ The current transport decodes to 960×540 and the compositor scales that image i
 | --- | --- | --- |
 | Physical Balius identity | Existing operator-assigned canonical vehicle ID | Eligible for the Balius scope; provenance unchanged |
 | Physical Iris vehicle identity | Canonical publisher currently reports unknown | Unknown samples cannot populate Sustainer/Booster overlays |
-| Barometric altitude | Publisher can declare a datum, defaults to unknown | Suppressed unless the datum is declared or a per-run documented override is supplied |
-| Vertical speed | Native scalar m/s has no general vertical-vector contract | Suppressed unless explicitly qualified for the source |
+| Barometric altitude | Publisher datum, or OpenRocket standard Mission source contract | Automatic for a declared datum or standard Mission above-launch height; otherwise requires a documented override |
+| Vertical speed | Canonical ENU upward component, or OpenRocket standard Mission signed upward scalar | Automatic for those contracts; other native sources require qualification |
+| Simulation clock | OpenRocket Mission accepted packet's launch-relative `txTimeUs` | Automatic T−/T+ from the selected delayed observation; never device uptime or extrapolated wall time |
 | Physical attitude | No validated orientation in ordinary legacy packets | Orientation unavailable; gyro integrals are not substituted |
 | Simulation attitude | Existing validated, packet-associated extension | Supported where the accepted packet supplies it |
 | Native flight phases | Balius provisional / supported Zephyrus schema retained | State shown with existing schema semantics; missing milestones are not invented |

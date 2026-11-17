@@ -8,9 +8,38 @@ from typing import Any
 from .domain import finite
 from .network.observation import observation_to_sample
 from .rocket_pose import telemetry_pose
+from .zephyrus_states import ZEPHYRUS_STATE_SCHEMA
 
 EVENTS = ("LIFTOFF", "BURNOUT", "APOGEE", "DROGUE", "MAIN", "LANDING")
 SCENES = ("Standby", "Prelaunch", "Flight", "Recovery", "Replay", "End card")
+
+
+def _openrocket_mission_details(native, state, mode):
+    """Recognize the received Mission contract, not just a SIMULATION label."""
+    details = native.get("details") or {}
+    if not (
+        isinstance(details, dict)
+        and mode == "simulation"
+        and native.get("source") == "SIMULATION"
+        and details.get("mission") is True
+        and isinstance(details.get("packetId"), str)
+        and details["packetId"]
+        and state.get("schema") == ZEPHYRUS_STATE_SCHEMA
+    ):
+        return {}
+    return details
+
+
+def _mission_elapsed(details):
+    """MissionTelemetrySource/MissionRun txTimeUs is launch-relative, not uptime."""
+    stamp = details.get("txTimeUs")
+    if not isinstance(stamp, str):
+        return None
+    # Bound before conversion, including malformed/untrusted native metadata.
+    digits = stamp.removeprefix("-")
+    if len(stamp) > 20 or not digits.isascii() or not digits.isdigit():
+        return None
+    return int(stamp) / 1_000_000
 
 
 @dataclass(frozen=True)
@@ -93,19 +122,25 @@ class BroadcastTelemetry:
         if not finite(arrival):
             return None
         values = payload["values"]
+        state = values.get("state") or {}
+        native = values.get("native") if values.get("native_schema") == "rocket-telemetry.sample/1" else {}
+        native = native if isinstance(native, dict) else {}
+        mission = _openrocket_mission_details(native, state, scope.mode)
+        mission_elapsed = _mission_elapsed(mission)
+        # OpenRocket's standard observation source emits barometer height above
+        # launch and signed velocityUp(). Older publishers preserve that contract
+        # in native Mission metadata but leave the canonical datum/vector empty.
+        # FC-generated samples use a different basis and are not qualified here.
+        standard_mission = bool(mission) and state.get("basis") == "flight-events"
         baro = values.get("baro_altitude") or {}
         datum = {"agl_launch": "above_launch", "msl": "msl", "wgs84_ellipsoid": "ellipsoid"}.get(
-            baro.get("datum"), datum_override
+            baro.get("datum"), "above_launch" if standard_mission else datum_override
         )
         altitude = baro.get("value_m") if datum != "unknown" and finite(baro.get("value_m")) else None
-        # The existing schema's ENU field is null. Only an explicitly qualified
-        # native scalar adapter may supply vertical speed; never guess a schema.
-        native = values.get("native") or {}
-        speed = (
-            native.get("velocity")
-            if vertical_contract and values.get("native_schema") == "rocket-telemetry.sample/1"
-            else None
-        )
+        vector = values.get("velocity_enu_m_s")
+        speed = vector[2] if isinstance(vector, list) and len(vector) == 3 else None
+        if not finite(speed) and (standard_mission or vertical_contract):
+            speed = native.get("velocity")
         speed = speed if finite(speed) else None
         age = event.get("source_age_ms")
         age = max(0, age / 1000) if finite(age) else None
@@ -117,7 +152,6 @@ class BroadcastTelemetry:
         )
         sample.details["network_source_mode"] = scope.mode
         sample.details["network_station"] = info["station"]
-        state = values.get("state") or {}
         name = state.get("name") if isinstance(state.get("name"), str) else "UNKNOWN"
         return cls(
             payload["observation_id"],
@@ -135,6 +169,7 @@ class BroadcastTelemetry:
             name,
             state.get("schema", "provisional"),
             telemetry_pose(sample, fresh=True, state_name=name),
+            mission_elapsed,
         )
 
 

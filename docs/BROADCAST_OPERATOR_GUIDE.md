@@ -24,8 +24,9 @@ The two gauges use the application's existing **Settings → Display units** pre
 
 A valid packet does not automatically qualify every display field:
 
+- OpenRocket **standard Mission** observations populate above-launch altitude and signed vertical speed automatically. Their received `flight-events` source contract supplies those meanings, including with older publishers that leave the canonical datum/vector empty. No field override is needed. Flight-computer-generated samples retain their separate field qualification rules.
 - Barometric altitude requires its declared datum, or a documented per-run override in **Timing and telemetry**.
-- The native scalar velocity requires an explicit source contract establishing signed vertical m/s. Otherwise vertical speed is blank.
+- Canonical ENU velocity supplies its upward component automatically. Other native scalar velocity requires an explicit source contract establishing signed vertical m/s. Otherwise vertical speed is blank.
 - Physical Iris observations currently have unknown vehicle attribution; picking Sustainer/Booster in the panel does not manufacture attribution.
 - Attitude requires validated orientation or the existing packet-associated simulation extension. Integrated gyro values never rotate the rocket model.
 - Motor/chute state is never inferred from an attractive animation or from arbitrary phase labels.
@@ -45,6 +46,8 @@ The 0.5 second default is **uncalibrated receive-time buffering**, visibly marke
 Unsupported delay/memory combinations are rejected. Missing calibrated paths remain unavailable. Qualification requires connected source identities. A changed measured camera epoch or telemetry connection invalidates timing and returns Program to a slate. Mission/vehicle/source-mode changes also clear qualification. Recheck after changing devices, codec or network route even when its identity is unchanged. Saved measurements are reference preferences: calibration is unqualified again on the next app launch.
 
 ## Clock, timeline and replay
+
+OpenRocket Mission simulation uses the selected delayed packet's launch-relative `txTimeUs` automatically, with **SIMULATION PACKET TIME** as its basis. Negative time displays T−; zero and positive time display T+. This follows simulation speed and pauses, uses the same received sample as the gauges, and does not mistake device uptime or the latest publisher status time for flight time. A simulation label alone is not a clock mapping. The manual controls below apply when a source does not supply a mapped flight clock.
 
 **Clock and events** offers a relative planned countdown or an ISO scheduled time with explicit UTC offset, for example `2026-11-04T14:30:00-05:00`. Hold freezes a planned countdown; resume is explicit. Reaching planned zero displays AWAITING LAUNCH until actual liftoff is marked.
 

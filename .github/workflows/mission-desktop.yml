@@ -58,7 +58,7 @@ jobs:
           tests/test_mission_station.py tests/test_mission_lifecycle.py
           tests/test_mission_network.py tests/test_mission_video.py
           tests/test_network_runtime.py tests/test_network_ui_integration.py
-          tests/test_broadcast_core.py tests/test_broadcast_session.py
+          tests/test_broadcast_core.py tests/test_broadcast_session.py tests/test_broadcast_mission.py
           tests/test_broadcast_ui.py tests/test_broadcast_obs_presets.py tests/test_obs_bridge.py
           --basetemp=build/mission-desktop-fixtures
           --junitxml=build/mission-desktop.xml

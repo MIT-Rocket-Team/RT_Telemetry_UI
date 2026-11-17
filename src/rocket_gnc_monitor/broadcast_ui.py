@@ -240,7 +240,7 @@ class BroadcastPanel(QDialog):
     def build_timing(self):
         layout = self.page("Timing and telemetry")
         note = QLabel(
-            "All output uses one delayed timeline. Measure each path with a visible flash/time marker and matching telemetry event. Unknown fields stay blank. Changing timing returns Program to a slate and clears the event clock; take the camera again after buffering."
+            "OpenRocket standard Mission telemetry supplies altitude, vertical speed and the flight clock automatically. Overrides below are only for sources without declared field meanings. All output uses one delayed timeline. Measure each path with a visible flash/time marker and matching telemetry event. Unknown fields stay blank. Changing timing returns Program to a slate and clears the event clock; take the camera again after buffering."
         )
         note.setWordWrap(True)
         layout.addWidget(note)
@@ -275,7 +275,7 @@ class BroadcastPanel(QDialog):
         layout.addLayout(form)
         self.datum = self.combo(
             [
-                ("Unknown — suppress altitude", "unknown"),
+                ("Automatic — use source definition", "unknown"),
                 ("Above launch", "above_launch"),
                 ("Mean sea level", "msl"),
                 ("WGS84 ellipsoid", "ellipsoid"),
@@ -353,7 +353,7 @@ class BroadcastPanel(QDialog):
     def build_clock(self):
         layout = self.page("Clock and events")
         label = QLabel(
-            "Observed now means the real event happened now; it reaches Program after the common delay. On Program means the event is visible in the delayed frame now. Planned zero always waits for an actual liftoff mark."
+            "OpenRocket Mission uses received simulation time automatically. Manual clock controls apply when no source flight clock is available. Observed now means the real event happened now; it reaches Program after the common delay. On Program means the event is visible in the delayed frame now. Planned zero always waits for an actual liftoff mark."
         )
         label.setWordWrap(True)
         layout.addWidget(label)
@@ -563,6 +563,11 @@ class BroadcastPanel(QDialog):
                 combo.blockSignals(False)
         target = s.pause_time if s.paused and s.pause_time is not None else now - s.timing.delay
         elapsed, state, basis = s.clock.at(target)
+        presented = s.previous_snapshots.get(s.program if c.active else s.preview)
+        if presented is not None:
+            elapsed, state, basis = (
+                presented.view.mission_elapsed_s, presented.view.clock_state, presented.view.clock_basis
+            )
         from .broadcast_renderer import mission_clock
 
         self.clock_status.setText(mission_clock(elapsed, state) + " · " + basis)

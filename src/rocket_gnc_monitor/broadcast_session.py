@@ -276,6 +276,12 @@ class BroadcastSession:
         if self.scope.mode == "replay" and record and record.mission_elapsed is not None:
             elapsed, clock_state = record.mission_elapsed, "elapsed"
             clock_basis = "RECORDED FLIGHT CLOCK"
+        elif self.scope.mode == "simulation" and record and record.mission_elapsed is not None:
+            # Follow the selected delayed observation, including accelerated or
+            # paused simulation. Never advance this clock using wall time.
+            elapsed = record.mission_elapsed
+            clock_state = "countdown" if elapsed < 0 else "elapsed"
+            clock_basis = "SIMULATION PACKET TIME"
         source = self.sources.get(selection.main)
         missing = []
         if delay is None:
