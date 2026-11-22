@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt
 from rocket_gnc_monitor.controller import Controller
 from rocket_gnc_monitor.media import VideoWorker
 from rocket_gnc_monitor.recording import SessionReader
+from rocket_gnc_monitor.station_profile import StationProfile
 from rocket_gnc_monitor.station_workspace import StationWindow
 
 
@@ -32,6 +33,32 @@ def refresh(window):
 
 def choices(combo):
     return {combo.itemData(index) for index in range(combo.count())}
+
+
+@pytest.mark.parametrize("station", ["base", "away1"])
+def test_start_camera_click_survives_refresh(qtbot, tmp_path, monkeypatch, station):
+    from recorded_flight import video_fixture
+
+    fixture = video_fixture(tmp_path)
+    monkeypatch.setattr("rocket_gnc_monitor.controller.VideoWorker",
+                        lambda *args: VideoWorker("file", fixture))
+    window = StationWindow(tmp_path, profile=StationProfile(station=station, role="video"), auto_place=False)
+    qtbot.addWidget(window)
+    window.show()
+    try:
+        window.task_done("cameras", [("USB receiver", "0")])
+        digital = window.video_widgets["digital"]
+        digital["camera"].setCurrentIndex(digital["camera"].findData("0"))
+        refresh(window)
+        start = digital["start"]
+        assert start.isEnabled() and start.isVisible()
+        qtbot.mousePress(start, Qt.MouseButton.LeftButton)
+        refresh(window)
+        qtbot.mouseRelease(start, Qt.MouseButton.LeftButton)
+        assert window.controller.video_config == ("camera", "0")
+        qtbot.waitUntil(lambda: window.last_pixmaps["digital"] is not None, timeout=6000)
+    finally:
+        window.close()
 
 
 def test_video_computer_opens_distinct_cameras_without_unlocking_rocket(qtbot, tmp_path, monkeypatch):

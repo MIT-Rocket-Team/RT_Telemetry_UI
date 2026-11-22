@@ -22,6 +22,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import ifaddr
 from aiohttp import ClientSession, ClientTimeout, WSMsgType, web
 from zeroconf import ServiceBrowser, ServiceInfo, Zeroconf
 
@@ -30,6 +31,7 @@ from ..recording import ObservationArchive
 from .configuration import ConfigurationLedger, validate_configuration_request
 from .journal import EventJournal
 from .protocol import (
+    mission_title,
     EVENT_KINDS,
     MAX_MESSAGE,
     MAX_REQUEST,
@@ -140,6 +142,11 @@ class NetworkRuntime:
         self.vehicle_mode = profile.vehicle
         self.source_mode = _setting(settings, "network_source_mode", "live")
         require(self.source_mode in {"live", "replay", "simulation"}, "Invalid network source mode")
+        self.publisher_id = _setting(settings, "mission_publisher", None)
+        self.published_title = None
+        if (self.mission_id and self.station == "launch" and self.source_mode == "live"
+                and self.publisher_id == self.node_id):
+            self.published_title = mission_title(_setting(settings, "mission_title", ""))
         self.accept_source_modes = _setting(settings, "network_accept_source_modes", ["live"])
         require(isinstance(self.accept_source_modes, list) and set(self.accept_source_modes) <= {"live", "replay", "simulation"}, "Invalid accepted source modes")
         self.bind_host = _setting(settings, "network_bind_host", "0.0.0.0")
@@ -189,7 +196,8 @@ class NetworkRuntime:
                 "mission_id": self.mission_id, "generated_mono_ms": self.mono_ms()}
 
     def _info(self):
-        return {**self._common(), "station": self.station, "role": self.role,
+        return {**self._common(), **({"published_mission_title": self.published_title} if self.published_title else {}),
+            "station": self.station, "role": self.role,
             "vehicle_mode": self.vehicle_mode, "source_mode": self.source_mode, "app_version": __version__,
             "supported_event_kinds": list(EVENT_KINDS),
             "clock": {"quality": "unknown", "uncertainty_ms": None},
@@ -597,6 +605,13 @@ class NetworkRuntime:
             require(self.mission_id is not None and subscribe["mission_id"] == self.mission_id == request_value["mission_id"], "Mission identity mismatch")
             require(isinstance(subscribe["accept_source_modes"], list) and self.source_mode in subscribe["accept_source_modes"], "Source mode is not accepted")
             client_identity = (request_value["node_id"], request_value["boot_id"])
+            port = subscribe.get("listener_port")
+            if self.published_title and port is not None and request.remote:
+                require(type(port) is int and 1 <= port <= 65535, "Invalid station listener port")
+                peer_host = ipaddress.ip_address(request.remote)
+                host = f"[{peer_host}]" if peer_host.version == 6 else str(peer_host)
+                address = f"http://{host}:{port}"
+                self._connect_peer(address, expected_node=client_identity[0])
             resume = subscribe["resume"]
             barrier = self._journal.head
             history, reason = None, None
@@ -683,6 +698,11 @@ class NetworkRuntime:
                         addresses.add(addr[0].split("%")[0])
             except OSError:
                 pass
+            # A Mac or Windows laptop may have a station Ethernet adapter as well as Wi-Fi.
+            for adapter in await asyncio.to_thread(ifaddr.get_adapters):
+                for address in adapter.ips:
+                    if isinstance(address.ip, str) and not ipaddress.ip_address(address.ip).is_loopback:
+                        addresses.add(address.ip)
             # Route lookup chooses an interface; UDP connect does not transmit a packet.
             try:
                 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
@@ -695,6 +715,7 @@ class NetworkRuntime:
         self._zc = Zeroconf()
         alias = f"rt-{'base' if self.station == 'launch' else self.station}-{self.role}"
         properties = {"p": "1", "node": self.node_id, "station": self.station, "role": self.role, "api": "/api/v1"}
+        properties["boot"] = self.boot_id
         self._service_info = ServiceInfo(SERVICE_TYPE, f"{alias}.{SERVICE_TYPE}",
             addresses=[ipaddress.ip_address(address).packed for address in addresses], port=self.port,
             properties=properties, server=f"{alias}-{self.node_id[:8]}.local.")
@@ -721,7 +742,7 @@ class NetworkRuntime:
             host = f"[{address.replace('%', '%25')}]" if ":" in address else address
             self._connect_peer(f"http://{host}:{info.port}", hint)
 
-    def _connect_peer(self, address, hint=None, force=False):
+    def _connect_peer(self, address, hint=None, force=False, expected_node=None):
         if address == self.local_endpoint:
             return
         if len(self._peer_tasks) >= 128 and address not in self._peer_tasks:
@@ -736,7 +757,7 @@ class NetworkRuntime:
             if not force:
                 return
             existing.cancel()
-        self._peer_tasks[address] = asyncio.create_task(self._peer_loop(address))
+        self._peer_tasks[address] = asyncio.create_task(self._peer_loop(address, expected_node))
 
     def _refresh_public(self):
         now = time.monotonic()
@@ -756,22 +777,25 @@ class NetworkRuntime:
                 peer["error"] = "Conflicting station slot or node identity; choose a unique station/installation"
         with self._lock:
             # Merge multiple addresses only when node, boot and full station identity agree.
+            def rank(row):
+                return (row["state"] in {"ONLINE", "SYNCHRONIZING", "MISMATCH"},
+                        row.get("_last_seen", 0))
             merged = {}
             for peer in self._peers.values():
                 info = peer.get("info")
                 key = (info["node_id"], info["boot_id"], info["station"], info["role"], info["mission_id"]) if info else peer["endpoint"]
-                if key not in merged or peer.get("_last_seen", 0) > merged[key].get("_last_seen", 0):
+                if key not in merged or rank(peer) > rank(merged[key]):
                     merged[key] = copy.deepcopy(peer)
             self._public_peers = list(merged.values())
 
     async def _get_peer_info(self, address):
-        async with self._session.get(address + "/api/v1/info") as response:
+        async with self._session.get(address + "/api/v1/info", allow_redirects=False) as response:
             if response.status != 200:
                 raise OSError(f"HTTP {response.status} from station identity endpoint")
             raw = await response.content.read(MAX_MESSAGE + 1)
             return validate_info(loads(raw))
 
-    async def _peer_loop(self, address):
+    async def _peer_loop(self, address, expected_node=None):
         peer = self._peers.setdefault(address, {"endpoint": address, "state": "CONNECTING", "error": "", "info": None,
             "status": None, "latest": [], "streams": [], "rtt_ms": None, "rtt_metric": "application_round_trip",
             "_heartbeat_received": None, "_last_seen": time.monotonic(), "cursor": None,
@@ -781,9 +805,12 @@ class NetworkRuntime:
         while not self._stop_event.is_set():
             healthy_start = None
             try:
-                peer.update(state="CONNECTING", error="", synchronized=False)
+                if peer["state"] != "MISMATCH":
+                    peer.update(state="CONNECTING", error="", synchronized=False)
                 self._refresh_public()
                 info = await self._get_peer_info(address)
+                if expected_node and info["node_id"] != expected_node:
+                    raise NetworkProtocolError(409, "identity_hint_mismatch", "Station listener identity changed")
                 peer["info"], peer["_last_seen"] = info, time.monotonic()
                 hint = self._hints.get(address)
                 if hint and any(hint.get(key) != str(info[field]) for key, field in (("node", "node_id"), ("station", "station"), ("role", "role"))):
@@ -818,7 +845,11 @@ class NetworkRuntime:
                     continue
                 peer.update(state="INCOMPATIBLE" if exc.code == "incompatible" else "CONFLICT" if exc.code == "identity_hint_mismatch" else "MISMATCH" if exc.code in {"mission_mismatch", "mode_mismatch"} else "ERROR", error=exc.message, synchronized=False)
                 self._refresh_public()
-                return  # Configuration or discovery evidence must change before retry.
+                # A station may publish or leave a mission after its service was discovered.
+                if exc.code == "mission_mismatch":
+                    await asyncio.sleep(3)
+                    continue
+                return
             except Exception as exc:  # noqa: BLE001 - keep the peer retry worker alive across transport failures
                 if healthy_start is not None and time.monotonic() - healthy_start >= 30:
                     failures = 0
@@ -845,6 +876,8 @@ class NetworkRuntime:
             validate_info(hello["payload"])
             require(all(hello["payload"][field] == info[field] for field in ("node_id", "boot_id", "mission_id", "station", "role", "vehicle_mode", "source_mode")), "Hello identity changed")
             await ws.send_str(dumps(self._envelope("subscribe", {"client_node_id": self.node_id, "client_boot_id": self.boot_id,
+                **({"listener_port": self.port} if self.publisher_id == info["node_id"]
+                   and info.get("published_mission_title") else {}),
                 "mission_id": self.mission_id, "accept_source_modes": self.accept_source_modes, "resume": peer["cursor"]})))
             peer.update(state="SYNCHRONIZING", synchronized=False)
             barrier = None

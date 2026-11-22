@@ -14,7 +14,7 @@ from PySide6.QtCore import QObject, QTimer, Signal
 
 from .network import NetworkRuntime
 from .network.observation import observation_from_sample, observation_to_sample
-from .network.protocol import endpoint
+from .network.protocol import endpoint, mission_title
 from .domain import finite
 
 
@@ -46,6 +46,8 @@ def network_configuration(data_dir, **overrides):
                   network_discovery=True, peers=[], mission_id=None)
     try:
         saved = json.loads((Path(data_dir) / "station-network.json").read_text())
+        if isinstance(saved.get("recent_mission"), dict):
+            config["recent_mission"] = saved["recent_mission"]
         config.update({key: saved[key] for key in config if key != "mission_id" and key in saved})
     except (OSError, ValueError, TypeError):
         pass
@@ -169,6 +171,50 @@ class StationNetworkBridge(QObject):
         self.timer.stop()
         self.stop()
 
+    def publish_mission(self, title, *, reopen=False):
+        if self.window.profile.station != "base" or self.controller.mode != "LIVE":
+            raise ValueError("Create a live mission on a Base station")
+        if self.config["mission_id"]:
+            raise ValueError("Leave your current mission first")
+        title = mission_title(title)
+        node = self.runtime.node_id
+        recent = self.config.get("recent_mission", {})
+        if reopen:
+            if (recent.get("publisher") != node or recent.get("title") != title
+                    or recent.get("vehicle") != self.window.profile.vehicle):
+                raise ValueError("This Base did not publish that mission")
+            mission = str(uuid.UUID(recent["id"]))
+        else:
+            mission = str(uuid.uuid4())
+        self.apply({**self.config, "mission_id": mission, "mission_publisher": node, "mission_title": title,
+                    "receive_source_mode": "live", "accept_replay": False, "simulation_streams": []})
+
+    def leave_mission(self):
+        self.apply({**self.config, "mission_id": None, "mission_publisher": None, "mission_title": None,
+                    "receive_source_mode": "live", "accept_replay": False, "simulation_streams": []})
+
+    def published_missions(self):
+        """Reachable live Base publishers, keyed independently of title or adapter."""
+        missions = {}
+        for peer in self.runtime.peers_snapshot():
+            info = peer.get("info") or {}
+            title = info.get("published_mission_title")
+            if (not title or not info.get("mission_id") or info.get("station") != "launch"
+                    or info.get("source_mode") != "live" or peer.get("conflict")
+                    or peer["state"] not in {"MISMATCH", "ONLINE", "SYNCHRONIZING"}
+                    or time.monotonic() - peer.get("_last_seen", 0) > 10):
+                continue
+            missions[(info["mission_id"], info["node_id"])] = peer
+        return missions
+
+    def join_publication(self, key):
+        peer = self.published_missions().get(key)
+        if peer is None:
+            raise ValueError("Base is no longer reachable. Wait for it to reappear.")
+        if self.controller.mode != "LIVE" or self.config["mission_id"]:
+            raise ValueError("Join from Live mode after leaving your current mission")
+        self.join_peer(peer)
+
     def join_peer(self, peer):
         """Joining a simulation is explicit and does not change local hardware mode."""
         info = peer.get("info") or {}
@@ -179,13 +225,18 @@ class StationNetworkBridge(QObject):
             raise ValueError("Open Telemetry UI in Base mode to receive this simulation")
         if mode not in ("live", "simulation", "replay") or not info.get("mission_id"):
             raise ValueError("The selected station has no joinable mission")
+        if self.window.profile.station != "base" and (info.get("station") != "launch"
+                or mode != "live" or not info.get("published_mission_title")):
+            raise ValueError("Choose a mission published by Base")
+        title = info.get("published_mission_title") if info.get("station") == "launch" and mode == "live" else None
         streams = validate_simulation_streams(info.get("simulation", {}).get("streams", [])) if mode == "simulation" else []
         config = {**self.config, "mission_id": info["mission_id"],
                   "receive_source_mode": mode, "accept_replay": mode == "replay",
+                  "mission_title": title, "mission_publisher": info["node_id"] if title else None,
                   "simulation_streams": streams,
                   "peers": list(dict.fromkeys([*self.config["peers"], peer["endpoint"]]))}
         self.apply(config)
-        if self.window.profile.role == "telemetry" and info.get("role") == "telem":
+        if self.window.profile.station == "base" and info.get("station") != "launch" and self.window.profile.role == "telemetry" and info.get("role") == "telem":
             self.select_source(info["node_id"])
 
     def _default_source(self, config):
@@ -234,6 +285,11 @@ class StationNetworkBridge(QObject):
         # Deliberately never restore a previous mission merely by restarting.
         path = self.controller.data_dir / "station-network.json"
         persisted = {key: config[key] for key in ("network_bind_host", "network_port", "network_discovery", "peers")}
+        if config.get("mission_title") and config["mission_id"]:
+            config["recent_mission"] = dict(id=config["mission_id"], title=config["mission_title"],
+                                            publisher=config["mission_publisher"], vehicle=self.window.profile.vehicle)
+        if config.get("recent_mission"):
+            persisted["recent_mission"] = config["recent_mission"]
         path.write_text(json.dumps(persisted, indent=2) + "\n")
         self.stop()
         self.config = config
@@ -606,7 +662,7 @@ class StationNetworkBridge(QObject):
         mission = self.config["mission_id"]
         online = sum(p["state"] == "ONLINE" and not p.get("conflict") for p in self.peers)
         return self.error or self.runtime.error or self.runtime.archive_status.get("error") or (
-            f"Network: {self.runtime.state} · {online} peers · " + (f"{self.config.get('receive_source_mode', 'live').upper()} mission {mission[:8]}" if mission else "choose a mission")
+            f"Network: {self.runtime.state} · {online} peers · " + (f"{self.config.get('receive_source_mode', 'live').upper()} mission {self.config.get('mission_title') or mission[:8]}" if mission else "choose a mission")
         )
 
 

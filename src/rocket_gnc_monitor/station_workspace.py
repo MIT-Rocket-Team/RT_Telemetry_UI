@@ -199,11 +199,11 @@ class StationWindow(InstrumentWindow):
 
     def refresh_network_status(self):
         if not self.station_network:
-            self.workspace_network.setText("Network…")
+            self.workspace_network.setText("Missions…")
             return
         runtime = self.station_network.runtime
         count = sum(p["state"] == "ONLINE" and not p.get("conflict") for p in self.station_network.peers)
-        self.workspace_network.setText(f"Network · {count}" if runtime.mission_id else "Join network…")
+        self.workspace_network.setText(f"Missions · {count}" if runtime.mission_id else "Missions…")
         self.workspace_network.setToolTip(self.station_network.summary())
         if self.telemetry_source is not None:
             from .network_ui import refresh_source_selector
@@ -275,7 +275,7 @@ class StationWindow(InstrumentWindow):
             heading.addWidget(widget)
             widget.show()
         self.workspace_settings = button("Settings…", self.open_settings)
-        self.workspace_network = button("Network…", self.open_station_network)
+        self.workspace_network = button("Missions…", self.open_station_network)
         heading.addWidget(self.workspace_network)
         heading.addWidget(self.workspace_settings)
         if self.profile.station == 'base' and self.profile.role == 'video':
@@ -421,7 +421,7 @@ class StationWindow(InstrumentWindow):
                 if key != "log":
                     action.setVisible(False)
         view_menu.addAction("Arrange station displays", self.arrange_displays)
-        view_menu.addAction("Station network…", self.open_station_network)
+        view_menu.addAction("Missions…", self.open_station_network)
         if self.profile.station == 'base' and self.profile.role == 'video':
             self.broadcast_action = view_menu.addAction("Broadcast controls…", self.open_broadcast)
             self.broadcast_action.setShortcut("Ctrl+Shift+B")
@@ -1139,6 +1139,10 @@ class StationWindow(InstrumentWindow):
         self.activateWindow()
         self.cards["flight3d"].setFocus()
 
+    def video_inputs_available(self):
+        # Station USB video receivers work independently of the telemetry board.
+        return self.controller.mode != "REPLAY"
+
     def start_camera(self, stream="digital"):
         # The video computer has USB receivers, but no telemetry PCB (board diagram).
         if self.controller.mode == "REPLAY":
@@ -1378,13 +1382,6 @@ class StationWindow(InstrumentWindow):
         self.network_panel.refresh()
         if self.iris_links is not None:
             self.iris_links.refresh()
-        for stream, widgets in self.video_widgets.items():
-            state = c.video_streams[stream]
-            available = c.mode != "REPLAY" and not (state.config or state.reserved_cameras)
-            widgets["start"].setEnabled(available and bool(widgets["camera"].currentData()))
-            widgets["file"].setEnabled(c.mode != "REPLAY")
-            widgets["start"].setToolTip("Start this USB video receiver independently of telemetry USB")
-            widgets["file"].setToolTip("Open a local video source")
         if c.mode != "REPLAY" and any(s.worker and s.worker.last_frame for s in c.video_streams.values()):
             self.record_button.setEnabled(True)
             self.legacy_actions["log"].setEnabled(True)

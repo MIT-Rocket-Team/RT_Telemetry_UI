@@ -1,6 +1,6 @@
 # Build and distribution
 
-Run commands from the repository root. Telemetry UI is version `1.0.0`. The application keeps the `RocketGNCMonitor-v0a` executable name and macOS bundle identifier `edu.mit.rocketteam.gncmonitor.v0a` so existing Dock shortcuts and preferences continue to work. Saved-file and network formats are unchanged.
+Run commands from the repository root. Telemetry UI is version `1.1.0`. The application keeps the `RocketGNCMonitor-v0a` executable name and macOS bundle identifier `edu.mit.rocketteam.gncmonitor.v0a` so existing Dock shortcuts and preferences continue to work. Saved-file and network formats are unchanged.
 
 ## Build prerequisites
 

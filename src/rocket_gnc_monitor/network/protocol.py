@@ -118,6 +118,12 @@ def endpoint(value):
     return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
 
 
+def mission_title(value):
+    require(isinstance(value, str) and 1 <= len(value.strip()) <= 64 and value.isprintable(),
+            "Enter a mission title of 1–64 printable characters")
+    return value.strip()
+
+
 def validate_info(value):
     obj(value, ("protocol", "node_id", "boot_id", "mission_id", "generated_mono_ms", "station", "role",
                 "vehicle_mode", "source_mode", "app_version", "supported_event_kinds", "capabilities", "limits"))
@@ -128,6 +134,11 @@ def validate_info(value):
     for name in ("node_id", "boot_id"):
         uuid_text(value[name])
     uuid_text(value["mission_id"], nullable=True)
+    if "published_mission_title" in value:
+        title = value["published_mission_title"]
+        require(mission_title(title) == title, "Invalid published mission title")
+        require(value["station"] == "launch" and value["source_mode"] == "live" and value["mission_id"],
+                "Only a live Base can publish a named mission")
     counter(value["generated_mono_ms"])
     require(value["station"] in STATIONS and value["role"] in {"telem", "video"}, "Invalid logical station slot")
     require(value["vehicle_mode"] in {"balius", "iris"}, "Invalid vehicle mode")

@@ -23,7 +23,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 VENDOR = ROOT / "vendor"
 APP_NAME = "RocketGNCMonitor-v0a"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 
 def process_architecture():

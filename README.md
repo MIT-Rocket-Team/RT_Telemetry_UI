@@ -1,6 +1,6 @@
 # RT Telemetry UI
 
-The MIT Rocket Team's native **Telemetry UI v1.0.0** for macOS, Windows, and Linux x86-64. This repository contains the application, tests, runtime resources, hardware references, and build scripts. The `RocketGNCMonitor-v0a` executable name, saved-file formats, and preferences identity remain compatible with earlier releases.
+The MIT Rocket Team's native **Telemetry UI v1.1.0** for macOS, Windows, and Linux x86-64. This repository contains the application, tests, runtime resources, hardware references, and build scripts. The `RocketGNCMonitor-v0a` executable name, saved-file formats, and preferences identity remain compatible with earlier releases.
 
 ## Station workspaces
 

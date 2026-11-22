@@ -42,7 +42,7 @@ exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name=app_name,
 collection = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name=app_name)
 if sys.platform == "darwin":
     app = BUNDLE(collection, name=app_name + ".app", icon=str(root / "build" / "icon.icns"), bundle_identifier="edu.mit.rocketteam.gncmonitor.v0a",
-        info_plist={"CFBundleShortVersionString": "1.0.0", "CFBundleVersion": "10000",
+        info_plist={"CFBundleShortVersionString": "1.1.0", "CFBundleVersion": "10100",
             "CFBundleDisplayName": "Rocket GNC Monitor v0a",
             "NSHighResolutionCapable": True,
             "NSCameraUsageDescription": "Display and record the connected rocket video receiver.",

@@ -305,7 +305,6 @@ class MainWindow(QMainWindow):
         self.last_pixmaps = {stream: None for stream in c.video_channels}
         self.disconnect_buttons = {}
         self.refresh_buttons = {}
-        self.live_controls = []
         self.pointer_controls = []
         self.metrics = {}
         self.last_pixmap = None
@@ -832,7 +831,8 @@ class MainWindow(QMainWindow):
             )
             for control in (start, file, stop):
                 row.addWidget(control)
-            self.live_controls.extend((start, file))
+            start.setToolTip("Start the selected USB video receiver")
+            file.setToolTip("Open a local video source")
             column.addLayout(row)
             middle.addWidget(panel, 1)
             self.video_widgets[stream] = dict(
@@ -1338,6 +1338,9 @@ class MainWindow(QMainWindow):
         if stream == "digital":
             self.last_pixmap = None
         self.video_widgets[stream]["image"].setText(f"{self.controller.video_labels[stream].upper()} · NO VIDEO")
+
+    def video_inputs_available(self):
+        return self.controller.mode != "REPLAY" and self.controller.ground_connected
 
     def start_camera(self, stream="digital"):
         self.controller.require_ground_station()
@@ -1858,11 +1861,6 @@ class MainWindow(QMainWindow):
         )
         self.control_readiness.setText(readiness)
         self.control_readiness.setStyleSheet(f"color: {COLORS['accent' if live_ready else 'gold']};")
-        for control in self.live_controls:
-            control.setEnabled(live_ready)
-            control.setToolTip(
-                "" if live_ready else "Connect the ground station in Live mode to unlock this control."
-            )
         for control in self.pointer_controls:
             control.setEnabled(pointer_ready and (not c.pointer_pending or c.virtual_pointer is not None))
             control.setToolTip("" if pointer_ready else "Connect the antenna pointer.")
@@ -2065,12 +2063,9 @@ class MainWindow(QMainWindow):
             widgets["status"].setToolTip(state)
             busy = bool(channel.config or channel.reserved_cameras)
             widgets["camera"].setEnabled(c.mode != "REPLAY" and not busy)
-            widgets["start"].setEnabled(
-                c.mode != "REPLAY"
-                and c.ground_connected
-                and bool(widgets["camera"].currentData())
-                and not busy
-            )
+            inputs_available = self.video_inputs_available()
+            widgets["file"].setEnabled(inputs_available)
+            widgets["start"].setEnabled(inputs_available and bool(widgets["camera"].currentData()) and not busy)
             widgets["stop"].setEnabled(bool(channel.config))
         self.attitude.refresh()
         if now - self.last_table > 0.5:

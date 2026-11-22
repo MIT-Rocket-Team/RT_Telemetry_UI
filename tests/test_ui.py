@@ -141,7 +141,8 @@ def test_live_panel_tracks_valid_packets_and_relocks_on_disconnect(qtbot, tmp_pa
     try:
         assert c.mode == "LIVE" and window.pages.currentIndex() == 0
         assert not window.record_button.isEnabled() and not window.point_button.isEnabled()
-        assert all(not control.isEnabled() for control in window.live_controls)
+        assert all(not widgets[key].isEnabled() for widgets in window.video_widgets.values()
+                   for key in ("start", "file"))
         assert "disconnected" in window.connection_headline.text()
         assert c.video is None
         c.connect("telemetry", os.ttyname(pairs[0][1]))
